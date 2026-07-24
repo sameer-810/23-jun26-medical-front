@@ -48,6 +48,8 @@ interface DraftLine {
   quantity: string;
   unitPrice: string;
   discount: string;
+  /** Whether `discount` is a flat ₹ amount or a % of the line's gross. */
+  discountMode: "amount" | "pct";
   taxRate: string;
 }
 const emptyLine = (): DraftLine => ({
@@ -60,6 +62,7 @@ const emptyLine = (): DraftLine => ({
   quantity: "1",
   unitPrice: "",
   discount: "",
+  discountMode: "amount",
   taxRate: "",
 });
 
@@ -239,6 +242,7 @@ export default function NewSaleScreen() {
             quantity: "1",
             unitPrice: String(b.mrp || sp.sellingPrice),
             discount: "",
+            discountMode: "amount",
             taxRate: String(sp.taxRatePct),
           };
           const blank = cur.findIndex((l) => !l.productId);
@@ -258,6 +262,7 @@ export default function NewSaleScreen() {
           quantity: "1",
           unitPrice: String(sp.sellingPrice),
           discount: "",
+          discountMode: "amount",
           taxRate: String(sp.taxRatePct),
         });
       }
@@ -288,7 +293,12 @@ export default function NewSaleScreen() {
     const unitPrice =
       l.unitPrice === "" ? p.sellingPrice * factor : Number(l.unitPrice) || 0;
     const gross = unitPrice * qty;
-    const discount = Number(l.discount) || 0;
+    // A % discount is of this line's gross; a flat one is the rupee value typed.
+    const discountInput = Number(l.discount) || 0;
+    const discount =
+      l.discountMode === "pct"
+        ? (gross * Math.min(discountInput, 100)) / 100
+        : discountInput;
     const taxable = Math.max(gross - discount, 0);
     const rate = l.taxRate === "" ? p.taxRatePct : Number(l.taxRate) || 0;
     const tax = (taxable * rate) / 100;
@@ -347,7 +357,14 @@ export default function NewSaleScreen() {
       unit: l.unit || undefined,
       quantity: Number(l.quantity),
       unitPrice: l.unitPrice === "" ? undefined : Number(l.unitPrice),
-      discountAmount: l.discount === "" ? undefined : Number(l.discount),
+      discountAmount:
+        l.discountMode === "amount" && l.discount !== ""
+          ? Number(l.discount)
+          : undefined,
+      discountPct:
+        l.discountMode === "pct" && l.discount !== ""
+          ? Number(l.discount)
+          : undefined,
       taxRatePct: l.taxRate === "" ? undefined : Number(l.taxRate),
     }));
 
@@ -609,11 +626,54 @@ export default function NewSaleScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <TextField
-                      label="Discount ₹"
+                      label={
+                        line.discountMode === "pct"
+                          ? "Discount %"
+                          : "Discount ₹"
+                      }
                       value={line.discount}
                       onChangeText={(v) => setLine(i, { discount: v })}
                       keyboardType="decimal-pad"
                       placeholder="0"
+                      // Show the rupees a % works out to, so it's never a mystery.
+                      hint={
+                        line.discountMode === "pct" && Number(line.discount) > 0
+                          ? `= ${money(calc(line).discount)} off`
+                          : undefined
+                      }
+                      trailing={
+                        <View style={styles.discToggle}>
+                          {(["amount", "pct"] as const).map((m) => {
+                            const active = line.discountMode === m;
+                            return (
+                              <Pressable
+                                key={m}
+                                onPress={() => setLine(i, { discountMode: m })}
+                                accessibilityLabel={
+                                  m === "amount"
+                                    ? "Discount in rupees"
+                                    : "Discount in percent"
+                                }
+                                style={[
+                                  styles.discToggleBtn,
+                                  active && styles.discToggleBtnOn,
+                                ]}
+                              >
+                                <Text
+                                  variant="label-sm"
+                                  style={{
+                                    color: active
+                                      ? "#FFFFFF"
+                                      : palette.text.tertiary,
+                                  }}
+                                >
+                                  {m === "amount" ? "₹" : "%"}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      }
                     />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -760,6 +820,21 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: radius.full,
     backgroundColor: palette.teal[50],
+  },
+  discToggle: {
+    flexDirection: "row",
+    borderRadius: radius.sm,
+    overflow: "hidden",
+    backgroundColor: palette.ink[100],
+  },
+  discToggleBtn: {
+    width: 24,
+    height: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  discToggleBtnOn: {
+    backgroundColor: palette.teal[600],
   },
   addRow: {
     flexDirection: "row",
