@@ -219,6 +219,12 @@ const styles = StyleSheet.create({
     // Fixed-width column (width set inline per collapsed state); must NOT flex-grow
     // or it fights the explicit width and fills half the screen when collapsed.
     flexShrink: 0,
+    // Fill the drawer's height so the nav ScrollView (flex:1) has a bounded
+    // parent. Without this it worked on web (the drawer gave it height) but
+    // collapsed to zero on native — the nav list vanished and the footer rode
+    // up under the brand. height:"100%" fills vertically without touching the
+    // inline width, so the permanent drawer stays fixed-width.
+    height: "100%",
     backgroundColor: palette.surface.primary,
     borderRightWidth: 1,
     borderRightColor: palette.border.default,
