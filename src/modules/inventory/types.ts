@@ -229,9 +229,9 @@ export interface Paginated<T> {
 /** One extracted value plus how much we trust it. */
 export interface OcrField<T = string | number | null> {
   value: T;
-  /** "high" = two independent reads agreed AND the rules passed. */
+  /** "high" = the value passed the rule checks; "low" = a rule flagged it. */
   confidence: "high" | "low";
-  /** The rival reading, when the two passes disagreed. */
+  /** A rival reading to suggest, when we have one. */
   alternative: T | null;
   reason: string | null;
 }

@@ -327,8 +327,8 @@ export default function ScanBillScreen() {
                 Reading the bill…
               </Text>
               <Text variant="caption" tone="tertiary">
-                Two independent passes to cross-check every batch and expiry.
-                Usually under 10 seconds.
+                Reading every product, batch, expiry and price. Usually under 10
+                seconds.
               </Text>
             </VStack>
           </HStack>
@@ -371,8 +371,9 @@ export default function ScanBillScreen() {
               </HStack>
               {bill.stats.needsReview > 0 && (
                 <Text variant="caption" tone="tertiary">
-                  Amber lines are where our two reads disagreed — check those
-                  before saving. Everything else was confirmed twice.
+                  Amber lines have something to check — a batch or expiry that
+                  looks off, or a product we couldn&apos;t match. Confirm those
+                  before saving.
                 </Text>
               )}
             </VStack>
