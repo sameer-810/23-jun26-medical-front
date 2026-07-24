@@ -11,7 +11,7 @@ import { TextField } from "@shared/ui";
  * A React Native TextField bound to react-hook-form.
  *
  * This is the RN-idiomatic way to use react-hook-form: RN's TextInput has no DOM
- * ref, so the web `register()` path (as the SAAD CARGO web app uses) doesn't
+ * ref, so the web `register()` path  doesn't
  * apply — the official answer is a controlled input powered by `useController`.
  * The RHF docs specifically recommend wrapping it once, here, so every form gets
  * value/onBlur/error wiring for free and screens stay declarative.
