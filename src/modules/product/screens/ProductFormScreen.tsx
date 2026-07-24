@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { View, Pressable, Switch, Platform, Alert } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { useForm, useWatch, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Trash2 } from "lucide-react-native";
 import {
   useProduct,
@@ -12,19 +14,13 @@ import {
   useCreateCategory,
   useCreateBrand,
 } from "@modules/product/hooks/useProducts";
+import { productSchema } from "@modules/product/product.validation";
 import { PackUnit, ScheduleDrug } from "@modules/product/types";
 import { apiErrorMessage } from "@api/apiClient";
+import { ControlledTextField } from "@shared/form/ControlledTextField";
+import { ControlledSelect } from "@shared/form/ControlledSelect";
 import { palette, radius } from "@shared/designSystem";
-import {
-  Screen,
-  Text,
-  VStack,
-  HStack,
-  Card,
-  Button,
-  TextField,
-  Select,
-} from "@shared/ui";
+import { Screen, Text, VStack, HStack, Card, Button } from "@shared/ui";
 import { PacksEditor } from "@modules/product/components/PacksEditor";
 
 const SCHEDULES: { value: ScheduleDrug; label: string }[] = [
@@ -64,51 +60,56 @@ export default function ProductFormScreen() {
   const removeMut = useRemoveProduct();
   const mut = editing ? updateMut : createMut;
 
-  const [f, setF] = useState({
-    name: "",
-    sku: "",
-    barcode: "",
-    saltComposition: "",
-    categoryId: null as string | null,
-    brandId: null as string | null,
-    baseUnit: "pcs",
-    packs: [] as PackUnit[],
-    sellingPrice: "",
-    mrp: "",
-    taxRatePct: "",
-    hsnCode: "",
-    reorderLevel: "",
-    prescriptionRequired: false,
-    scheduleDrug: "" as ScheduleDrug,
+  // One form holds every value — text, numbers, dropdowns, switch and packs —
+  // so the edit screen populates with a single reset() and nothing side-syncs.
+  const { control, handleSubmit, reset } = useForm({
+    resolver: zodResolver(productSchema),
+    mode: "onTouched",
+    defaultValues: {
+      name: "",
+      sku: "",
+      barcode: "",
+      saltComposition: "",
+      baseUnit: "pcs",
+      sellingPrice: "",
+      mrp: "",
+      taxRatePct: "",
+      hsnCode: "",
+      reorderLevel: "",
+      categoryId: null as string | null,
+      brandId: null as string | null,
+      scheduleDrug: "" as string,
+      prescriptionRequired: false,
+      packs: [] as PackUnit[],
+    },
   });
+  // PacksEditor needs the live base unit as it's typed. useWatch (not watch())
+  // is the render-safe, React-Compiler-compatible way to subscribe to a field.
+  const baseUnit = useWatch({ control, name: "baseUnit" });
 
   useEffect(() => {
     if (product) {
-      setF({
+      reset({
         name: product.name,
         sku: product.sku,
         barcode: product.barcode,
         saltComposition: product.saltComposition || "",
-        categoryId: product.categoryId,
-        brandId: product.brandId,
         baseUnit: product.baseUnit,
-        packs: product.packs,
         sellingPrice: String(product.sellingPrice),
         mrp: String(product.mrp),
         taxRatePct: String(product.taxRatePct),
         hsnCode: product.hsnCode,
         reorderLevel: String(product.reorderLevel),
-        prescriptionRequired: product.prescriptionRequired,
+        categoryId: product.categoryId,
+        brandId: product.brandId,
         scheduleDrug: product.scheduleDrug,
+        prescriptionRequired: product.prescriptionRequired,
+        packs: product.packs,
       });
     }
-  }, [product]);
+  }, [product, reset]);
 
-  const set = (k: keyof typeof f) => (v: string) =>
-    setF((s) => ({ ...s, [k]: v }));
-
-  const submit = () => {
-    if (!f.name.trim()) return;
+  const submit = handleSubmit((f) => {
     const payload = {
       name: f.name.trim(),
       sku: f.sku.trim() || undefined,
@@ -124,10 +125,10 @@ export default function ProductFormScreen() {
       hsnCode: f.hsnCode.trim(),
       reorderLevel: f.reorderLevel === "" ? undefined : Number(f.reorderLevel),
       prescriptionRequired: f.prescriptionRequired,
-      scheduleDrug: f.scheduleDrug,
+      scheduleDrug: f.scheduleDrug as ScheduleDrug,
     };
     mut.mutate(payload as never, { onSuccess: () => navigation.goBack() });
-  };
+  });
 
   const categoryOptions = (categories || []).map((c) => ({
     value: c.id,
@@ -168,27 +169,27 @@ export default function ProductFormScreen() {
       {/* Identity */}
       <Card style={{ marginBottom: 16 }}>
         <VStack gap={16}>
-          <TextField
+          <ControlledTextField
+            control={control}
+            name="name"
             label="Product name"
-            value={f.name}
-            onChangeText={set("name")}
             placeholder="Amoxicillin 500mg"
           />
           <HStack gap={12}>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="sku"
                 label="SKU"
-                value={f.sku}
-                onChangeText={set("sku")}
                 placeholder="Auto-generated"
                 autoCapitalize="characters"
               />
             </View>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="barcode"
                 label="Barcode"
-                value={f.barcode}
-                onChangeText={set("barcode")}
                 placeholder="EAN / UPC"
                 keyboardType="number-pad"
               />
@@ -196,28 +197,28 @@ export default function ProductFormScreen() {
           </HStack>
           {/* Staff search by molecule as often as by brand ("something with
               pantoprazole"), and substitutes are chosen on the salt. */}
-          <TextField
+          <ControlledTextField
+            control={control}
+            name="saltComposition"
             label="Salt / composition"
-            value={f.saltComposition}
-            onChangeText={set("saltComposition")}
             placeholder="e.g. Paracetamol 500mg + Caffeine 30mg"
           />
-          <Select
+          <ControlledSelect
+            control={control}
+            name="categoryId"
             label="Category"
-            value={f.categoryId}
             options={categoryOptions}
-            onChange={(v) => setF((s) => ({ ...s, categoryId: v }))}
             onCreate={async (label) => {
               const cat = await createCategory.mutateAsync(label);
               return { value: cat.id, label: cat.name };
             }}
             allowClear
           />
-          <Select
+          <ControlledSelect
+            control={control}
+            name="brandId"
             label="Brand"
-            value={f.brandId}
             options={brandOptions}
-            onChange={(v) => setF((s) => ({ ...s, brandId: v }))}
             onCreate={async (label) => {
               const b = await createBrand.mutateAsync(label);
               return { value: b.id, label: b.name };
@@ -233,16 +234,22 @@ export default function ProductFormScreen() {
       </Text>
       <Card style={{ marginBottom: 16 }}>
         <VStack gap={16}>
-          <TextField
+          <ControlledTextField
+            control={control}
+            name="baseUnit"
             label="Base unit"
-            value={f.baseUnit}
-            onChangeText={set("baseUnit")}
             placeholder="tablet / pcs / ml"
           />
-          <PacksEditor
-            baseUnit={f.baseUnit}
-            packs={f.packs}
-            onChange={(packs) => setF((s) => ({ ...s, packs }))}
+          <Controller
+            control={control}
+            name="packs"
+            render={({ field }) => (
+              <PacksEditor
+                baseUnit={baseUnit}
+                packs={field.value}
+                onChange={field.onChange}
+              />
+            )}
           />
         </VStack>
       </Card>
@@ -255,19 +262,19 @@ export default function ProductFormScreen() {
         <VStack gap={16}>
           <HStack gap={12}>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="sellingPrice"
                 label="Selling price (₹)"
-                value={f.sellingPrice}
-                onChangeText={set("sellingPrice")}
                 keyboardType="decimal-pad"
                 placeholder="0.00"
               />
             </View>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="mrp"
                 label="MRP (₹)"
-                value={f.mrp}
-                onChangeText={set("mrp")}
                 keyboardType="decimal-pad"
                 placeholder="0.00"
               />
@@ -275,27 +282,27 @@ export default function ProductFormScreen() {
           </HStack>
           <HStack gap={12}>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="taxRatePct"
                 label="GST %"
-                value={f.taxRatePct}
-                onChangeText={set("taxRatePct")}
                 keyboardType="decimal-pad"
                 placeholder="from settings"
               />
             </View>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="hsnCode"
                 label="HSN code"
-                value={f.hsnCode}
-                onChangeText={set("hsnCode")}
                 placeholder="3004"
               />
             </View>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="reorderLevel"
                 label="Reorder level"
-                value={f.reorderLevel}
-                onChangeText={set("reorderLevel")}
                 keyboardType="number-pad"
                 placeholder="from settings"
               />
@@ -319,22 +326,27 @@ export default function ProductFormScreen() {
                 Warn at point of sale (Rx / Schedule drugs).
               </Text>
             </VStack>
-            <Switch
-              value={f.prescriptionRequired}
-              onValueChange={(v) =>
-                setF((s) => ({ ...s, prescriptionRequired: v }))
-              }
-              trackColor={{ true: palette.teal[500], false: palette.ink[200] }}
-              thumbColor="#FFFFFF"
+            <Controller
+              control={control}
+              name="prescriptionRequired"
+              render={({ field }) => (
+                <Switch
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  trackColor={{
+                    true: palette.teal[500],
+                    false: palette.ink[200],
+                  }}
+                  thumbColor="#FFFFFF"
+                />
+              )}
             />
           </HStack>
-          <Select
+          <ControlledSelect
+            control={control}
+            name="scheduleDrug"
             label="Drug schedule"
-            value={f.scheduleDrug}
             options={SCHEDULES.map((s) => ({ value: s.value, label: s.label }))}
-            onChange={(v) =>
-              setF((s) => ({ ...s, scheduleDrug: (v || "") as ScheduleDrug }))
-            }
           />
         </VStack>
       </Card>

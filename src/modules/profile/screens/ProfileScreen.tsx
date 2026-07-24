@@ -1,12 +1,19 @@
-import React, { useState } from "react";
+import React from "react";
 import { View } from "react-native";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { User, Phone, Lock, LogOut, Building2 } from "lucide-react-native";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import {
   useUpdateProfile,
   useChangePassword,
 } from "@modules/profile/hooks/useProfile";
+import {
+  profileDetailsSchema,
+  changePasswordSchema,
+} from "@modules/profile/profile.validation";
 import { apiErrorMessage } from "@api/apiClient";
+import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
@@ -16,7 +23,6 @@ import {
   Card,
   Avatar,
   Button,
-  TextField,
   StatusChip,
 } from "@shared/ui";
 
@@ -27,12 +33,32 @@ export default function ProfileScreen() {
   const profileMut = useUpdateProfile();
   const pwdMut = useChangePassword();
 
-  const [firstName, setFirst] = useState(user?.firstName || "");
-  const [lastName, setLast] = useState(user?.lastName || "");
-  const [phone, setPhone] = useState(user?.phone || "");
+  // Two independent forms on one screen — profile details and a password change.
+  const detailsForm = useForm({
+    resolver: zodResolver(profileDetailsSchema),
+    mode: "onTouched",
+    defaultValues: {
+      firstName: user?.firstName || "",
+      lastName: user?.lastName || "",
+      phone: user?.phone || "",
+    },
+  });
+  const passwordForm = useForm({
+    resolver: zodResolver(changePasswordSchema),
+    mode: "onTouched",
+    defaultValues: { currentPassword: "", newPassword: "" },
+  });
 
-  const [currentPassword, setCur] = useState("");
-  const [newPassword, setNew] = useState("");
+  const saveProfile = detailsForm.handleSubmit((f) =>
+    profileMut.mutate({
+      firstName: f.firstName.trim(),
+      lastName: f.lastName.trim(),
+      phone: f.phone.trim() || undefined,
+    }),
+  );
+  const changePassword = passwordForm.handleSubmit((f) =>
+    pwdMut.mutate(f, { onSuccess: () => passwordForm.reset() }),
+  );
 
   return (
     <Screen
@@ -96,7 +122,9 @@ export default function ProfileScreen() {
           )}
           <HStack gap={12}>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={detailsForm.control}
+                name="firstName"
                 label="First name"
                 leading={
                   <User
@@ -105,19 +133,19 @@ export default function ProfileScreen() {
                     strokeWidth={1.8}
                   />
                 }
-                value={firstName}
-                onChangeText={setFirst}
               />
             </View>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={detailsForm.control}
+                name="lastName"
                 label="Last name"
-                value={lastName}
-                onChangeText={setLast}
               />
             </View>
           </HStack>
-          <TextField
+          <ControlledTextField
+            control={detailsForm.control}
+            name="phone"
             label="Phone"
             leading={
               <Phone
@@ -126,21 +154,13 @@ export default function ProfileScreen() {
                 strokeWidth={1.8}
               />
             }
-            value={phone}
-            onChangeText={setPhone}
             keyboardType="phone-pad"
           />
           <Button
             label="Save profile"
             variant="secondary"
             loading={profileMut.isPending}
-            onPress={() =>
-              profileMut.mutate({
-                firstName: firstName.trim(),
-                lastName: lastName.trim(),
-                phone: phone.trim() || undefined,
-              })
-            }
+            onPress={saveProfile}
           />
         </VStack>
       </Card>
@@ -161,40 +181,29 @@ export default function ProfileScreen() {
               Password changed.
             </Text>
           )}
-          <TextField
+          <ControlledTextField
+            control={passwordForm.control}
+            name="currentPassword"
             label="Current password"
             leading={
               <Lock size={18} color={palette.text.tertiary} strokeWidth={1.8} />
             }
-            value={currentPassword}
-            onChangeText={setCur}
             secureTextEntry
           />
-          <TextField
+          <ControlledTextField
+            control={passwordForm.control}
+            name="newPassword"
             label="New password"
             leading={
               <Lock size={18} color={palette.text.tertiary} strokeWidth={1.8} />
             }
-            value={newPassword}
-            onChangeText={setNew}
             secureTextEntry
           />
           <Button
             label="Update password"
             variant="secondary"
-            disabled={currentPassword.length < 1 || newPassword.length < 6}
             loading={pwdMut.isPending}
-            onPress={() =>
-              pwdMut.mutate(
-                { currentPassword, newPassword },
-                {
-                  onSuccess: () => {
-                    setCur("");
-                    setNew("");
-                  },
-                },
-              )
-            }
+            onPress={changePassword}
           />
         </VStack>
       </Card>

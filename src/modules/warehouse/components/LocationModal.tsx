@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { View, Modal, Pressable, StyleSheet } from "react-native";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { X } from "lucide-react-native";
 import {
   useCreateLocation,
@@ -10,9 +12,11 @@ import {
   LocationType,
   TYPE_LABELS,
 } from "@modules/warehouse/types";
+import { locationSchema } from "@modules/warehouse/location.validation";
 import { apiErrorMessage } from "@api/apiClient";
+import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius, shadows } from "@shared/designSystem";
-import { Text, VStack, HStack, Button, TextField, ChipsRow } from "@shared/ui";
+import { Text, VStack, HStack, Button, ChipsRow } from "@shared/ui";
 
 type Mode = "createWarehouse" | "createChild" | "rename";
 
@@ -27,15 +31,22 @@ interface Props {
 export function LocationModal({ visible, mode, parent, node, onClose }: Props) {
   const createMut = useCreateLocation();
   const renameMut = useRenameLocation();
-  const [name, setName] = useState("");
-  const [type, setType] = useState<LocationType>("zone");
-
   const allowed = parent?.allowedChildTypes || [];
 
+  const { control, handleSubmit, reset } = useForm({
+    resolver: zodResolver(locationSchema),
+    mode: "onTouched",
+    defaultValues: { name: "", type: "zone", mode },
+  });
+
+  // Reopening the modal reseeds it — a single reset(), so no side setState.
   useEffect(() => {
     if (visible) {
-      setName(mode === "rename" ? node?.name || "" : "");
-      if (mode === "createChild" && allowed.length) setType(allowed[0]);
+      reset({
+        name: mode === "rename" ? node?.name || "" : "",
+        type: mode === "createChild" && allowed.length ? allowed[0] : "zone",
+        mode,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
@@ -50,26 +61,28 @@ export function LocationModal({ visible, mode, parent, node, onClose }: Props) {
         ? "Rename location"
         : `Add to ${parent?.code}`;
 
-  const submit = () => {
+  const submit = handleSubmit((f) => {
+    const name = f.name.trim();
     if (mode === "rename") {
-      if (!name.trim() || !node) return;
-      renameMut.mutate(
-        { id: node.id, name: name.trim() },
-        { onSuccess: onClose },
-      );
+      if (!node) return;
+      renameMut.mutate({ id: node.id, name }, { onSuccess: onClose });
     } else if (mode === "createWarehouse") {
       createMut.mutate(
-        { type: "warehouse", name: name.trim() || undefined },
+        { type: "warehouse", name: name || undefined },
         { onSuccess: onClose },
       );
     } else {
       if (!parent) return;
       createMut.mutate(
-        { type, name: name.trim() || undefined, parentId: parent.id },
+        {
+          type: f.type as LocationType,
+          name: name || undefined,
+          parentId: parent.id,
+        },
         { onSuccess: onClose },
       );
     }
-  };
+  });
 
   return (
     <Modal
@@ -111,13 +124,19 @@ export function LocationModal({ visible, mode, parent, node, onClose }: Props) {
                 >
                   Type
                 </Text>
-                <ChipsRow
-                  chips={allowed.map((t) => ({
-                    key: t,
-                    label: TYPE_LABELS[t],
-                  }))}
-                  active={type}
-                  onChange={(k) => setType(k as LocationType)}
+                <Controller
+                  control={control}
+                  name="type"
+                  render={({ field }) => (
+                    <ChipsRow
+                      chips={allowed.map((t) => ({
+                        key: t,
+                        label: TYPE_LABELS[t],
+                      }))}
+                      active={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
                 />
               </View>
             )}
@@ -127,8 +146,10 @@ export function LocationModal({ visible, mode, parent, node, onClose }: Props) {
               </Text>
             )}
 
-            <TextField
-              label="Name (optional)"
+            <ControlledTextField
+              control={control}
+              name="name"
+              label={mode === "rename" ? "Name" : "Name (optional)"}
               placeholder={
                 mode === "createWarehouse"
                   ? "Main Warehouse"
@@ -136,8 +157,6 @@ export function LocationModal({ visible, mode, parent, node, onClose }: Props) {
                     ? node?.name
                     : "Auto-named if blank"
               }
-              value={name}
-              onChangeText={setName}
               onSubmitEditing={submit}
             />
 

@@ -1,12 +1,13 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Modal, Pressable, StyleSheet, ScrollView } from "react-native";
+import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { X, PackagePlus } from "lucide-react-native";
-import {
-  NewProductDraft,
-  draftIsValid,
-} from "@modules/inventory/productFromBill";
+import { NewProductDraft } from "@modules/inventory/productFromBill";
+import { quickProductSchema } from "@modules/inventory/quickProduct.validation";
+import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Text, VStack, HStack, Button, TextField } from "@shared/ui";
+import { Text, VStack, HStack, Button } from "@shared/ui";
 
 interface Props {
   visible: boolean;
@@ -40,10 +41,17 @@ export function QuickAddProduct({
   onCancel,
   onSave,
 }: Props) {
-  const [d, setD] = useState<NewProductDraft>(initial);
-  // Remount per open (keyed by caller) keeps this in step with `initial`.
-  const set = (patch: Partial<NewProductDraft>) =>
-    setD((cur) => ({ ...cur, ...patch }));
+  // The parent remounts this per open (keyed), so `initial` seeds the form once.
+  const { control, handleSubmit } = useForm({
+    resolver: zodResolver(quickProductSchema),
+    mode: "onTouched",
+    defaultValues: initial,
+  });
+  // Live values for the "1 strip = 15 tablets" helper line.
+  const [packUnit, packFactor, baseUnit] = useWatch({
+    control,
+    name: ["packUnit", "packFactor", "baseUnit"],
+  });
 
   return (
     <Modal
@@ -83,17 +91,17 @@ export function QuickAddProduct({
                 </Text>
               )}
 
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="name"
                 label="Product name"
-                value={d.name}
-                onChangeText={(v) => set({ name: v })}
                 placeholder="e.g. Amoxycillin 500mg Capsule"
               />
 
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="baseUnit"
                 label="Base unit — what you count stock in"
-                value={d.baseUnit}
-                onChangeText={(v) => set({ baseUnit: v })}
                 placeholder="tablet / capsule / ml"
                 autoCapitalize="none"
               />
@@ -107,53 +115,53 @@ export function QuickAddProduct({
                 </Text>
                 <HStack gap={10}>
                   <View style={{ flex: 1.2 }}>
-                    <TextField
-                      value={d.packUnit}
-                      onChangeText={(v) => set({ packUnit: v })}
+                    <ControlledTextField
+                      control={control}
+                      name="packUnit"
                       placeholder="strip"
                       autoCapitalize="none"
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <TextField
-                      value={d.packFactor}
-                      onChangeText={(v) => set({ packFactor: v })}
+                    <ControlledTextField
+                      control={control}
+                      name="packFactor"
                       placeholder="15"
                       keyboardType="number-pad"
                     />
                   </View>
                 </HStack>
                 <Text variant="caption" tone="tertiary">
-                  {d.packUnit.trim() && Number(d.packFactor) > 1
-                    ? `1 ${d.packUnit.trim()} = ${d.packFactor} ${d.baseUnit.trim() || "units"}`
-                    : `Leave blank if it's sold as single ${d.baseUnit.trim() || "units"}.`}
+                  {packUnit.trim() && Number(packFactor) > 1
+                    ? `1 ${packUnit.trim()} = ${packFactor} ${baseUnit.trim() || "units"}`
+                    : `Leave blank if it's sold as single ${baseUnit.trim() || "units"}.`}
                 </Text>
               </VStack>
 
               <HStack gap={10}>
                 <View style={{ flex: 1 }}>
-                  <TextField
+                  <ControlledTextField
+                    control={control}
+                    name="mrp"
                     label="MRP (₹)"
-                    value={d.mrp}
-                    onChangeText={(v) => set({ mrp: v })}
                     placeholder="0.00"
                     keyboardType="decimal-pad"
                   />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <TextField
+                  <ControlledTextField
+                    control={control}
+                    name="gstPct"
                     label="GST %"
-                    value={d.gstPct}
-                    onChangeText={(v) => set({ gstPct: v })}
                     placeholder="12"
                     keyboardType="decimal-pad"
                   />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <TextField
+                  <ControlledTextField
+                    control={control}
+                    name="hsnCode"
                     label="HSN"
-                    value={d.hsnCode}
-                    onChangeText={(v) => set({ hsnCode: v })}
                     placeholder="3004"
                     autoCapitalize="none"
                   />
@@ -183,8 +191,8 @@ export function QuickAddProduct({
               <View style={{ flex: 1.4 }}>
                 <Button
                   label={saving ? "Creating…" : "Create & use"}
-                  onPress={() => onSave(d)}
-                  disabled={saving || !draftIsValid(d)}
+                  onPress={handleSubmit((data) => onSave(data))}
+                  disabled={saving}
                 />
               </View>
             </HStack>

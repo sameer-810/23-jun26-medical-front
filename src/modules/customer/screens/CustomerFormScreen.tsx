@@ -1,23 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { View, Pressable } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, User, Phone, Mail } from "lucide-react-native";
 import {
   useCustomer,
   useCreateCustomer,
   useUpdateCustomer,
 } from "@modules/customer/hooks/useCustomers";
+import { customerSchema } from "@modules/customer/customer.validation";
 import { apiErrorMessage } from "@api/apiClient";
+import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import {
-  Screen,
-  Text,
-  VStack,
-  HStack,
-  Card,
-  Button,
-  TextField,
-} from "@shared/ui";
+import { Screen, Text, VStack, HStack, Card, Button } from "@shared/ui";
 
 export default function CustomerFormScreen() {
   const navigation = useNavigation<any>();
@@ -30,30 +26,25 @@ export default function CustomerFormScreen() {
   const updateMut = useUpdateCustomer(id || "");
   const mut = editing ? updateMut : createMut;
 
-  const [f, setF] = useState({
-    name: "",
-    mobile: "",
-    email: "",
-    address: "",
-    gstin: "",
+  const { control, handleSubmit, reset } = useForm({
+    resolver: zodResolver(customerSchema),
+    mode: "onTouched",
+    defaultValues: { name: "", mobile: "", email: "", address: "", gstin: "" },
   });
 
+  // Populate the form once the record loads (edit mode).
   useEffect(() => {
     if (customer)
-      setF({
+      reset({
         name: customer.name,
         mobile: customer.mobile,
         email: customer.email,
         address: customer.address,
         gstin: customer.gstin,
       });
-  }, [customer]);
+  }, [customer, reset]);
 
-  const set = (k: keyof typeof f) => (v: string) =>
-    setF((s) => ({ ...s, [k]: v }));
-
-  const submit = () => {
-    if (!f.name.trim()) return;
+  const submit = handleSubmit((f) =>
     mut.mutate(
       {
         name: f.name.trim(),
@@ -63,8 +54,8 @@ export default function CustomerFormScreen() {
         gstin: f.gstin.trim() || undefined,
       },
       { onSuccess: () => navigation.goBack() },
-    );
-  };
+    ),
+  );
 
   return (
     <Screen
@@ -94,16 +85,18 @@ export default function CustomerFormScreen() {
 
       <Card style={{ marginBottom: 16 }}>
         <VStack gap={16}>
-          <TextField
+          <ControlledTextField
+            control={control}
+            name="name"
             label="Name"
             leading={
               <User size={18} color={palette.text.tertiary} strokeWidth={1.8} />
             }
-            value={f.name}
-            onChangeText={set("name")}
             placeholder="Customer name"
           />
-          <TextField
+          <ControlledTextField
+            control={control}
+            name="mobile"
             label="Mobile"
             leading={
               <Phone
@@ -112,31 +105,29 @@ export default function CustomerFormScreen() {
                 strokeWidth={1.8}
               />
             }
-            value={f.mobile}
-            onChangeText={set("mobile")}
             keyboardType="phone-pad"
             placeholder="9876543210"
           />
-          <TextField
+          <ControlledTextField
+            control={control}
+            name="email"
             label="Email (optional)"
             leading={
               <Mail size={18} color={palette.text.tertiary} strokeWidth={1.8} />
             }
-            value={f.email}
-            onChangeText={set("email")}
             keyboardType="email-address"
             autoCapitalize="none"
           />
-          <TextField
+          <ControlledTextField
+            control={control}
+            name="address"
             label="Address (optional)"
-            value={f.address}
-            onChangeText={set("address")}
             placeholder="Address"
           />
-          <TextField
+          <ControlledTextField
+            control={control}
+            name="gstin"
             label="GSTIN (optional, for B2B)"
-            value={f.gstin}
-            onChangeText={set("gstin")}
             autoCapitalize="characters"
           />
         </VStack>

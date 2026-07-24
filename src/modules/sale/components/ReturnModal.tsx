@@ -23,11 +23,17 @@ export function ReturnModal({ visible, sale, onClose }: Props) {
     return Math.round((l.baseQuantity - l.returnedBaseQty) * 1000) / 1000;
   };
 
+  // Per-line check: you can't return more than was sold-and-not-yet-returned.
+  const overBy = (lineId: string) =>
+    (Number(qty[lineId]) || 0) > returnableOf(lineId);
+  const anyOver = sale.lines.some((l) => overBy(l.id));
+  const anyQty = sale.lines.some((l) => (Number(qty[l.id]) || 0) > 0);
+
   const submit = () => {
     const lines = sale.lines
       .map((l) => ({ lineId: l.id, baseQty: Number(qty[l.id]) || 0 }))
       .filter((l) => l.baseQty > 0);
-    if (!lines.length) return;
+    if (!lines.length || anyOver) return;
     mut.mutate(
       { saleId: sale.id, reason: reason.trim() || undefined, lines },
       { onSuccess: onClose },
@@ -78,7 +84,7 @@ export function ReturnModal({ visible, sale, onClose }: Props) {
                         Sold {l.baseQuantity} · returnable {returnable}
                       </Text>
                     </VStack>
-                    <View style={{ width: 90 }}>
+                    <View style={{ width: 100 }}>
                       <TextField
                         placeholder="0"
                         keyboardType="decimal-pad"
@@ -86,6 +92,7 @@ export function ReturnModal({ visible, sale, onClose }: Props) {
                         onChangeText={(v) =>
                           setQty((s) => ({ ...s, [l.id]: v }))
                         }
+                        error={overBy(l.id) ? `Max ${returnable}` : undefined}
                       />
                     </View>
                   </View>
@@ -103,10 +110,16 @@ export function ReturnModal({ visible, sale, onClose }: Props) {
             />
           </View>
 
+          {anyOver && (
+            <Text variant="caption" tone="danger" style={{ marginTop: 10 }}>
+              A return quantity is more than what was sold — fix the amber line.
+            </Text>
+          )}
           <Button
             label="Process return"
             style={{ marginTop: 16 }}
             loading={mut.isPending}
+            disabled={!anyQty || anyOver}
             onPress={submit}
           />
         </Pressable>

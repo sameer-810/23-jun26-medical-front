@@ -1,10 +1,14 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Pressable } from "react-native";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Mail } from "lucide-react-native";
 import { useForgotPassword } from "@modules/auth/hooks/useAuth";
+import { forgotPasswordSchema } from "@modules/auth/auth.validation";
 import { apiErrorMessage } from "@api/apiClient";
+import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Text, VStack, HStack, Button, TextField } from "@shared/ui";
+import { Text, VStack, HStack, Button } from "@shared/ui";
 import { AuthLayout } from "@modules/auth/components/AuthLayout";
 
 type Nav = { navigate: (s: string, p?: object) => void };
@@ -14,13 +18,14 @@ export default function ForgotPasswordScreen({
 }: {
   navigation: Nav;
 }) {
-  const [email, setEmail] = useState("");
   const mut = useForgotPassword();
+  const { control, handleSubmit, getValues } = useForm({
+    resolver: zodResolver(forgotPasswordSchema),
+    mode: "onTouched",
+    defaultValues: { email: "" },
+  });
 
-  const submit = () => {
-    if (!email) return;
-    mut.mutate({ email: email.trim() });
-  };
+  const submit = handleSubmit((d) => mut.mutate({ email: d.email.trim() }));
 
   return (
     <AuthLayout
@@ -44,7 +49,9 @@ export default function ForgotPasswordScreen({
           </View>
         )}
 
-        <TextField
+        <ControlledTextField
+          control={control}
+          name="email"
           label="Email"
           leading={
             <Mail size={18} color={palette.text.tertiary} strokeWidth={1.8} />
@@ -52,8 +59,6 @@ export default function ForgotPasswordScreen({
           placeholder="you@company.com"
           keyboardType="email-address"
           autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
         />
 
         <Button
@@ -68,7 +73,9 @@ export default function ForgotPasswordScreen({
             label="I have a code"
             variant="secondary"
             onPress={() =>
-              navigation.navigate("ResetPassword", { email: email.trim() })
+              navigation.navigate("ResetPassword", {
+                email: getValues("email").trim(),
+              })
             }
           />
         ) : null}

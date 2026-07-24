@@ -1,10 +1,14 @@
 import React, { useState } from "react";
 import { View, Pressable } from "react-native";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Building2, Mail, Lock, User, Eye, EyeOff } from "lucide-react-native";
 import { useSignup } from "@modules/auth/hooks/useAuth";
+import { signupSchema } from "@modules/auth/auth.validation";
 import { apiErrorMessage } from "@api/apiClient";
+import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Text, VStack, HStack, Button, TextField, ChipsRow } from "@shared/ui";
+import { Text, VStack, HStack, Button, ChipsRow } from "@shared/ui";
 import { AuthLayout } from "@modules/auth/components/AuthLayout";
 
 type Nav = { navigate: (s: string) => void };
@@ -20,26 +24,31 @@ const INDUSTRIES = [
 ];
 
 export default function SignupScreen({ navigation }: { navigation: Nav }) {
-  const [organizationName, setOrg] = useState("");
   const [industry, setIndustry] = useState("pharmacy");
-  const [firstName, setFirst] = useState("");
-  const [lastName, setLast] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const mut = useSignup();
+  const { control, handleSubmit } = useForm({
+    resolver: zodResolver(signupSchema),
+    mode: "onTouched",
+    defaultValues: {
+      organizationName: "",
+      firstName: "",
+      lastName: "",
+      email: "",
+      password: "",
+    },
+  });
 
-  const submit = () => {
-    if (!organizationName || !firstName || !email || !password) return;
+  const submit = handleSubmit((d) =>
     mut.mutate({
-      organizationName: organizationName.trim(),
+      organizationName: d.organizationName.trim(),
       industry,
-      firstName: firstName.trim(),
-      lastName: lastName.trim() || undefined,
-      email: email.trim(),
-      password,
-    });
-  };
+      firstName: d.firstName.trim(),
+      lastName: d.lastName.trim() || undefined,
+      email: d.email.trim(),
+      password: d.password,
+    }),
+  );
 
   return (
     <AuthLayout
@@ -55,7 +64,9 @@ export default function SignupScreen({ navigation }: { navigation: Nav }) {
           </View>
         )}
 
-        <TextField
+        <ControlledTextField
+          control={control}
+          name="organizationName"
           label="Company / Store name"
           leading={
             <Building2
@@ -65,8 +76,6 @@ export default function SignupScreen({ navigation }: { navigation: Nav }) {
             />
           }
           placeholder="Acme Pharmacy"
-          value={organizationName}
-          onChangeText={setOrg}
         />
 
         <View>
@@ -82,7 +91,9 @@ export default function SignupScreen({ navigation }: { navigation: Nav }) {
 
         <HStack gap={12}>
           <View style={{ flex: 1 }}>
-            <TextField
+            <ControlledTextField
+              control={control}
+              name="firstName"
               label="First name"
               leading={
                 <User
@@ -92,21 +103,21 @@ export default function SignupScreen({ navigation }: { navigation: Nav }) {
                 />
               }
               placeholder="Aisha"
-              value={firstName}
-              onChangeText={setFirst}
             />
           </View>
           <View style={{ flex: 1 }}>
-            <TextField
+            <ControlledTextField
+              control={control}
+              name="lastName"
               label="Last name"
               placeholder="Khan"
-              value={lastName}
-              onChangeText={setLast}
             />
           </View>
         </HStack>
 
-        <TextField
+        <ControlledTextField
+          control={control}
+          name="email"
           label="Email"
           leading={
             <Mail size={18} color={palette.text.tertiary} strokeWidth={1.8} />
@@ -114,18 +125,16 @@ export default function SignupScreen({ navigation }: { navigation: Nav }) {
           placeholder="you@company.com"
           keyboardType="email-address"
           autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
         />
-        <TextField
+        <ControlledTextField
+          control={control}
+          name="password"
           label="Password"
           leading={
             <Lock size={18} color={palette.text.tertiary} strokeWidth={1.8} />
           }
           placeholder="At least 6 characters"
           secureTextEntry={!show}
-          value={password}
-          onChangeText={setPassword}
           trailing={
             <Pressable hitSlop={10} onPress={() => setShow((s) => !s)}>
               {show ? (

@@ -1,10 +1,14 @@
 import React, { useState } from "react";
 import { View, Pressable } from "react-native";
 import { KeyRound, Lock, Eye, EyeOff } from "lucide-react-native";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useResetPassword } from "@modules/auth/hooks/useAuth";
+import { resetPasswordSchema } from "@modules/auth/auth.validation";
 import { apiErrorMessage } from "@api/apiClient";
+import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Text, VStack, HStack, Button, TextField } from "@shared/ui";
+import { Text, VStack, HStack, Button } from "@shared/ui";
 import { AuthLayout } from "@modules/auth/components/AuthLayout";
 
 type Nav = { navigate: (s: string) => void };
@@ -17,15 +21,17 @@ export default function ResetPasswordScreen({
   navigation: Nav;
   route: Route;
 }) {
-  const [token, setToken] = useState("");
-  const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const mut = useResetPassword();
+  const { control, handleSubmit } = useForm({
+    resolver: zodResolver(resetPasswordSchema),
+    mode: "onTouched",
+    defaultValues: { token: "", password: "" },
+  });
 
-  const submit = () => {
-    if (!token || !password) return;
-    mut.mutate({ token: token.trim(), password });
-  };
+  const submit = handleSubmit((d) =>
+    mut.mutate({ token: d.token.trim(), password: d.password }),
+  );
 
   return (
     <AuthLayout
@@ -52,7 +58,9 @@ export default function ResetPasswordScreen({
           </View>
         )}
 
-        <TextField
+        <ControlledTextField
+          control={control}
+          name="token"
           label="Reset code"
           leading={
             <KeyRound
@@ -63,18 +71,16 @@ export default function ResetPasswordScreen({
           }
           placeholder="6-digit code"
           keyboardType="number-pad"
-          value={token}
-          onChangeText={setToken}
         />
-        <TextField
+        <ControlledTextField
+          control={control}
+          name="password"
           label="New password"
           leading={
             <Lock size={18} color={palette.text.tertiary} strokeWidth={1.8} />
           }
           placeholder="At least 6 characters"
           secureTextEntry={!show}
-          value={password}
-          onChangeText={setPassword}
           trailing={
             <Pressable hitSlop={10} onPress={() => setShow((s) => !s)}>
               {show ? (

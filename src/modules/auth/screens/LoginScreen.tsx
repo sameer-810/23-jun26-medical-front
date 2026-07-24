@@ -1,24 +1,32 @@
 import React, { useState } from "react";
 import { View, Pressable } from "react-native";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react-native";
 import { useLogin } from "@modules/auth/hooks/useAuth";
+import { loginSchema } from "@modules/auth/auth.validation";
 import { apiErrorMessage } from "@api/apiClient";
+import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Text, VStack, HStack, Button, TextField } from "@shared/ui";
+import { Text, VStack, HStack, Button } from "@shared/ui";
 import { AuthLayout } from "@modules/auth/components/AuthLayout";
 
 type Nav = { navigate: (s: string) => void };
 
 export default function LoginScreen({ navigation }: { navigation: Nav }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const mut = useLogin();
+  // onTouched: validate a field once it's blurred, then keep it live — the same
+  // "don't scold mid-type" UX, now via the maintained standard library.
+  const { control, handleSubmit } = useForm({
+    resolver: zodResolver(loginSchema),
+    mode: "onTouched",
+    defaultValues: { email: "", password: "" },
+  });
 
-  const submit = () => {
-    if (!email || !password) return;
-    mut.mutate({ email: email.trim(), password });
-  };
+  const submit = handleSubmit((data) =>
+    mut.mutate({ email: data.email.trim(), password: data.password }),
+  );
 
   return (
     <AuthLayout
@@ -34,7 +42,9 @@ export default function LoginScreen({ navigation }: { navigation: Nav }) {
           </View>
         )}
 
-        <TextField
+        <ControlledTextField
+          control={control}
+          name="email"
           label="Email"
           leading={
             <Mail size={18} color={palette.text.tertiary} strokeWidth={1.8} />
@@ -42,19 +52,17 @@ export default function LoginScreen({ navigation }: { navigation: Nav }) {
           placeholder="you@company.com"
           keyboardType="email-address"
           autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
           onSubmitEditing={submit}
         />
-        <TextField
+        <ControlledTextField
+          control={control}
+          name="password"
           label="Password"
           leading={
             <Lock size={18} color={palette.text.tertiary} strokeWidth={1.8} />
           }
           placeholder="••••••••"
           secureTextEntry={!show}
-          value={password}
-          onChangeText={setPassword}
           onSubmitEditing={submit}
           trailing={
             <Pressable hitSlop={10} onPress={() => setShow((s) => !s)}>

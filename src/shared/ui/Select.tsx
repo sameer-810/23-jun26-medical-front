@@ -49,6 +49,10 @@ interface Props {
   onRequestCreate?: (query: string) => void;
   /** Noun for the create row, e.g. "product" -> `Add "X" as a new product`. */
   createNoun?: string;
+  /** Inline validation message — red border + caption, same as TextField. */
+  error?: string;
+  /** Helper text shown when there's no error. */
+  hint?: string;
 }
 
 // Never render more than this at once: a 100k-option list would lock the UI.
@@ -70,6 +74,8 @@ export function Select({
   selectedLabel,
   onRequestCreate,
   createNoun = "item",
+  error,
+  hint,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -134,7 +140,10 @@ export function Select({
           {label}
         </Text>
       )}
-      <Pressable onPress={() => setOpen(true)} style={styles.field}>
+      <Pressable
+        onPress={() => setOpen(true)}
+        style={[styles.field, error ? styles.fieldError : null]}
+      >
         <Text
           variant="body"
           tone={shownLabel ? "primary" : "tertiary"}
@@ -149,6 +158,15 @@ export function Select({
           strokeWidth={1.8}
         />
       </Pressable>
+      {error ? (
+        <Text variant="caption" tone="danger" style={{ marginTop: 6 }}>
+          {error}
+        </Text>
+      ) : hint ? (
+        <Text variant="caption" tone="tertiary" style={{ marginTop: 6 }}>
+          {hint}
+        </Text>
+      ) : null}
 
       <Modal
         visible={open}
@@ -320,6 +338,9 @@ const styles = StyleSheet.create({
     borderWidth: outline.width,
     borderColor: outline.color,
     backgroundColor: palette.surface.primary,
+  },
+  fieldError: {
+    borderColor: palette.danger.text,
   },
   requestCreate: {
     flexDirection: "row",

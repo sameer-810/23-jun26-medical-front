@@ -1,12 +1,16 @@
 import React, { useState } from "react";
 import { View, Pressable } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, User, Mail, Phone, Lock } from "lucide-react-native";
 import {
   useCreateUser,
   usePermissionCatalogue,
 } from "@modules/team/hooks/useTeam";
+import { addUserSchema } from "@modules/team/team.validation";
 import { apiErrorMessage } from "@api/apiClient";
+import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
@@ -15,7 +19,6 @@ import {
   HStack,
   Card,
   Button,
-  TextField,
   ChipsRow,
 } from "@shared/ui";
 import { PermissionEditor } from "@modules/team/components/PermissionEditor";
@@ -25,13 +28,19 @@ export default function AddUserScreen() {
   const { data: catalogue } = usePermissionCatalogue();
   const mut = useCreateUser();
 
-  const [firstName, setFirst] = useState("");
-  const [lastName, setLast] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
   const [roleLabel, setRoleLabel] = useState("");
   const [permissions, setPermissions] = useState<string[]>([]);
+  const { control, handleSubmit } = useForm({
+    resolver: zodResolver(addUserSchema),
+    mode: "onTouched",
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      password: "",
+    },
+  });
 
   const labelChips = (catalogue?.suggestedLabels || []).map((l) => ({
     key: l,
@@ -43,21 +52,20 @@ export default function AddUserScreen() {
       cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key],
     );
 
-  const submit = () => {
-    if (!firstName || !email || !password) return;
+  const submit = handleSubmit((f) =>
     mut.mutate(
       {
-        firstName: firstName.trim(),
-        lastName: lastName.trim() || undefined,
-        email: email.trim(),
-        phone: phone.trim() || undefined,
-        password,
+        firstName: f.firstName.trim(),
+        lastName: f.lastName.trim() || undefined,
+        email: f.email.trim(),
+        phone: f.phone.trim() || undefined,
+        password: f.password,
         roleLabel: roleLabel || undefined,
         permissions,
       },
       { onSuccess: () => navigation.goBack() },
-    );
-  };
+    ),
+  );
 
   return (
     <Screen
@@ -90,7 +98,9 @@ export default function AddUserScreen() {
         <VStack gap={16}>
           <HStack gap={12}>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="firstName"
                 label="First name"
                 leading={
                   <User
@@ -99,32 +109,32 @@ export default function AddUserScreen() {
                     strokeWidth={1.8}
                   />
                 }
-                value={firstName}
-                onChangeText={setFirst}
                 placeholder="Ravi"
               />
             </View>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="lastName"
                 label="Last name"
-                value={lastName}
-                onChangeText={setLast}
                 placeholder="Sharma"
               />
             </View>
           </HStack>
-          <TextField
+          <ControlledTextField
+            control={control}
+            name="email"
             label="Email"
             leading={
               <Mail size={18} color={palette.text.tertiary} strokeWidth={1.8} />
             }
-            value={email}
-            onChangeText={setEmail}
             placeholder="ravi@company.com"
             keyboardType="email-address"
             autoCapitalize="none"
           />
-          <TextField
+          <ControlledTextField
+            control={control}
+            name="phone"
             label="Phone (optional)"
             leading={
               <Phone
@@ -133,18 +143,16 @@ export default function AddUserScreen() {
                 strokeWidth={1.8}
               />
             }
-            value={phone}
-            onChangeText={setPhone}
             placeholder="+91…"
             keyboardType="phone-pad"
           />
-          <TextField
+          <ControlledTextField
+            control={control}
+            name="password"
             label="Temporary password"
             leading={
               <Lock size={18} color={palette.text.tertiary} strokeWidth={1.8} />
             }
-            value={password}
-            onChangeText={setPassword}
             placeholder="At least 6 characters"
             secureTextEntry
           />

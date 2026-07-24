@@ -1,12 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { View, Switch } from "react-native";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Building2, Receipt, BellRing } from "lucide-react-native";
 import {
   useSettings,
   useUpdateSettings,
 } from "@modules/settings/hooks/useSettings";
+import { settingsSchema } from "@modules/settings/settings.validation";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { apiErrorMessage } from "@api/apiClient";
+import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
@@ -15,41 +19,59 @@ import {
   HStack,
   Card,
   Button,
-  TextField,
   StatusChip,
 } from "@shared/ui";
+
+/** A themed on/off row bound to a react-hook-form boolean field. */
+function SwitchRow({ control, name }: { control: any; name: string }) {
+  return (
+    <Controller
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <Switch
+          value={field.value}
+          onValueChange={field.onChange}
+          trackColor={{ true: palette.teal[500], false: palette.ink[200] }}
+          thumbColor="#FFFFFF"
+        />
+      )}
+    />
+  );
+}
 
 export default function SettingsScreen() {
   const { data, isLoading, refetch, isRefetching } = useSettings();
   const mut = useUpdateSettings();
   const org = useAuthStore((s) => s.organization);
 
-  const [company, setCompany] = useState({
-    legalName: "",
-    addressLine1: "",
-    city: "",
-    state: "",
-    pincode: "",
-    phone: "",
-    email: "",
-    drugLicenseNo: "",
-    gstin: "",
-  });
-  const [tax, setTax] = useState({
-    enabled: true,
-    defaultRatePct: "12",
-    invoicePrefix: "INV",
-    priceIncludesTax: false,
-  });
-  const [channels, setChannels] = useState({
-    inApp: true,
-    email: false,
-    sms: false,
+  const { control, handleSubmit, reset } = useForm({
+    resolver: zodResolver(settingsSchema),
+    mode: "onTouched",
+    defaultValues: {
+      legalName: "",
+      addressLine1: "",
+      city: "",
+      state: "",
+      pincode: "",
+      phone: "",
+      email: "",
+      drugLicenseNo: "",
+      gstin: "",
+      taxEnabled: true,
+      defaultRatePct: "12",
+      invoicePrefix: "INV",
+      priceIncludesTax: false,
+      alertInApp: true,
+      alertEmail: false,
+      alertSms: false,
+    },
   });
 
+  // Populate the whole form once settings load — a single reset(), no side sync.
   useEffect(() => {
     if (data) {
-      setCompany({
+      reset({
         legalName: data.company.legalName,
         addressLine1: data.company.addressLine1,
         city: data.company.city,
@@ -59,31 +81,43 @@ export default function SettingsScreen() {
         email: data.company.email,
         drugLicenseNo: data.company.drugLicenseNo,
         gstin: data.company.gstin,
-      });
-      setTax({
-        enabled: data.tax.enabled,
+        taxEnabled: data.tax.enabled,
         defaultRatePct: String(data.tax.defaultRatePct),
         invoicePrefix: data.tax.invoicePrefix,
         priceIncludesTax: data.tax.priceIncludesTax,
+        alertInApp: data.alertChannels.inApp,
+        alertEmail: data.alertChannels.email,
+        alertSms: data.alertChannels.sms,
       });
-      setChannels(data.alertChannels);
     }
-  }, [data]);
+  }, [data, reset]);
 
-  const save = () =>
+  const save = handleSubmit((f) =>
     mut.mutate({
-      company,
-      tax: {
-        enabled: tax.enabled,
-        defaultRatePct: Number(tax.defaultRatePct) || 0,
-        invoicePrefix: tax.invoicePrefix,
-        priceIncludesTax: tax.priceIncludesTax,
+      company: {
+        legalName: f.legalName,
+        addressLine1: f.addressLine1,
+        city: f.city,
+        state: f.state,
+        pincode: f.pincode,
+        phone: f.phone,
+        email: f.email,
+        drugLicenseNo: f.drugLicenseNo,
+        gstin: f.gstin,
       },
-      alertChannels: channels,
-    });
-
-  const set = (k: keyof typeof company) => (v: string) =>
-    setCompany((c) => ({ ...c, [k]: v }));
+      tax: {
+        enabled: f.taxEnabled,
+        defaultRatePct: Number(f.defaultRatePct) || 0,
+        invoicePrefix: f.invoicePrefix,
+        priceIncludesTax: f.priceIncludesTax,
+      },
+      alertChannels: {
+        inApp: f.alertInApp,
+        email: f.alertEmail,
+        sms: f.alertSms,
+      },
+    }),
+  );
 
   return (
     <Screen
@@ -128,56 +162,52 @@ export default function SettingsScreen() {
       />
       <Card style={{ marginBottom: 24 }}>
         <VStack gap={16}>
-          <TextField
+          <ControlledTextField
+            control={control}
+            name="legalName"
             label="Legal name"
-            value={company.legalName}
-            onChangeText={set("legalName")}
             placeholder="Acme Pharmacy Pvt Ltd"
           />
-          <TextField
+          <ControlledTextField
+            control={control}
+            name="addressLine1"
             label="Address"
-            value={company.addressLine1}
-            onChangeText={set("addressLine1")}
             placeholder="Street, area"
           />
           <HStack gap={12}>
             <View style={{ flex: 1 }}>
-              <TextField
-                label="City"
-                value={company.city}
-                onChangeText={set("city")}
-              />
+              <ControlledTextField control={control} name="city" label="City" />
             </View>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="state"
                 label="State"
-                value={company.state}
-                onChangeText={set("state")}
               />
             </View>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="pincode"
                 label="PIN"
-                value={company.pincode}
-                onChangeText={set("pincode")}
                 keyboardType="number-pad"
               />
             </View>
           </HStack>
           <HStack gap={12}>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="phone"
                 label="Phone"
-                value={company.phone}
-                onChangeText={set("phone")}
                 keyboardType="phone-pad"
               />
             </View>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="email"
                 label="Email"
-                value={company.email}
-                onChangeText={set("email")}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
@@ -185,18 +215,18 @@ export default function SettingsScreen() {
           </HStack>
           <HStack gap={12} align="center">
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="drugLicenseNo"
                 label="Drug license no."
-                value={company.drugLicenseNo}
-                onChangeText={set("drugLicenseNo")}
                 placeholder="MH-PH-…"
               />
             </View>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="gstin"
                 label="GSTIN"
-                value={company.gstin}
-                onChangeText={set("gstin")}
                 autoCapitalize="characters"
               />
             </View>
@@ -216,31 +246,22 @@ export default function SettingsScreen() {
             <Text variant="label-lg" tone="primary">
               GST enabled
             </Text>
-            <Switch
-              value={tax.enabled}
-              onValueChange={(v) => setTax((t) => ({ ...t, enabled: v }))}
-              trackColor={{ true: palette.teal[500], false: palette.ink[200] }}
-              thumbColor="#FFFFFF"
-            />
+            <SwitchRow control={control} name="taxEnabled" />
           </HStack>
           <HStack gap={12}>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="defaultRatePct"
                 label="Default GST rate (%)"
-                value={tax.defaultRatePct}
-                onChangeText={(v) =>
-                  setTax((t) => ({ ...t, defaultRatePct: v }))
-                }
                 keyboardType="decimal-pad"
               />
             </View>
             <View style={{ flex: 1 }}>
-              <TextField
+              <ControlledTextField
+                control={control}
+                name="invoicePrefix"
                 label="Invoice prefix"
-                value={tax.invoicePrefix}
-                onChangeText={(v) =>
-                  setTax((t) => ({ ...t, invoicePrefix: v }))
-                }
                 autoCapitalize="characters"
               />
             </View>
@@ -254,14 +275,7 @@ export default function SettingsScreen() {
                 If on, selling prices are treated as tax-inclusive.
               </Text>
             </VStack>
-            <Switch
-              value={tax.priceIncludesTax}
-              onValueChange={(v) =>
-                setTax((t) => ({ ...t, priceIncludesTax: v }))
-              }
-              trackColor={{ true: palette.teal[500], false: palette.ink[200] }}
-              thumbColor="#FFFFFF"
-            />
+            <SwitchRow control={control} name="priceIncludesTax" />
           </HStack>
         </VStack>
       </Card>
@@ -279,24 +293,18 @@ export default function SettingsScreen() {
               <StatusChip key={d} label={`${d} days`} tone="info" />
             ))}
           </HStack>
-          {(["inApp", "email", "sms"] as const).map((ch) => (
-            <HStack key={ch} align="center" justify="space-between">
+          {(
+            [
+              ["alertInApp", "In-app alerts"],
+              ["alertEmail", "Email alerts"],
+              ["alertSms", "SMS alerts"],
+            ] as const
+          ).map(([name, label]) => (
+            <HStack key={name} align="center" justify="space-between">
               <Text variant="label-lg" tone="primary">
-                {ch === "inApp"
-                  ? "In-app alerts"
-                  : ch === "email"
-                    ? "Email alerts"
-                    : "SMS alerts"}
+                {label}
               </Text>
-              <Switch
-                value={channels[ch]}
-                onValueChange={(v) => setChannels((c) => ({ ...c, [ch]: v }))}
-                trackColor={{
-                  true: palette.teal[500],
-                  false: palette.ink[200],
-                }}
-                thumbColor="#FFFFFF"
-              />
+              <SwitchRow control={control} name={name} />
             </HStack>
           ))}
         </VStack>
