@@ -49,6 +49,16 @@ const linking = {
           ResetPassword: "reset-password",
         },
       },
+      // Platform console (superadmin) — its own URL space under /admin.
+      Admin: {
+        path: "admin",
+        screens: {
+          AdminLogin: "login",
+          AdminDashboard: "",
+          AdminPharmacyDetail: "pharmacies/:id",
+          AdminCreatePharmacy: "new",
+        },
+      },
       App: {
         screens: {
           Dashboard: "dashboard",

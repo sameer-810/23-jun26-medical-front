@@ -9,6 +9,7 @@ import { useAuthStore } from "@shared/store/useAuthStore";
 import { palette } from "@shared/designSystem";
 import AuthNavigator from "@navigation/AuthNavigator";
 import AppNavigator from "@navigation/AppNavigator";
+import AdminNavigator from "@navigation/AdminNavigator";
 
 const Stack = createNativeStackNavigator();
 
@@ -44,6 +45,9 @@ export default function RootNavigator() {
       ) : (
         <Stack.Screen name="App" component={AppNavigator} />
       )}
+      {/* Platform console — always reachable at /admin, gated by its own
+          (separate) admin session regardless of the tenant auth state above. */}
+      <Stack.Screen name="Admin" component={AdminNavigator} />
     </Stack.Navigator>
   );
 }
