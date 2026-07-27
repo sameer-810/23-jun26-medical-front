@@ -1,5 +1,5 @@
 /**
- * MedStock app icons — generated from an original, on-brand vector mark.
+ * Plusveda app icons — generated from an original, on-brand vector mark.
  *
  * The mark: a white medicine carton bearing a deep-teal medical cross, with a
  * second carton stacked behind it — i.e. "medical supplies in stock". Set on
@@ -91,7 +91,7 @@ async function png(svg, out, size = SIZE) {
 
 async function main() {
   fs.mkdirSync("assets/brand", { recursive: true });
-  console.log("Generating MedStock icons…");
+  console.log("Generating Plusveda icons…");
   await png(iconSvg, "assets/icon.png");
   await png(adaptiveSvg, "assets/adaptive-icon.png");
   await png(badgeSvg, "assets/splash-icon.png");

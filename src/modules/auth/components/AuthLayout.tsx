@@ -53,7 +53,7 @@ export function AuthLayout({ title, subtitle, children }: Props) {
                 <Activity size={24} color="#FFFFFF" strokeWidth={2.4} />
               </View>
               <Text variant="h2" tone="inverse">
-                MedStock
+                Plusveda
               </Text>
             </HStack>
 
@@ -108,7 +108,7 @@ export function AuthLayout({ title, subtitle, children }: Props) {
                       <Activity size={20} color="#FFFFFF" strokeWidth={2.4} />
                     </View>
                     <Text variant="h3" tone="primary">
-                      MedStock
+                      Plusveda
                     </Text>
                   </HStack>
                 )}

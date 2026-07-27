@@ -61,7 +61,7 @@ export function Sidebar({
           <>
             <VStack gap={1} flex={1}>
               <Text variant="h4" tone="primary" numberOfLines={1}>
-                MedStock
+                Plusveda
               </Text>
               <Text variant="caption" tone="tertiary" numberOfLines={1}>
                 {organization?.name || "Inventory"}

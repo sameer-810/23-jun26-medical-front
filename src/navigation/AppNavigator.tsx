@@ -121,7 +121,7 @@ export default function AppNavigator() {
               </View>
               <Text variant="h4" tone="primary">
                 {NAV_ITEMS.find((i) => i.name === route.name)?.label ||
-                  "MedStock"}
+                  "Plusveda"}
               </Text>
             </HStack>
           </SafeAreaView>

@@ -115,7 +115,7 @@ export default function DashboardScreen() {
             tone="success"
           />
           <Text variant="h2" tone="inverse">
-            Welcome to MedStock
+            Welcome to Plusveda
           </Text>
           <Text variant="body" style={{ color: "rgba(255,255,255,0.86)" }}>
             Products, warehouse, inventory, sales with FEFO & GST, expiry,

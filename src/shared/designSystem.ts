@@ -1,5 +1,5 @@
 /**
- * MedStock Design System — ServRx-aligned (2026).
+ * Plusveda Design System — ServRx-aligned (2026).
  *
  * Bright clinical teal as the single confident brand colour, cobalt blue as the
  * secondary accent, on clean cool-white surfaces (never warm/greige). Friendly

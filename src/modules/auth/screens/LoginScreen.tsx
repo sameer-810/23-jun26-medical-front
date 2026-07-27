@@ -31,7 +31,7 @@ export default function LoginScreen({ navigation }: { navigation: Nav }) {
   return (
     <AuthLayout
       title="Welcome back"
-      subtitle="Sign in to your MedStock workspace"
+      subtitle="Sign in to your Plusveda workspace"
     >
       <VStack gap={16}>
         {mut.isError && (
@@ -105,7 +105,7 @@ export default function LoginScreen({ navigation }: { navigation: Nav }) {
           style={{ marginTop: 8 }}
         >
           <Text variant="body-sm" tone="tertiary">
-            New to MedStock?
+            New to Plusveda?
           </Text>
           <Pressable onPress={() => navigation.navigate("Signup")} hitSlop={6}>
             <Text variant="label" tone="link">

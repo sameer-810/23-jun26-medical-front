@@ -53,7 +53,7 @@ export function invoiceHtml(sale: Sale, profile?: InvoiceProfile): string {
   </style></head><body>
     <div class="head">
       <div>
-        <h1>${esc(c?.legalName || "MedStock")}</h1>
+        <h1>${esc(c?.legalName || "Plusveda")}</h1>
         <div class="muted">${esc([c?.addressLine1, c?.city, c?.state, c?.pincode].filter(Boolean).join(", "))}</div>
         <div class="muted">${c?.phone ? "Ph: " + esc(c.phone) : ""} ${c?.gstin ? " · GSTIN: " + esc(c.gstin) : ""}</div>
         <div class="muted">${c?.drugLicenseNo ? "Drug Lic: " + esc(c.drugLicenseNo) : ""}</div>

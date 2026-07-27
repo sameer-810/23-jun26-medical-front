@@ -137,7 +137,7 @@ export default function App() {
 
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
-      document.title = "MedStock — Inventory & Sales";
+      document.title = "Plusveda — Inventory & Sales";
     }
   }, []);
 
