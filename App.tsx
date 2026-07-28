@@ -93,14 +93,21 @@ const linking = {
           },
           Inventory: {
             path: "inventory",
-            screens: { InventoryList: "" },
+            screens: {
+              InventoryList: "",
+              ProductInventory: ":id",
+              ProductLedger: ":id/ledger",
+              Alternatives: ":id/alternatives",
+            },
           },
+          ShortBook: "shortbook",
           Receive: {
             path: "receive-stock",
             screens: {
               ReceiveStock: "",
               Receipts: "history",
               ReceiptDetail: "history/:id",
+              PurchaseReturn: "history/:id/return",
               ScanBill: "scan",
             },
           },

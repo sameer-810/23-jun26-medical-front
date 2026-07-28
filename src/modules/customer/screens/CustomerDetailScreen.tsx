@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Pressable, Platform, Alert } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Pencil,
@@ -9,15 +10,17 @@ import {
   MapPin,
   Receipt,
   Trash2,
+  Wallet,
 } from "lucide-react-native";
 import {
   useCustomer,
   useRemoveCustomer,
 } from "@modules/customer/hooks/useCustomers";
+import { customerApi } from "@modules/customer/api/customerApi";
 import { useSales } from "@modules/sale/hooks/useSales";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
-import { palette, radius } from "@shared/designSystem";
+import { palette } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -40,7 +43,6 @@ const STATUS_TONE = {
 
 function confirm(msg: string, onYes: () => void) {
   if (Platform.OS === "web") {
-    // eslint-disable-next-line no-alert
     if (window.confirm(msg)) onYes();
   } else {
     Alert.alert("Please confirm", msg, [
@@ -59,6 +61,33 @@ export default function CustomerDetailScreen() {
   const removeMut = useRemoveCustomer();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canManage = hasPermission(PERMISSIONS.CUSTOMERS_MANAGE);
+
+  const queryClient = useQueryClient();
+  const { data: statement } = useQuery({
+    queryKey: ["customer", "statement", id],
+    queryFn: () => customerApi.statement(id, { limit: 50 }),
+    enabled: Boolean(id),
+  });
+  const outstanding = statement?.data.outstanding ?? 0;
+  const ledger = statement?.data.rows ?? [];
+
+  const payMut = useMutation({
+    mutationFn: (amount: number) =>
+      customerApi.recordPayment(id, { amount, mode: "cash" }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ["customer", "statement", id],
+      }),
+  });
+
+  const collect = () => {
+    if (Platform.OS !== "web") return;
+    const raw = window.prompt(
+      `Collect payment from ${customer?.name || "customer"} (outstanding ₹${Math.round(outstanding)}):`,
+    );
+    const amt = Number(raw);
+    if (raw && amt > 0) payMut.mutate(amt);
+  };
 
   const history = sales?.data ?? [];
   const totalSpent = history.reduce(
@@ -147,7 +176,7 @@ export default function CustomerDetailScreen() {
         </HStack>
       </Card>
 
-      <HStack gap={12} style={{ marginBottom: 24 }}>
+      <HStack gap={12} style={{ marginBottom: 16 }}>
         <View style={{ flex: 1 }}>
           <StatTile
             label="Invoices"
@@ -162,7 +191,39 @@ export default function CustomerDetailScreen() {
             tone="teal"
           />
         </View>
+        <View style={{ flex: 1 }}>
+          <StatTile
+            label="Outstanding"
+            value={money(outstanding)}
+            accent={
+              outstanding > 0
+                ? { color: palette.danger.text, tint: palette.danger.bg }
+                : undefined
+            }
+          />
+        </View>
       </HStack>
+
+      {canManage ? (
+        <Button
+          label={
+            outstanding > 0
+              ? `Collect payment (₹${Math.round(outstanding)} due)`
+              : "Collect payment"
+          }
+          variant={outstanding > 0 ? "primary" : "secondary"}
+          icon={
+            <Wallet
+              size={16}
+              color={outstanding > 0 ? "#FFFFFF" : palette.text.secondary}
+              strokeWidth={2}
+            />
+          }
+          style={{ marginBottom: 24 }}
+          loading={payMut.isPending}
+          onPress={collect}
+        />
+      ) : null}
 
       <Text variant="h3" tone="primary" style={{ marginBottom: 12 }}>
         Purchase history
@@ -197,6 +258,63 @@ export default function CustomerDetailScreen() {
           ))}
         </VStack>
       )}
+
+      {ledger.length > 0 ? (
+        <VStack gap={12} style={{ marginTop: 24 }}>
+          <Text variant="h3" tone="primary">
+            Account statement
+          </Text>
+          <Card padded={false} style={{ paddingVertical: 4 }}>
+            {ledger.map((r, i) => (
+              <View key={i}>
+                {i > 0 ? (
+                  <View
+                    style={{
+                      height: 1,
+                      backgroundColor: palette.border.subtle,
+                    }}
+                  />
+                ) : null}
+                <HStack
+                  gap={10}
+                  align="center"
+                  justify="space-between"
+                  style={{ paddingVertical: 10, paddingHorizontal: 12 }}
+                >
+                  <VStack gap={1} flex={1}>
+                    <Text variant="body-sm" tone="primary">
+                      {r.type} {r.ref ? `· ${r.ref}` : ""}
+                    </Text>
+                    <Text variant="caption" tone="tertiary">
+                      {new Date(r.date).toLocaleDateString("en-IN")}
+                      {r.note ? ` · ${r.note}` : ""}
+                    </Text>
+                  </VStack>
+                  <Text
+                    variant="body-sm"
+                    weight="600"
+                    style={{
+                      color: r.debit
+                        ? palette.danger.text
+                        : palette.success.text,
+                    }}
+                  >
+                    {r.debit ? `+${money(r.debit)}` : `−${money(r.credit)}`}
+                  </Text>
+                  <Text
+                    variant="body-sm"
+                    weight="700"
+                    tone="primary"
+                    style={{ width: 74, textAlign: "right" }}
+                  >
+                    {money(r.balance)}
+                  </Text>
+                </HStack>
+              </View>
+            ))}
+          </Card>
+        </VStack>
+      ) : null}
 
       {canManage && customer?.isActive && (
         <Button

@@ -1,10 +1,18 @@
 import React from "react";
 import { View, Pressable } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { ArrowLeft } from "lucide-react-native";
+import { ArrowLeft, Undo2 } from "lucide-react-native";
 import { useReceipt } from "@modules/inventory/hooks/useInventory";
 import { palette } from "@shared/designSystem";
-import { Screen, Text, VStack, HStack, Card, StatusChip } from "@shared/ui";
+import {
+  Screen,
+  Text,
+  VStack,
+  HStack,
+  Card,
+  Button,
+  StatusChip,
+} from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const d = (iso: string | null) =>
@@ -20,6 +28,21 @@ export default function ReceiptDetailScreen() {
       overline="Stock Inward"
       title={r?.receiptNo || "Receipt"}
       subtitle={r ? new Date(r.receivedAt).toLocaleString() : ""}
+      right={
+        r ? (
+          <Button
+            label="Return to supplier"
+            size="sm"
+            variant="secondary"
+            icon={
+              <Undo2 size={16} color={palette.text.secondary} strokeWidth={2} />
+            }
+            onPress={() =>
+              navigation.navigate("PurchaseReturn", { id: route.params?.id })
+            }
+          />
+        ) : undefined
+      }
     >
       <Pressable
         onPress={() => navigation.goBack()}

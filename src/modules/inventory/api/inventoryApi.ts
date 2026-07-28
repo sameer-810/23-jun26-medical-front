@@ -9,6 +9,10 @@ import {
   SearchResult,
   ScanResult,
   Paginated,
+  ProductLedgerResult,
+  ShortbookItem,
+  AlternativesResult,
+  PurchaseReturnPayload,
 } from "@modules/inventory/types";
 
 export const inventoryApi = {
@@ -76,6 +80,52 @@ export const inventoryApi = {
     const res = await apiClient.get<{ success: boolean; data: ReceiptDetail }>(
       `/inventory/receipts/${id}`,
     );
+    return res.data.data;
+  },
+
+  /** Medicine ledger — running-balance transaction history for a product. */
+  productLedger: async (
+    id: string,
+    params?: { page?: number; limit?: number },
+  ) => {
+    const res = await apiClient.get<ProductLedgerResult>(
+      `/inventory/products/${id}/ledger`,
+      { params },
+    );
+    return res.data;
+  },
+
+  /** ShortBook — low-stock reorder worklist. */
+  shortbook: async (params?: {
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const res = await apiClient.get<Paginated<ShortbookItem>>(
+      "/inventory/shortbook",
+      { params },
+    );
+    return res.data;
+  },
+
+  /** Alternative medicines (same molecule, in stock). */
+  alternatives: async (
+    productId: string,
+    sort?: "expiry" | "price" | "margin",
+  ) => {
+    const res = await apiClient.get<{
+      success: boolean;
+      data: AlternativesResult;
+    }>(`/inventory/products/${productId}/alternatives`, { params: { sort } });
+    return res.data.data;
+  },
+
+  /** Record a purchase return (goods sent back to a supplier). */
+  purchaseReturn: async (payload: PurchaseReturnPayload) => {
+    const res = await apiClient.post<{
+      success: boolean;
+      data: { _id: string; returnNo: string };
+    }>("/purchase-returns", payload);
     return res.data.data;
   },
 };

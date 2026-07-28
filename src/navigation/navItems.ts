@@ -3,6 +3,7 @@ import {
   Package,
   Warehouse,
   Boxes,
+  ListChecks,
   PackagePlus,
   Search,
   ShoppingCart,
@@ -60,6 +61,12 @@ export const NAV_ITEMS: NavItem[] = [
     name: "Inventory",
     label: "Inventory",
     icon: Boxes,
+    permission: PERMISSIONS.INVENTORY_VIEW,
+  },
+  {
+    name: "ShortBook",
+    label: "ShortBook",
+    icon: ListChecks,
     permission: PERMISSIONS.INVENTORY_VIEW,
   },
   {

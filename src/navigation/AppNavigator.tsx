@@ -31,6 +31,7 @@ import WarehouseScreen from "@modules/warehouse/screens/WarehouseScreen";
 import InventoryNavigator from "@modules/inventory/InventoryNavigator";
 import ReceivingNavigator from "@modules/inventory/ReceivingNavigator";
 import SearchScreen from "@modules/inventory/screens/SearchScreen";
+import ShortBookScreen from "@modules/inventory/screens/ShortBookScreen";
 import SalesNavigator from "@modules/sale/SalesNavigator";
 import CustomersNavigator from "@modules/customer/CustomersNavigator";
 import SuppliersNavigator from "@modules/supplier/SuppliersNavigator";
@@ -62,6 +63,7 @@ const SCREENS: Record<string, React.ComponentType> = {
   Products: ProductsNavigator,
   Warehouse: WarehouseScreen,
   Inventory: InventoryNavigator,
+  ShortBook: ShortBookScreen,
   Receive: ReceivingNavigator,
   Sales: SalesNavigator,
   Transfers: TransfersScreen,

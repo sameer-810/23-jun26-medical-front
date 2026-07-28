@@ -145,7 +145,9 @@ export interface ReceiptDetail extends ReceiptListItem {
     productId: string;
     productName: string;
     sku: string;
+    batchId: string | null;
     batchNumber: string;
+    locationId: string | null;
     labelCode: string | null;
     mfgDate: string | null;
     expiryDate: string | null;
@@ -156,6 +158,22 @@ export interface ReceiptDetail extends ReceiptListItem {
     baseQuantity: number;
     locationCode: string;
     lineValue: number;
+  }[];
+}
+
+export interface PurchaseReturnPayload {
+  receiptId?: string;
+  supplierId?: string | null;
+  supplierName?: string;
+  reason?: string;
+  lines: {
+    productId: string;
+    batchId?: string | null;
+    batchNumber?: string;
+    locationId?: string | null;
+    locationCode?: string;
+    baseQuantity: number;
+    purchasePrice?: number;
   }[];
 }
 
@@ -222,6 +240,68 @@ export interface Paginated<T> {
   success: boolean;
   data: T[];
   meta: { total: number; pages: number; page: number };
+}
+
+/* ---------------- Medicine ledger + ShortBook ---------------- */
+
+export interface LedgerRow {
+  id: string;
+  date: string;
+  type: string;
+  in: number;
+  out: number;
+  balance: number;
+  batchNumber: string;
+  party: string;
+}
+
+export interface LedgerProduct {
+  id: string;
+  name: string;
+  sku: string;
+  saltComposition: string;
+  brandName: string;
+  baseUnit: string;
+  reorderLevel: number;
+  hsnCode: string;
+  taxRatePct: number;
+  mrp: number;
+}
+
+export interface ProductLedgerResult {
+  success: boolean;
+  data: { product: LedgerProduct; currentStock: number; rows: LedgerRow[] };
+  meta: { total: number; pages: number; page: number };
+}
+
+export interface ShortbookItem {
+  productId: string;
+  name: string;
+  sku: string;
+  brandName: string;
+  baseUnit: string;
+  reorderLevel: number;
+  onHand: number;
+  need: number;
+}
+
+export interface AlternativeItem {
+  productId: string;
+  name: string;
+  sku: string;
+  saltComposition: string;
+  brandName: string;
+  baseUnit: string;
+  mrp: number;
+  sellingPrice: number;
+  available: number;
+  nearestExpiry: string | null;
+  margin: number;
+}
+
+export interface AlternativesResult {
+  molecule: string;
+  items: AlternativeItem[];
 }
 
 /* ---------------- Bill scan (OCR) ---------------- */

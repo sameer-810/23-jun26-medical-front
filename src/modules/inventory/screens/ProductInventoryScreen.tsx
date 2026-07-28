@@ -6,7 +6,13 @@ import {
   DimensionValue,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { ArrowLeft, MapPin, CalendarClock } from "lucide-react-native";
+import {
+  ArrowLeft,
+  MapPin,
+  CalendarClock,
+  ScrollText,
+  Repeat2,
+} from "lucide-react-native";
 import { useProductInventory } from "@modules/inventory/hooks/useInventory";
 import { ProductBatchStock } from "@modules/inventory/types";
 import { palette, radius } from "@shared/designSystem";
@@ -16,6 +22,7 @@ import {
   VStack,
   HStack,
   Card,
+  Button,
   StatTile,
   StatusChip,
 } from "@shared/ui";
@@ -55,6 +62,41 @@ export default function ProductInventoryScreen() {
       subtitle={data?.product.sku}
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
+      right={
+        <HStack gap={8}>
+          <Button
+            label="Alternatives"
+            size="sm"
+            variant="secondary"
+            icon={
+              <Repeat2
+                size={16}
+                color={palette.text.secondary}
+                strokeWidth={2}
+              />
+            }
+            onPress={() =>
+              navigation.navigate("Alternatives", {
+                id,
+                name: data?.product.name,
+              })
+            }
+          />
+          <Button
+            label="Ledger"
+            size="sm"
+            variant="secondary"
+            icon={
+              <ScrollText
+                size={16}
+                color={palette.text.secondary}
+                strokeWidth={2}
+              />
+            }
+            onPress={() => navigation.navigate("ProductLedger", { id })}
+          />
+        </HStack>
+      }
     >
       <Pressable
         onPress={() => navigation.goBack()}
