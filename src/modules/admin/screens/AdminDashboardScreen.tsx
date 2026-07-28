@@ -4,17 +4,16 @@ import { useNavigation } from "@react-navigation/native";
 import {
   Building2,
   Plus,
-  LogOut,
   Users,
   Package,
   Receipt,
   Search,
 } from "lucide-react-native";
-import { useAdminStore } from "@shared/store/useAdminStore";
 import {
   useAdminOverview,
   useAdminOrganizations,
 } from "@modules/admin/hooks/useAdmin";
+import { AdminNav } from "@modules/admin/components/AdminNav";
 import type { AdminOrg } from "@modules/admin/types";
 import { palette, radius } from "@shared/designSystem";
 import {
@@ -33,7 +32,6 @@ import {
 
 export default function AdminDashboardScreen() {
   const navigation = useNavigation<any>();
-  const logout = useAdminStore((s) => s.logout);
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -54,29 +52,16 @@ export default function AdminDashboardScreen() {
       overline="Platform"
       title="Pharmacies"
       right={
-        <HStack gap={8}>
-          <Button
-            label="Add pharmacy"
-            size="sm"
-            icon={<Plus size={16} color="#FFFFFF" strokeWidth={2.2} />}
-            onPress={() => navigation.navigate("AdminCreatePharmacy")}
-          />
-          <Button
-            label="Sign out"
-            size="sm"
-            variant="secondary"
-            icon={
-              <LogOut
-                size={16}
-                color={palette.text.secondary}
-                strokeWidth={2}
-              />
-            }
-            onPress={() => logout()}
-          />
-        </HStack>
+        <Button
+          label="Add pharmacy"
+          size="sm"
+          icon={<Plus size={16} color="#FFFFFF" strokeWidth={2.2} />}
+          onPress={() => navigation.navigate("AdminCreatePharmacy")}
+        />
       }
     >
+      <AdminNav active="pharmacies" />
+
       {/* Platform overview */}
       <HStack gap={12} style={{ marginBottom: 16, flexWrap: "wrap" }}>
         <StatTile

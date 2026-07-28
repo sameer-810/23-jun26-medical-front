@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Platform, Alert, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import {
@@ -11,11 +11,19 @@ import {
   ArrowLeft,
   Ban,
   CheckCircle2,
+  Pencil,
+  UsersRound,
+  Trash2,
+  CreditCard,
 } from "lucide-react-native";
 import {
   useAdminOrganization,
   useSetSuspended,
+  useArchivePharmacy,
+  useAssignPlan,
+  usePlans,
 } from "@modules/admin/hooks/useAdmin";
+import { AdminNav } from "@modules/admin/components/AdminNav";
 import { apiErrorMessage } from "@shared/api/apiClient";
 import { palette, radius } from "@shared/designSystem";
 import {
@@ -27,6 +35,7 @@ import {
   Button,
   StatusChip,
   StatTile,
+  Select,
 } from "@shared/ui";
 
 function confirm(msg: string, onYes: () => void) {
@@ -46,7 +55,17 @@ export default function PharmacyDetailScreen() {
   const id = route.params?.id as string;
 
   const { data: org, isLoading } = useAdminOrganization(id);
+  const { data: plans } = usePlans(false);
   const setSuspended = useSetSuspended();
+  const archive = useArchivePharmacy();
+  const assignPlan = useAssignPlan(id);
+
+  const [planCode, setPlanCode] = useState<string | null>(null);
+
+  const planOptions = (plans ?? []).map((p) => ({
+    value: p.code,
+    label: p.name,
+  }));
 
   return (
     <Screen
@@ -68,6 +87,8 @@ export default function PharmacyDetailScreen() {
         />
       }
     >
+      <AdminNav active="pharmacies" />
+
       {!org ? (
         <Text variant="body-sm" tone="tertiary">
           {isLoading ? "Loading…" : "Pharmacy not found."}
@@ -119,7 +140,15 @@ export default function PharmacyDetailScreen() {
                       {org.owner.email}
                     </Text>
                   </HStack>
-                  {org.owner.phone ? (
+                </VStack>
+              ) : null}
+
+              {org.gstin || org.phone || org.drugLicenseNo ? (
+                <VStack gap={4}>
+                  <Text variant="label" tone="tertiary">
+                    Business details
+                  </Text>
+                  {org.phone ? (
                     <HStack gap={6} align="center">
                       <Phone
                         size={14}
@@ -127,9 +156,19 @@ export default function PharmacyDetailScreen() {
                         strokeWidth={1.8}
                       />
                       <Text variant="body-sm" tone="secondary">
-                        {org.owner.phone}
+                        {org.phone}
                       </Text>
                     </HStack>
+                  ) : null}
+                  {org.gstin ? (
+                    <Text variant="body-sm" tone="secondary">
+                      GSTIN: {org.gstin}
+                    </Text>
+                  ) : null}
+                  {org.drugLicenseNo ? (
+                    <Text variant="body-sm" tone="secondary">
+                      Drug licence: {org.drugLicenseNo}
+                    </Text>
                   ) : null}
                 </VStack>
               ) : null}
@@ -157,35 +196,127 @@ export default function PharmacyDetailScreen() {
             />
           </HStack>
 
-          {setSuspended.isError ? (
+          {/* Subscription */}
+          <Card>
+            <VStack gap={12}>
+              <HStack gap={8} align="center">
+                <CreditCard
+                  size={18}
+                  color={palette.text.accent}
+                  strokeWidth={2}
+                />
+                <Text variant="h4" tone="primary">
+                  Subscription
+                </Text>
+              </HStack>
+              <Text variant="body-sm" tone="secondary">
+                Current: {org.subscription?.planCode || "none"} ·{" "}
+                {org.subscription?.status || "trial"}
+              </Text>
+              <Select
+                label="Assign plan"
+                placeholder="Choose a plan"
+                value={planCode}
+                options={planOptions}
+                onChange={setPlanCode}
+              />
+              <Button
+                label="Apply plan"
+                size="sm"
+                disabled={!planCode}
+                loading={assignPlan.isPending}
+                onPress={() =>
+                  planCode && assignPlan.mutate({ planCode, status: "active" })
+                }
+              />
+            </VStack>
+          </Card>
+
+          {(setSuspended.isError || archive.isError) && (
             <View style={styles.errorBox}>
               <Text variant="body-sm" tone="danger">
-                {apiErrorMessage(setSuspended.error)}
+                {apiErrorMessage(setSuspended.error || archive.error)}
               </Text>
             </View>
-          ) : null}
+          )}
 
-          {org.status === "active" ? (
+          {/* Actions */}
+          <VStack gap={10}>
+            <HStack gap={10}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  label="Edit"
+                  variant="secondary"
+                  icon={
+                    <Pencil
+                      size={16}
+                      color={palette.text.secondary}
+                      strokeWidth={2}
+                    />
+                  }
+                  onPress={() =>
+                    navigation.navigate("AdminEditPharmacy", { id })
+                  }
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  label="Users"
+                  variant="secondary"
+                  icon={
+                    <UsersRound
+                      size={16}
+                      color={palette.text.secondary}
+                      strokeWidth={2}
+                    />
+                  }
+                  onPress={() =>
+                    navigation.navigate("AdminPharmacyUsers", { id })
+                  }
+                />
+              </View>
+            </HStack>
+
+            {org.status === "active" ? (
+              <Button
+                label="Suspend pharmacy"
+                variant="destructive"
+                icon={<Ban size={16} color="#FFFFFF" strokeWidth={2} />}
+                loading={setSuspended.isPending}
+                onPress={() =>
+                  confirm(
+                    "Suspend this pharmacy? All its users will be signed out and unable to log in until reactivated.",
+                    () => setSuspended.mutate({ id, suspend: true }),
+                  )
+                }
+              />
+            ) : (
+              <Button
+                label="Reactivate pharmacy"
+                icon={
+                  <CheckCircle2 size={16} color="#FFFFFF" strokeWidth={2} />
+                }
+                loading={setSuspended.isPending}
+                onPress={() => setSuspended.mutate({ id, suspend: false })}
+              />
+            )}
+
             <Button
-              label="Suspend pharmacy"
+              label="Archive pharmacy"
               variant="destructive"
-              icon={<Ban size={16} color="#FFFFFF" strokeWidth={2} />}
-              loading={setSuspended.isPending}
+              icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2} />}
+              loading={archive.isPending}
               onPress={() =>
                 confirm(
-                  "Suspend this pharmacy? All its users will be signed out and unable to log in until reactivated.",
-                  () => setSuspended.mutate({ id, suspend: true }),
+                  "Archive this pharmacy? It will be hidden and everyone signed out. This is a soft-delete.",
+                  () =>
+                    archive.mutate(id, {
+                      onSuccess: () => navigation.goBack(),
+                    }),
                 )
               }
             />
-          ) : (
-            <Button
-              label="Reactivate pharmacy"
-              icon={<CheckCircle2 size={16} color="#FFFFFF" strokeWidth={2} />}
-              loading={setSuspended.isPending}
-              onPress={() => setSuspended.mutate({ id, suspend: false })}
-            />
-          )}
+          </VStack>
         </VStack>
       )}
     </Screen>

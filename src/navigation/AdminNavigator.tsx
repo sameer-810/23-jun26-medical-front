@@ -14,6 +14,15 @@ import AdminLoginScreen from "@modules/admin/screens/AdminLoginScreen";
 import AdminDashboardScreen from "@modules/admin/screens/AdminDashboardScreen";
 import PharmacyDetailScreen from "@modules/admin/screens/PharmacyDetailScreen";
 import CreatePharmacyScreen from "@modules/admin/screens/CreatePharmacyScreen";
+import EditPharmacyScreen from "@modules/admin/screens/EditPharmacyScreen";
+import PharmacyUsersScreen from "@modules/admin/screens/PharmacyUsersScreen";
+import CatalogListScreen from "@modules/admin/screens/CatalogListScreen";
+import CatalogFormScreen from "@modules/admin/screens/CatalogFormScreen";
+import PlansScreen from "@modules/admin/screens/PlansScreen";
+import PlanFormScreen from "@modules/admin/screens/PlanFormScreen";
+import AdminsScreen from "@modules/admin/screens/AdminsScreen";
+import AdminFormScreen from "@modules/admin/screens/AdminFormScreen";
+import AuditScreen from "@modules/admin/screens/AuditScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -60,6 +69,21 @@ export default function AdminNavigator() {
             name="AdminCreatePharmacy"
             component={CreatePharmacyScreen}
           />
+          <Stack.Screen
+            name="AdminEditPharmacy"
+            component={EditPharmacyScreen}
+          />
+          <Stack.Screen
+            name="AdminPharmacyUsers"
+            component={PharmacyUsersScreen}
+          />
+          <Stack.Screen name="AdminCatalog" component={CatalogListScreen} />
+          <Stack.Screen name="AdminCatalogForm" component={CatalogFormScreen} />
+          <Stack.Screen name="AdminPlans" component={PlansScreen} />
+          <Stack.Screen name="AdminPlanForm" component={PlanFormScreen} />
+          <Stack.Screen name="AdminAdmins" component={AdminsScreen} />
+          <Stack.Screen name="AdminAdminForm" component={AdminFormScreen} />
+          <Stack.Screen name="AdminAudit" component={AuditScreen} />
         </>
       )}
     </Stack.Navigator>
