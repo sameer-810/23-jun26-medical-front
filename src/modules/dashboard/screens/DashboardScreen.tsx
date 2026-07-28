@@ -1,5 +1,6 @@
 import React from "react";
 import { View, useWindowDimensions } from "react-native";
+import { useQuery } from "@tanstack/react-query";
 import {
   Boxes,
   PackageSearch,
@@ -13,9 +14,14 @@ import {
   ShieldAlert,
   Truck,
   BarChart3,
+  Wallet,
+  TrendingUp,
+  Landmark,
+  Percent,
 } from "lucide-react-native";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { useDashboardSummary } from "@modules/dashboard/hooks/useDashboard";
+import { dashboardApi } from "@modules/dashboard/api/dashboardApi";
 import { useSectionNav } from "@navigation/AppNavigator";
 import { palette, accents } from "@shared/designSystem";
 import {
@@ -71,6 +77,11 @@ export default function DashboardScreen() {
   const isAdmin = useAuthStore((s) => s.isAdmin);
   const go = useSectionNav();
   const { data, isLoading, refetch, isRefetching } = useDashboardSummary();
+  const { data: fin } = useQuery({
+    queryKey: ["dashboard", "finance"],
+    queryFn: dashboardApi.finance,
+  });
+  const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
   const tiles = [
     {
@@ -161,6 +172,125 @@ export default function DashboardScreen() {
           </View>
         ))}
       </View>
+
+      {/* Finance */}
+      <Text
+        variant="h3"
+        tone="primary"
+        style={{ marginTop: 28, marginBottom: 12 }}
+      >
+        Finance
+      </Text>
+      <View
+        style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 }}
+      >
+        <View style={{ width: tileWidth, padding: 6 }}>
+          <StatTile
+            label="Need to collect"
+            value={money(fin?.receivables.total ?? 0)}
+            icon={Wallet}
+            accent={accents.red}
+          />
+        </View>
+        <View style={{ width: tileWidth, padding: 6 }}>
+          <StatTile
+            label="Stock at cost (PTR)"
+            value={money(fin?.stock.cost ?? 0)}
+            icon={Landmark}
+            accent={accents.teal}
+          />
+        </View>
+        <View style={{ width: tileWidth, padding: 6 }}>
+          <StatTile
+            label="Stock at MRP"
+            value={money(fin?.stock.mrp ?? 0)}
+            icon={Boxes}
+            accent={accents.blue}
+          />
+        </View>
+        <View style={{ width: tileWidth, padding: 6 }}>
+          <StatTile
+            label="Margin (30d)"
+            value={`${fin?.margin.marginPct ?? 0}%`}
+            icon={Percent}
+            accent={accents.amber}
+          />
+        </View>
+      </View>
+
+      <Card style={{ marginTop: 12 }}>
+        <VStack gap={12}>
+          <HStack justify="space-between" align="center">
+            <HStack gap={8} align="center">
+              <TrendingUp size={18} color={palette.teal[600]} strokeWidth={2} />
+              <Text variant="label-lg" tone="primary">
+                Sales &amp; purchases
+              </Text>
+            </HStack>
+          </HStack>
+          <HStack gap={16} style={{ flexWrap: "wrap" }}>
+            <VStack gap={1}>
+              <Text variant="caption" tone="tertiary">
+                Sales (7d / 30d)
+              </Text>
+              <Text variant="body-sm" tone="secondary">
+                {money(fin?.sales.last7 ?? 0)} / {money(fin?.sales.last30 ?? 0)}
+              </Text>
+            </VStack>
+            <VStack gap={1}>
+              <Text variant="caption" tone="tertiary">
+                Purchases (30d)
+              </Text>
+              <Text variant="body-sm" tone="secondary">
+                {money(fin?.purchases.last30 ?? 0)}
+              </Text>
+            </VStack>
+            <VStack gap={1}>
+              <Text variant="caption" tone="tertiary">
+                Gross margin (30d)
+              </Text>
+              <Text variant="body-sm" tone="secondary">
+                {money(fin?.margin.grossMargin ?? 0)} (
+                {fin?.margin.marginPct ?? 0}
+                %)
+              </Text>
+            </VStack>
+          </HStack>
+        </VStack>
+      </Card>
+
+      {fin && fin.receivables.top.length > 0 ? (
+        <Card style={{ marginTop: 12 }}>
+          <VStack gap={10}>
+            <HStack justify="space-between" align="center">
+              <Text variant="label-lg" tone="primary">
+                Need to collect
+              </Text>
+              <Button
+                label="Customers"
+                size="sm"
+                variant="secondary"
+                fullWidth={false}
+                onPress={() => go("Customers")}
+              />
+            </HStack>
+            {fin.receivables.top.map((c) => (
+              <HStack key={c.customerId} justify="space-between" align="center">
+                <Text variant="body-sm" tone="secondary" numberOfLines={1}>
+                  {c.customerName}
+                </Text>
+                <Text
+                  variant="label"
+                  weight="600"
+                  style={{ color: palette.danger.text }}
+                >
+                  {money(c.outstanding)}
+                </Text>
+              </HStack>
+            ))}
+          </VStack>
+        </Card>
+      ) : null}
 
       {/* Team snapshot */}
       <Card style={{ marginTop: 16 }}>
