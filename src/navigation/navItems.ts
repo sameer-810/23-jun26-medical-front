@@ -14,6 +14,7 @@ import {
   ShieldAlert,
   ArrowLeftRight,
   BarChart3,
+  BookOpen,
   Users,
   ScrollText,
   Settings,
@@ -123,6 +124,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Search",
     icon: Search,
     permission: PERMISSIONS.PRODUCT_SEARCH,
+  },
+  {
+    name: "MedGuide",
+    label: "MedGuide",
+    icon: BookOpen,
+    permission: PERMISSIONS.DASHBOARD_VIEW,
   },
   {
     name: "Reports",

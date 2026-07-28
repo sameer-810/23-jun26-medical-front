@@ -101,6 +101,13 @@ const linking = {
             },
           },
           ShortBook: "shortbook",
+          MedGuide: {
+            path: "medguide",
+            screens: {
+              MedGuideSearch: "",
+              MedicineDetail: ":id",
+            },
+          },
           Orders: {
             path: "orders",
             screens: {
