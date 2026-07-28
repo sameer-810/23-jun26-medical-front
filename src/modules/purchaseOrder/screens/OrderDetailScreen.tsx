@@ -1,0 +1,192 @@
+import React from "react";
+import { View, StyleSheet } from "react-native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Send, CheckCircle2, Ban } from "lucide-react-native";
+import { purchaseOrderApi } from "@modules/purchaseOrder/api/purchaseOrderApi";
+import { apiErrorMessage } from "@api/apiClient";
+import { palette, radius } from "@shared/designSystem";
+import {
+  Screen,
+  Text,
+  VStack,
+  HStack,
+  Card,
+  Button,
+  StatusChip,
+} from "@shared/ui";
+
+const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+
+export default function OrderDetailScreen() {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const id = route.params?.id as string;
+  const qc = useQueryClient();
+
+  const { data: order, isLoading } = useQuery({
+    queryKey: ["order", id],
+    queryFn: () => purchaseOrderApi.get(id),
+    enabled: Boolean(id),
+  });
+
+  const statusMut = useMutation({
+    mutationFn: (status: "placed" | "received" | "cancelled") =>
+      purchaseOrderApi.setStatus(id, status),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["order", id] });
+      qc.invalidateQueries({ queryKey: ["orders"] });
+    },
+  });
+
+  const status = order?.status;
+
+  return (
+    <Screen
+      overline="Purchase order"
+      title={order?.orderNo || "Order"}
+      subtitle={order?.supplierName || ""}
+      right={
+        <Button
+          label="Back"
+          size="sm"
+          variant="secondary"
+          icon={
+            <ArrowLeft
+              size={16}
+              color={palette.text.secondary}
+              strokeWidth={2}
+            />
+          }
+          onPress={() => navigation.goBack()}
+        />
+      }
+    >
+      {!order ? (
+        <Text variant="body-sm" tone="tertiary">
+          {isLoading ? "Loading…" : "Order not found."}
+        </Text>
+      ) : (
+        <VStack gap={16}>
+          <Card>
+            <VStack gap={10}>
+              <HStack justify="space-between" align="center">
+                <StatusChip
+                  label={order.status}
+                  tone={
+                    order.status === "received"
+                      ? "success"
+                      : order.status === "cancelled"
+                        ? "danger"
+                        : order.status === "placed"
+                          ? "info"
+                          : "neutral"
+                  }
+                />
+                <Text variant="body-sm" tone="tertiary">
+                  {new Date(order.createdAt).toLocaleDateString("en-IN")}
+                </Text>
+              </HStack>
+              <HStack justify="space-between">
+                <Text variant="body-sm" tone="tertiary">
+                  Items
+                </Text>
+                <Text variant="label">
+                  {order.lines.length} · {order.totalQuantity} units
+                </Text>
+              </HStack>
+              <HStack justify="space-between">
+                <Text variant="body-sm" tone="tertiary">
+                  Estimated value
+                </Text>
+                <Text variant="label">{money(order.estimatedValue)}</Text>
+              </HStack>
+              {order.note ? (
+                <Text variant="body-sm" tone="secondary">
+                  {order.note}
+                </Text>
+              ) : null}
+            </VStack>
+          </Card>
+
+          {statusMut.isError ? (
+            <View style={styles.errorBox}>
+              <Text variant="body-sm" tone="danger">
+                {apiErrorMessage(statusMut.error)}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Status actions */}
+          {status === "draft" || status === "placed" ? (
+            <VStack gap={10}>
+              {status === "draft" ? (
+                <Button
+                  label="Place order"
+                  icon={<Send size={16} color="#FFFFFF" strokeWidth={2} />}
+                  loading={statusMut.isPending}
+                  onPress={() => statusMut.mutate("placed")}
+                />
+              ) : null}
+              {status === "placed" ? (
+                <Button
+                  label="Mark received"
+                  icon={
+                    <CheckCircle2 size={16} color="#FFFFFF" strokeWidth={2} />
+                  }
+                  loading={statusMut.isPending}
+                  onPress={() => statusMut.mutate("received")}
+                />
+              ) : null}
+              <Button
+                label="Cancel order"
+                variant="destructive"
+                icon={<Ban size={16} color="#FFFFFF" strokeWidth={2} />}
+                loading={statusMut.isPending}
+                onPress={() => statusMut.mutate("cancelled")}
+              />
+            </VStack>
+          ) : null}
+
+          <Text variant="h3" tone="primary">
+            Lines
+          </Text>
+          <VStack gap={8}>
+            {order.lines.map((l, i) => (
+              <Card key={i}>
+                <HStack gap={10} align="center" justify="space-between">
+                  <VStack gap={2} flex={1}>
+                    <Text variant="label-lg" tone="primary" numberOfLines={1}>
+                      {l.productName}
+                    </Text>
+                    <Text variant="body-sm" tone="tertiary">
+                      {l.sku}
+                    </Text>
+                  </VStack>
+                  <VStack gap={2} align="flex-end">
+                    <Text variant="label-lg" tone="primary">
+                      {l.quantity}
+                    </Text>
+                    <Text variant="caption" tone="tertiary">
+                      @ {money(l.estimatedPrice)}
+                    </Text>
+                  </VStack>
+                </HStack>
+              </Card>
+            ))}
+          </VStack>
+        </VStack>
+      )}
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  errorBox: {
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: palette.danger.bg,
+    borderWidth: 1,
+    borderColor: palette.danger.border,
+  },
+});

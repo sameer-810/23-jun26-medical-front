@@ -5,6 +5,7 @@ import {
   Boxes,
   ListChecks,
   PackagePlus,
+  ShoppingBag,
   Search,
   ShoppingCart,
   Contact,
@@ -74,6 +75,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Receive Stock",
     icon: PackagePlus,
     permission: PERMISSIONS.STOCK_INWARD_MANAGE,
+  },
+  {
+    name: "Orders",
+    label: "Orders",
+    icon: ShoppingBag,
+    permission: PERMISSIONS.PURCHASES_MANAGE,
   },
   {
     name: "Sales",

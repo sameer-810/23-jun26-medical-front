@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
-import { ListChecks, Search } from "lucide-react-native";
+import { ListChecks, Search, ShoppingBag } from "lucide-react-native";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { palette } from "@shared/designSystem";
 import {
@@ -10,6 +11,7 @@ import {
   VStack,
   HStack,
   Card,
+  Button,
   StatusChip,
   TextField,
   Pagination,
@@ -17,6 +19,7 @@ import {
 } from "@shared/ui";
 
 export default function ShortBookScreen() {
+  const navigation = useNavigation<any>();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -29,8 +32,35 @@ export default function ShortBookScreen() {
   const items = data?.data ?? [];
   const meta = data?.meta;
 
+  const createOrder = () =>
+    navigation.navigate("Orders", {
+      screen: "OrderForm",
+      params: {
+        seedLines: items.map((it) => ({
+          productId: it.productId,
+          productName: it.name,
+          sku: it.sku,
+          quantity: it.need || 1,
+        })),
+      },
+    });
+
   return (
-    <Screen overline="Inventory" title="ShortBook" subtitle="Items to reorder">
+    <Screen
+      overline="Inventory"
+      title="ShortBook"
+      subtitle="Items to reorder"
+      right={
+        items.length > 0 ? (
+          <Button
+            label="Create order"
+            size="sm"
+            icon={<ShoppingBag size={16} color="#FFFFFF" strokeWidth={2.2} />}
+            onPress={createOrder}
+          />
+        ) : undefined
+      }
+    >
       <View style={{ marginBottom: 12 }}>
         <TextField
           value={search}

@@ -101,6 +101,14 @@ const linking = {
             },
           },
           ShortBook: "shortbook",
+          Orders: {
+            path: "orders",
+            screens: {
+              OrdersList: "",
+              OrderForm: "new",
+              OrderDetail: ":id",
+            },
+          },
           Receive: {
             path: "receive-stock",
             screens: {
