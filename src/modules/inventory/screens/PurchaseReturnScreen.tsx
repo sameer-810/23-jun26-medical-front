@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Undo2 } from "lucide-react-native";
@@ -7,7 +7,7 @@ import { useReceipt } from "@modules/inventory/hooks/useInventory";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import type { PurchaseReturnPayload } from "@modules/inventory/types";
 import { apiErrorMessage } from "@api/apiClient";
-import { palette, radius } from "@shared/designSystem";
+import { palette } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -16,6 +16,7 @@ import {
   Card,
   Button,
   TextField,
+  Banner,
 } from "@shared/ui";
 
 export default function PurchaseReturnScreen() {
@@ -88,11 +89,11 @@ export default function PurchaseReturnScreen() {
       }
     >
       {serverError ? (
-        <View style={styles.errorBox}>
-          <Text variant="body-sm" tone="danger">
-            {serverError}
-          </Text>
-        </View>
+        <Banner
+          tone="danger"
+          message={serverError}
+          style={{ marginBottom: 16 }}
+        />
       ) : null}
 
       <Text variant="body-sm" tone="tertiary" style={{ marginBottom: 12 }}>
@@ -145,14 +146,3 @@ export default function PurchaseReturnScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  errorBox: {
-    padding: 12,
-    borderRadius: radius.md,
-    backgroundColor: palette.danger.bg,
-    borderWidth: 1,
-    borderColor: palette.danger.border,
-    marginBottom: 16,
-  },
-});

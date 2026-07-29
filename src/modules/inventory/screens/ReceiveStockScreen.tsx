@@ -6,8 +6,8 @@ import {
   History,
   PackageCheck,
   ScanLine,
-  AlertTriangle,
   Printer,
+  Search,
 } from "lucide-react-native";
 import {
   useProducts,
@@ -44,7 +44,7 @@ import {
   totalBaseUnits,
 } from "@modules/inventory/receiveDraft";
 import { apiErrorMessage } from "@api/apiClient";
-import { palette, radius } from "@shared/designSystem";
+import { palette } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -54,6 +54,8 @@ import {
   Button,
   TextField,
   Select,
+  Combobox,
+  Banner,
 } from "@shared/ui";
 import { useAuthStore } from "@shared/store/useAuthStore";
 
@@ -90,6 +92,7 @@ export default function ReceiveStockScreen() {
 
   const [supplierId, setSupplierId] = useState<string | null>(null);
   const [referenceNo, setReference] = useState("");
+  const [addQuery, setAddQuery] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
   // The whole receipt, not just its number — its lines carry the label codes
   // the "Print labels" step needs.
@@ -171,6 +174,36 @@ export default function ReceiveStockScreen() {
       })),
     [searchResults],
   );
+
+  // Keyboard-first "add a line" search — filling the first blank line, else
+  // appending. Mirrors the POS add-bar so building a multi-line GRN is fast.
+  const productItems = useMemo(
+    () =>
+      searchResults.map((p) => ({
+        value: p.id,
+        label: p.name,
+        sublabel: p.sku,
+      })),
+    [searchResults],
+  );
+  const addLineForProduct = (id: string) => {
+    const p = productsById[id];
+    if (p) setKnownProducts((cur) => ({ ...cur, [p.id]: p }));
+    setLines((cur) => {
+      const blank = cur.findIndex((l) => !l.productId);
+      if (blank >= 0) {
+        setExpanded((e) => new Set(e).add(blank));
+        return cur.map((l, k) =>
+          k === blank ? { ...l, productId: id, unit: p?.baseUnit || null } : l,
+        );
+      }
+      setExpanded((e) => new Set(e).add(cur.length));
+      return [
+        ...cur,
+        { ...emptyLine(), productId: id, unit: p?.baseUnit || null },
+      ];
+    });
+  };
 
   const setLine = (i: number, patch: Partial<DraftLine>) =>
     setLines((cur) =>
@@ -293,42 +326,22 @@ export default function ReceiveStockScreen() {
         </HStack>
       }
     >
-      {dupWarning && (
-        <View style={warnBox}>
-          <HStack gap={8} align="flex-start">
-            <AlertTriangle
-              size={16}
-              color={palette.warning.text}
-              strokeWidth={2.2}
-            />
-            <Text
-              variant="body-sm"
-              style={{ color: palette.warning.text, flex: 1 }}
-            >
-              {dupWarning}
-            </Text>
-          </HStack>
-        </View>
-      )}
-      {scanNote && (
-        <View style={infoBox}>
-          <HStack gap={8} align="center">
-            <ScanLine size={16} color={palette.info.text} strokeWidth={2} />
-            <Text
-              variant="body-sm"
-              style={{ color: palette.info.text, flex: 1 }}
-            >
-              {scanNote}
-            </Text>
-          </HStack>
-        </View>
-      )}
-      {done && (
-        <View style={okBox}>
+      {dupWarning ? (
+        <Banner
+          tone="warning"
+          message={dupWarning}
+          style={{ marginBottom: 16 }}
+        />
+      ) : null}
+      {scanNote ? (
+        <Banner tone="info" message={scanNote} style={{ marginBottom: 16 }} />
+      ) : null}
+      {done ? (
+        <Banner tone="success" style={{ marginBottom: 16 }}>
           <HStack gap={10} align="center" justify="space-between" wrap>
             <HStack gap={8} align="center" flex={1}>
               <PackageCheck
-                size={18}
+                size={16}
                 color={palette.success.text}
                 strokeWidth={2}
               />
@@ -352,15 +365,15 @@ export default function ReceiveStockScreen() {
               />
             )}
           </HStack>
-        </View>
-      )}
-      {mut.isError && (
-        <View style={errorBox}>
-          <Text variant="body-sm" tone="danger">
-            {apiErrorMessage(mut.error)}
-          </Text>
-        </View>
-      )}
+        </Banner>
+      ) : null}
+      {mut.isError ? (
+        <Banner
+          tone="danger"
+          message={apiErrorMessage(mut.error)}
+          style={{ marginBottom: 16 }}
+        />
+      ) : null}
 
       <Card style={{ marginBottom: 16 }}>
         <VStack gap={16}>
@@ -388,6 +401,27 @@ export default function ReceiveStockScreen() {
           />
         </VStack>
       </Card>
+
+      <View style={{ marginBottom: 12, zIndex: 20 }}>
+        <Combobox
+          placeholder="Search a medicine to add a line — or use Scan bill above"
+          query={addQuery}
+          onQueryChange={(t) => {
+            setAddQuery(t);
+            setProductQuery(t);
+          }}
+          items={productItems}
+          loading={productsLoading}
+          onSelect={(id) => {
+            addLineForProduct(id);
+            setAddQuery("");
+          }}
+          leading={
+            <Search size={18} color={palette.teal[600]} strokeWidth={2} />
+          }
+          emptyText="No match — type the full name, or add the line manually below"
+        />
+      </View>
 
       <VStack gap={10}>
         {lines.map((line, i) => (
@@ -469,36 +503,3 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 });
-
-const errorBox = {
-  padding: 14,
-  borderRadius: radius.md,
-  backgroundColor: palette.danger.bg,
-  borderWidth: 1,
-  borderColor: palette.danger.border,
-  marginBottom: 16,
-} as const;
-const okBox = {
-  padding: 14,
-  borderRadius: radius.md,
-  backgroundColor: palette.success.bg,
-  borderWidth: 1,
-  borderColor: palette.success.border,
-  marginBottom: 16,
-} as const;
-const infoBox = {
-  padding: 14,
-  borderRadius: radius.md,
-  backgroundColor: palette.info.bg,
-  borderWidth: 1,
-  borderColor: palette.info.border,
-  marginBottom: 16,
-} as const;
-const warnBox = {
-  padding: 14,
-  borderRadius: radius.md,
-  backgroundColor: palette.warning.bg,
-  borderWidth: 1,
-  borderColor: palette.warning.border,
-  marginBottom: 16,
-} as const;

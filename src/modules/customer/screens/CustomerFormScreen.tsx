@@ -1,9 +1,9 @@
 import React, { useEffect } from "react";
-import { View, Pressable } from "react-native";
+import { View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, User, Phone, Mail } from "lucide-react-native";
+import { User, Phone, Mail } from "lucide-react-native";
 import {
   useCustomer,
   useCreateCustomer,
@@ -13,7 +13,7 @@ import { customerSchema } from "@modules/customer/customer.validation";
 import { apiErrorMessage } from "@api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Screen, Text, VStack, HStack, Card, Button } from "@shared/ui";
+import { Screen, Text, VStack, Card, Button, BackLink } from "@shared/ui";
 
 export default function CustomerFormScreen() {
   const navigation = useNavigation<any>();
@@ -62,18 +62,7 @@ export default function CustomerFormScreen() {
       overline="Customers"
       title={editing ? "Edit customer" : "Add customer"}
     >
-      <Pressable
-        onPress={() => navigation.goBack()}
-        hitSlop={6}
-        style={{ marginBottom: 16 }}
-      >
-        <HStack gap={6} align="center">
-          <ArrowLeft size={18} color={palette.text.link} strokeWidth={2} />
-          <Text variant="label" tone="link">
-            Back
-          </Text>
-        </HStack>
-      </Pressable>
+      <BackLink label="Back" onPress={() => navigation.goBack()} />
 
       {mut.isError && (
         <View style={errorBox}>

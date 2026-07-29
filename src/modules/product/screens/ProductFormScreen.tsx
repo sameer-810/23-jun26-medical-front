@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { View, Pressable, Switch } from "react-native";
+import { View, Switch } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useForm, useWatch, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Trash2 } from "lucide-react-native";
+import { Trash2 } from "lucide-react-native";
 import {
   useProduct,
   useCreateProduct,
@@ -28,6 +28,7 @@ import {
   Card,
   Button,
   ConfirmDialog,
+  BackLink,
 } from "@shared/ui";
 import { PacksEditor } from "@modules/product/components/PacksEditor";
 
@@ -142,18 +143,7 @@ export default function ProductFormScreen() {
       title={editing ? "Edit product" : "Add product"}
       subtitle={editing ? product?.sku : "Define a catalogue item"}
     >
-      <Pressable
-        onPress={() => navigation.goBack()}
-        hitSlop={6}
-        style={{ marginBottom: 16 }}
-      >
-        <HStack gap={6} align="center">
-          <ArrowLeft size={18} color={palette.text.link} strokeWidth={2} />
-          <Text variant="label" tone="link">
-            Back to products
-          </Text>
-        </HStack>
-      </Pressable>
+      <BackLink label="Back to products" onPress={() => navigation.goBack()} />
 
       {mut.isError && (
         <View style={errorBox}>

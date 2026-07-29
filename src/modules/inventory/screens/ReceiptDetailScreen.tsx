@@ -1,7 +1,7 @@
 import React from "react";
-import { View, Pressable } from "react-native";
+import { View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { ArrowLeft, Undo2 } from "lucide-react-native";
+import { Undo2 } from "lucide-react-native";
 import { useReceipt } from "@modules/inventory/hooks/useInventory";
 import { palette } from "@shared/designSystem";
 import {
@@ -12,6 +12,8 @@ import {
   Card,
   Button,
   StatusChip,
+  BackLink,
+  Skeleton,
 } from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -44,21 +46,29 @@ export default function ReceiptDetailScreen() {
         ) : undefined
       }
     >
-      <Pressable
-        onPress={() => navigation.goBack()}
-        hitSlop={6}
-        style={{ marginBottom: 16 }}
-      >
-        <HStack gap={6} align="center">
-          <ArrowLeft size={18} color={palette.text.link} strokeWidth={2} />
-          <Text variant="label" tone="link">
-            Back to history
-          </Text>
-        </HStack>
-      </Pressable>
+      <BackLink label="Back to history" onPress={() => navigation.goBack()} />
 
       {isLoading || !r ? (
-        <Text tone="tertiary">Loading…</Text>
+        <VStack gap={16}>
+          <Card>
+            <VStack gap={10}>
+              {[0, 1, 2].map((i) => (
+                <HStack key={i} justify="space-between">
+                  <Skeleton width="35%" height={14} />
+                  <Skeleton width="45%" height={14} />
+                </HStack>
+              ))}
+            </VStack>
+          </Card>
+          {[0, 1].map((i) => (
+            <Card key={i} elevation="base">
+              <VStack gap={8}>
+                <Skeleton width="70%" height={16} />
+                <Skeleton width="50%" height={14} />
+              </VStack>
+            </Card>
+          ))}
+        </VStack>
       ) : (
         <>
           <Card style={{ marginBottom: 16 }}>

@@ -14,6 +14,7 @@ import {
   Card,
   Button,
   StatusChip,
+  Skeleton,
 } from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -63,9 +64,41 @@ export default function OrderDetailScreen() {
       }
     >
       {!order ? (
-        <Text variant="body-sm" tone="tertiary">
-          {isLoading ? "Loading…" : "Order not found."}
-        </Text>
+        isLoading ? (
+          <VStack gap={16}>
+            <Card>
+              <VStack gap={10}>
+                <HStack justify="space-between" align="center">
+                  <Skeleton width={90} height={22} rounded="full" />
+                  <Skeleton width={80} height={14} />
+                </HStack>
+                <HStack justify="space-between">
+                  <Skeleton width="30%" height={14} />
+                  <Skeleton width="40%" height={14} />
+                </HStack>
+                <HStack justify="space-between">
+                  <Skeleton width="35%" height={14} />
+                  <Skeleton width="35%" height={14} />
+                </HStack>
+              </VStack>
+            </Card>
+            {[0, 1].map((i) => (
+              <Card key={i}>
+                <HStack justify="space-between" align="center">
+                  <VStack gap={6} flex={1}>
+                    <Skeleton width="60%" height={16} />
+                    <Skeleton width="35%" height={12} />
+                  </VStack>
+                  <Skeleton width={40} height={16} />
+                </HStack>
+              </Card>
+            ))}
+          </VStack>
+        ) : (
+          <Text variant="body-sm" tone="tertiary">
+            Order not found.
+          </Text>
+        )
       ) : (
         <VStack gap={16}>
           <Card>

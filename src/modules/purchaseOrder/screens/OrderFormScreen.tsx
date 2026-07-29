@@ -1,13 +1,13 @@
-import React, { useState } from "react";
-import { View, Pressable, StyleSheet } from "react-native";
+import React, { useMemo, useState } from "react";
+import { View, Pressable } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Plus, X, Search } from "lucide-react-native";
+import { ArrowLeft, X, Search } from "lucide-react-native";
 import { purchaseOrderApi } from "@modules/purchaseOrder/api/purchaseOrderApi";
 import type { SeededLine } from "@modules/purchaseOrder/types";
 import { useProducts } from "@modules/product/hooks/useProducts";
 import { apiErrorMessage } from "@api/apiClient";
-import { palette, radius } from "@shared/designSystem";
+import { palette } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -16,6 +16,8 @@ import {
   Card,
   Button,
   TextField,
+  Combobox,
+  Banner,
 } from "@shared/ui";
 
 interface Line {
@@ -45,10 +47,27 @@ export default function OrderFormScreen() {
   const [search, setSearch] = useState("");
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const { data: results } = useProducts({
+  const { data: results, isFetching: productsLoading } = useProducts({
     search: search || undefined,
     limit: 8,
   });
+
+  const productsById = useMemo(() => {
+    const map: Record<string, { id: string; name: string; sku: string }> = {};
+    for (const p of results?.data ?? [])
+      map[p.id] = { id: p.id, name: p.name, sku: p.sku };
+    return map;
+  }, [results]);
+
+  const productItems = useMemo(
+    () =>
+      (results?.data ?? []).map((p) => ({
+        value: p.id,
+        label: p.name,
+        sublabel: p.sku,
+      })),
+    [results],
+  );
 
   const addProduct = (p: { id: string; name: string; sku: string }) => {
     if (lines.some((l) => l.productId === p.id)) return;
@@ -117,59 +136,39 @@ export default function OrderFormScreen() {
       }
     >
       {serverError ? (
-        <View style={styles.errorBox}>
-          <Text variant="body-sm" tone="danger">
-            {serverError}
-          </Text>
-        </View>
+        <Banner
+          tone="danger"
+          message={serverError}
+          style={{ marginBottom: 16 }}
+        />
       ) : null}
 
       <Card style={{ marginBottom: 12 }}>
-        <VStack gap={12}>
-          <TextField
-            label="Supplier / distributor"
-            value={supplierName}
-            onChangeText={setSupplierName}
-            placeholder="Distributor name"
-          />
-          <View>
-            <TextField
-              label="Add product"
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search by name or salt (c.paracetamol)"
-              leading={
-                <Search
-                  size={18}
-                  color={palette.text.tertiary}
-                  strokeWidth={1.8}
-                />
-              }
-              autoCapitalize="none"
-            />
-            {search.length > 0 ? (
-              <Card style={{ marginTop: 6 }} padded={false}>
-                {(results?.data ?? []).slice(0, 8).map((p) => (
-                  <Pressable
-                    key={p.id}
-                    onPress={() => addProduct(p)}
-                    style={styles.result}
-                  >
-                    <Plus
-                      size={14}
-                      color={palette.teal[600]}
-                      strokeWidth={2.2}
-                    />
-                    <Text variant="body-sm" tone="primary" numberOfLines={1}>
-                      {p.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </Card>
-            ) : null}
-          </View>
-        </VStack>
+        <TextField
+          label="Supplier / distributor"
+          value={supplierName}
+          onChangeText={setSupplierName}
+          placeholder="Distributor name"
+        />
       </Card>
+
+      <View style={{ marginBottom: 12, zIndex: 20 }}>
+        <Combobox
+          placeholder="Search by name or salt (c.paracetamol) to add a line"
+          query={search}
+          onQueryChange={setSearch}
+          items={productItems}
+          loading={productsLoading}
+          onSelect={(id) => {
+            const p = productsById[id];
+            if (p) addProduct(p);
+          }}
+          leading={
+            <Search size={18} color={palette.teal[600]} strokeWidth={2} />
+          }
+          emptyText="No match — type the full name"
+        />
+      </View>
 
       <VStack gap={8}>
         {lines.map((l, i) => (
@@ -236,23 +235,3 @@ export default function OrderFormScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  errorBox: {
-    padding: 12,
-    borderRadius: radius.md,
-    backgroundColor: palette.danger.bg,
-    borderWidth: 1,
-    borderColor: palette.danger.border,
-    marginBottom: 16,
-  },
-  result: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: palette.border.subtle,
-  },
-});

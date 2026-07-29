@@ -15,6 +15,7 @@ import {
   StatTile,
   Pagination,
   EmptyState,
+  Skeleton,
 } from "@shared/ui";
 
 export default function ProductLedgerScreen() {
@@ -33,6 +34,32 @@ export default function ProductLedgerScreen() {
   const product = data?.data.product;
   const rows = data?.data.rows ?? [];
   const meta = data?.meta;
+
+  if (isLoading || !data) {
+    return (
+      <Screen overline="Inventory" title="Ledger">
+        <VStack gap={16}>
+          <HStack gap={12} wrap>
+            {[0, 1, 2, 3].map((i) => (
+              <View key={i} style={{ flexGrow: 1, flexBasis: 110 }}>
+                <Skeleton height={64} />
+              </View>
+            ))}
+          </HStack>
+          <Card>
+            <VStack gap={12}>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <HStack key={i} justify="space-between">
+                  <Skeleton width="45%" height={14} />
+                  <Skeleton width={40} height={14} />
+                </HStack>
+              ))}
+            </VStack>
+          </Card>
+        </VStack>
+      </Screen>
+    );
+  }
 
   return (
     <Screen

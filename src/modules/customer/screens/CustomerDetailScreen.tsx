@@ -1,9 +1,8 @@
 import React, { useState } from "react";
-import { View, Pressable } from "react-native";
+import { View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft,
   Pencil,
   Phone,
   Mail,
@@ -34,6 +33,8 @@ import {
   EmptyState,
   ConfirmDialog,
   PromptDialog,
+  BackLink,
+  Skeleton,
 } from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -81,24 +82,45 @@ export default function CustomerDetailScreen() {
     0,
   );
 
+  if (!customer) {
+    return (
+      <Screen overline="Customer" title="Customer">
+        <VStack gap={16}>
+          <Card>
+            <HStack gap={14} align="center">
+              <Skeleton width={54} height={54} rounded="full" />
+              <VStack gap={8} flex={1}>
+                <Skeleton width="50%" height={18} />
+                <Skeleton width="70%" height={14} />
+              </VStack>
+            </HStack>
+          </Card>
+          <HStack gap={12}>
+            {[0, 1, 2].map((i) => (
+              <View key={i} style={{ flex: 1 }}>
+                <Skeleton height={72} />
+              </View>
+            ))}
+          </HStack>
+          <Card>
+            <VStack gap={10}>
+              <Skeleton width="40%" height={16} />
+              <Skeleton width="90%" height={14} />
+              <Skeleton width="80%" height={14} />
+            </VStack>
+          </Card>
+        </VStack>
+      </Screen>
+    );
+  }
+
   return (
     <Screen
       overline="Customer"
       title={customer?.name || "Customer"}
       subtitle={customer?.mobile || ""}
     >
-      <Pressable
-        onPress={() => navigation.goBack()}
-        hitSlop={6}
-        style={{ marginBottom: 16 }}
-      >
-        <HStack gap={6} align="center">
-          <ArrowLeft size={18} color={palette.text.link} strokeWidth={2} />
-          <Text variant="label" tone="link">
-            Back to customers
-          </Text>
-        </HStack>
-      </Pressable>
+      <BackLink label="Back to customers" onPress={() => navigation.goBack()} />
 
       <Card style={{ marginBottom: 16 }}>
         <HStack gap={14} align="center">

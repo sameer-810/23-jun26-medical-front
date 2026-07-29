@@ -12,7 +12,6 @@ import {
 } from "@modules/stockops/components/StockCellPicker";
 import { AdjustmentType } from "@modules/stockops/types";
 import { apiErrorMessage } from "@api/apiClient";
-import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -24,6 +23,7 @@ import {
   ChipsRow,
   StatusChip,
   EmptyState,
+  Banner,
 } from "@shared/ui";
 
 const TYPES = [
@@ -86,18 +86,18 @@ export default function DamagedScreen() {
       subtitle="Write off damaged / lost / expired stock, or correct a count"
     >
       {done && (
-        <View style={okBox}>
-          <Text variant="body-sm" tone="success">
-            Adjustment {done} recorded.
-          </Text>
-        </View>
+        <Banner
+          tone="success"
+          message={`Adjustment ${done} recorded.`}
+          style={{ marginBottom: 16 }}
+        />
       )}
       {mut.isError && (
-        <View style={errBox}>
-          <Text variant="body-sm" tone="danger">
-            {apiErrorMessage(mut.error)}
-          </Text>
-        </View>
+        <Banner
+          tone="danger"
+          message={apiErrorMessage(mut.error)}
+          style={{ marginBottom: 16 }}
+        />
       )}
 
       <Card style={{ marginBottom: 16 }}>
@@ -202,20 +202,3 @@ export default function DamagedScreen() {
     </Screen>
   );
 }
-
-const errBox = {
-  padding: 14,
-  borderRadius: radius.md,
-  backgroundColor: palette.danger.bg,
-  borderWidth: 1,
-  borderColor: palette.danger.border,
-  marginBottom: 16,
-} as const;
-const okBox = {
-  padding: 14,
-  borderRadius: radius.md,
-  backgroundColor: palette.success.bg,
-  borderWidth: 1,
-  borderColor: palette.success.border,
-  marginBottom: 16,
-} as const;

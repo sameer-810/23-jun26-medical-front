@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { View, Pressable, Switch } from "react-native";
+import { View, Switch } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { ArrowLeft, ShieldCheck, KeyRound, Trash2 } from "lucide-react-native";
+import { ShieldCheck, KeyRound, Trash2 } from "lucide-react-native";
 import {
   useTeamUser,
   usePermissionCatalogue,
@@ -25,6 +25,7 @@ import {
   StatusChip,
   ConfirmDialog,
   Skeleton,
+  BackLink,
 } from "@shared/ui";
 import { PermissionEditor } from "@modules/team/components/PermissionEditor";
 
@@ -94,18 +95,7 @@ export default function UserDetailScreen() {
 
   return (
     <Screen overline="Team member" title={user.fullName} subtitle={user.email}>
-      <Pressable
-        onPress={() => navigation.goBack()}
-        hitSlop={6}
-        style={{ marginBottom: 16 }}
-      >
-        <HStack gap={6} align="center">
-          <ArrowLeft size={18} color={palette.text.link} strokeWidth={2} />
-          <Text variant="label" tone="link">
-            Back to team
-          </Text>
-        </HStack>
-      </Pressable>
+      <BackLink label="Back to team" onPress={() => navigation.goBack()} />
 
       <Card style={{ marginBottom: 16 }}>
         <HStack gap={14} align="center">

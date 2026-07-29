@@ -17,6 +17,7 @@ import {
   Card,
   Button,
   StatusChip,
+  Skeleton,
 } from "@shared/ui";
 
 // Some source fields carry inline HTML (<p>, <br>) — flatten to plain text.
@@ -116,9 +117,33 @@ export default function MedicineDetailScreen() {
       }
     >
       {!m ? (
-        <Text variant="body-sm" tone="tertiary">
-          {isLoading ? "Loading…" : "Medicine not found."}
-        </Text>
+        isLoading ? (
+          <VStack gap={12}>
+            <Card>
+              <HStack gap={14} align="center">
+                <Skeleton width={72} height={72} rounded="md" />
+                <VStack gap={8} flex={1}>
+                  <Skeleton width="60%" height={14} />
+                  <Skeleton width="45%" height={14} />
+                  <Skeleton width={80} height={22} rounded="full" />
+                </VStack>
+              </HStack>
+            </Card>
+            {[0, 1, 2].map((i) => (
+              <Card key={i}>
+                <VStack gap={8}>
+                  <Skeleton width="35%" height={16} />
+                  <Skeleton width="90%" height={12} />
+                  <Skeleton width="80%" height={12} />
+                </VStack>
+              </Card>
+            ))}
+          </VStack>
+        ) : (
+          <Text variant="body-sm" tone="tertiary">
+            Medicine not found.
+          </Text>
+        )
       ) : (
         <VStack gap={12}>
           <Card>

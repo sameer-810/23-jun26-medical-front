@@ -1,13 +1,7 @@
 import React from "react";
-import {
-  View,
-  Pressable,
-  useWindowDimensions,
-  DimensionValue,
-} from "react-native";
+import { View, useWindowDimensions, DimensionValue } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import {
-  ArrowLeft,
   MapPin,
   CalendarClock,
   ScrollText,
@@ -25,6 +19,8 @@ import {
   Button,
   StatTile,
   StatusChip,
+  BackLink,
+  Skeleton,
 } from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -54,6 +50,34 @@ export default function ProductInventoryScreen() {
   const { data, isLoading, refetch, isRefetching } = useProductInventory(id);
 
   const tileW = `${100 / cols}%` as DimensionValue;
+
+  if (isLoading || !data) {
+    return (
+      <Screen overline="Inventory" title="Product">
+        <VStack gap={16}>
+          <HStack gap={12} wrap>
+            {[0, 1, 2, 3].map((i) => (
+              <View key={i} style={{ flexGrow: 1, flexBasis: 140 }}>
+                <Skeleton height={72} />
+              </View>
+            ))}
+          </HStack>
+          {[0, 1].map((i) => (
+            <Card key={i} elevation="base">
+              <VStack gap={10}>
+                <HStack justify="space-between">
+                  <Skeleton width="40%" height={16} />
+                  <Skeleton width={60} height={16} />
+                </HStack>
+                <Skeleton width="70%" height={14} />
+                <Skeleton width="55%" height={14} />
+              </VStack>
+            </Card>
+          ))}
+        </VStack>
+      </Screen>
+    );
+  }
 
   return (
     <Screen
@@ -98,18 +122,7 @@ export default function ProductInventoryScreen() {
         </HStack>
       }
     >
-      <Pressable
-        onPress={() => navigation.goBack()}
-        hitSlop={6}
-        style={{ marginBottom: 16 }}
-      >
-        <HStack gap={6} align="center">
-          <ArrowLeft size={18} color={palette.text.link} strokeWidth={2} />
-          <Text variant="label" tone="link">
-            Back to inventory
-          </Text>
-        </HStack>
-      </Pressable>
+      <BackLink label="Back to inventory" onPress={() => navigation.goBack()} />
 
       <View
         style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 }}

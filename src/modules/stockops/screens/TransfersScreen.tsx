@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { View } from "react-native";
 import { ArrowLeftRight } from "lucide-react-native";
 import { useAllLocations } from "@modules/warehouse/hooks/useWarehouse";
 import {
@@ -12,7 +11,6 @@ import {
   emptyCell,
 } from "@modules/stockops/components/StockCellPicker";
 import { apiErrorMessage } from "@api/apiClient";
-import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -24,6 +22,7 @@ import {
   Select,
   StatusChip,
   EmptyState,
+  Banner,
 } from "@shared/ui";
 
 export default function TransfersScreen() {
@@ -86,18 +85,18 @@ export default function TransfersScreen() {
       subtitle="Drawer-to-drawer / rack-to-rack within a warehouse"
     >
       {done && (
-        <View style={okBox}>
-          <Text variant="body-sm" tone="success">
-            Transfer {done} completed.
-          </Text>
-        </View>
+        <Banner
+          tone="success"
+          message={`Transfer ${done} completed.`}
+          style={{ marginBottom: 16 }}
+        />
       )}
       {mut.isError && (
-        <View style={errBox}>
-          <Text variant="body-sm" tone="danger">
-            {apiErrorMessage(mut.error)}
-          </Text>
-        </View>
+        <Banner
+          tone="danger"
+          message={apiErrorMessage(mut.error)}
+          style={{ marginBottom: 16 }}
+        />
       )}
 
       <Card style={{ marginBottom: 16 }}>
@@ -179,20 +178,3 @@ export default function TransfersScreen() {
     </Screen>
   );
 }
-
-const errBox = {
-  padding: 14,
-  borderRadius: radius.md,
-  backgroundColor: palette.danger.bg,
-  borderWidth: 1,
-  borderColor: palette.danger.border,
-  marginBottom: 16,
-} as const;
-const okBox = {
-  padding: 14,
-  borderRadius: radius.md,
-  backgroundColor: palette.success.bg,
-  borderWidth: 1,
-  borderColor: palette.success.border,
-  marginBottom: 16,
-} as const;

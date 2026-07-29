@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { View, Pressable } from "react-native";
+import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, User, Mail, Phone, Lock } from "lucide-react-native";
+import { User, Mail, Phone, Lock } from "lucide-react-native";
 import {
   useCreateUser,
   usePermissionCatalogue,
@@ -20,6 +20,7 @@ import {
   Card,
   Button,
   ChipsRow,
+  BackLink,
 } from "@shared/ui";
 import { PermissionEditor } from "@modules/team/components/PermissionEditor";
 
@@ -73,18 +74,7 @@ export default function AddUserScreen() {
       title="Add member"
       subtitle="Create a staff account and grant permissions"
     >
-      <Pressable
-        onPress={() => navigation.goBack()}
-        hitSlop={6}
-        style={{ marginBottom: 16 }}
-      >
-        <HStack gap={6} align="center">
-          <ArrowLeft size={18} color={palette.text.link} strokeWidth={2} />
-          <Text variant="label" tone="link">
-            Back to team
-          </Text>
-        </HStack>
-      </Pressable>
+      <BackLink label="Back to team" onPress={() => navigation.goBack()} />
 
       {mut.isError && (
         <View style={errorBox}>

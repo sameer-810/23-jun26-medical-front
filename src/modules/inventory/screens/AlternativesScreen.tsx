@@ -14,6 +14,7 @@ import {
   Button,
   StatusChip,
   EmptyState,
+  Skeleton,
 } from "@shared/ui";
 
 type Sort = "expiry" | "price" | "margin";
@@ -37,6 +38,31 @@ export default function AlternativesScreen() {
   });
 
   const items = data?.items ?? [];
+
+  if (isLoading || !data) {
+    return (
+      <Screen overline="Alternatives" title={name || "Alternatives"}>
+        <HStack gap={8} style={{ marginBottom: 14 }}>
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} width={110} height={34} rounded="full" />
+          ))}
+        </HStack>
+        <VStack gap={8}>
+          {[0, 1, 2, 3].map((i) => (
+            <Card key={i}>
+              <HStack justify="space-between" align="center">
+                <VStack gap={6} flex={1}>
+                  <Skeleton width="60%" height={16} />
+                  <Skeleton width="40%" height={12} />
+                </VStack>
+                <Skeleton width={54} height={16} />
+              </HStack>
+            </Card>
+          ))}
+        </VStack>
+      </Screen>
+    );
+  }
 
   return (
     <Screen

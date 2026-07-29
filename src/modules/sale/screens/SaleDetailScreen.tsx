@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { View, Pressable } from "react-native";
+import { View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { ArrowLeft, Printer, Undo2, MapPin } from "lucide-react-native";
+import { Printer, Undo2, MapPin } from "lucide-react-native";
 import { useSale, useInvoiceProfile } from "@modules/sale/hooks/useSales";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
@@ -16,6 +16,7 @@ import {
   Button,
   StatusChip,
   Skeleton,
+  BackLink,
 } from "@shared/ui";
 import { ReturnModal } from "@modules/sale/components/ReturnModal";
 
@@ -82,14 +83,7 @@ export default function SaleDetailScreen() {
         style={{ marginBottom: 16 }}
         wrap
       >
-        <Pressable onPress={() => navigation.goBack()} hitSlop={6}>
-          <HStack gap={6} align="center">
-            <ArrowLeft size={18} color={palette.text.link} strokeWidth={2} />
-            <Text variant="label" tone="link">
-              Back
-            </Text>
-          </HStack>
-        </Pressable>
+        <BackLink label="Back" onPress={() => navigation.goBack()} />
         <HStack gap={10}>
           <Button
             label="Print"

@@ -37,6 +37,7 @@ import {
   StatTile,
   Select,
   ConfirmDialog,
+  Skeleton,
 } from "@shared/ui";
 
 export default function PharmacyDetailScreen() {
@@ -83,9 +84,34 @@ export default function PharmacyDetailScreen() {
       <AdminNav active="pharmacies" />
 
       {!org ? (
-        <Text variant="body-sm" tone="tertiary">
-          {isLoading ? "Loading…" : "Pharmacy not found."}
-        </Text>
+        isLoading ? (
+          <VStack gap={16}>
+            <Card>
+              <VStack gap={14}>
+                <HStack gap={10} align="center">
+                  <Skeleton width={40} height={40} rounded="md" />
+                  <VStack gap={6} flex={1}>
+                    <Skeleton width="55%" height={18} />
+                    <Skeleton width="70%" height={12} />
+                  </VStack>
+                </HStack>
+                <Skeleton width="40%" height={14} />
+                <Skeleton width="80%" height={12} />
+              </VStack>
+            </Card>
+            <HStack gap={12} wrap>
+              {[0, 1, 2].map((i) => (
+                <View key={i} style={styles.tile}>
+                  <Skeleton height={72} />
+                </View>
+              ))}
+            </HStack>
+          </VStack>
+        ) : (
+          <Text variant="body-sm" tone="tertiary">
+            Pharmacy not found.
+          </Text>
+        )
       ) : (
         <VStack gap={16}>
           <Card>
