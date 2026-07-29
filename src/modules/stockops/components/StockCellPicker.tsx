@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
+import { View } from "react-native";
 import { useProducts } from "@modules/product/hooks/useProducts";
 import { useProductInventory } from "@modules/inventory/hooks/useInventory";
-import { VStack, Select, Text } from "@shared/ui";
+import { VStack, HStack, Select, Text } from "@shared/ui";
 
 export interface CellSelection {
   productId: string | null;
@@ -17,7 +18,11 @@ interface Props {
   value: CellSelection;
   onChange: (sel: CellSelection) => void;
   locationLabel?: string;
+  /** When true, lay the product/batch/location Selects on a single wrapping row. */
+  row?: boolean;
 }
+
+const fieldWrap = { flexGrow: 1, flexBasis: 200, minWidth: 160 } as const;
 
 const EMPTY: Omit<CellSelection, "productId"> = {
   batchId: null,
@@ -33,6 +38,7 @@ export function StockCellPicker({
   value,
   onChange,
   locationLabel = "Location",
+  row = false,
 }: Props) {
   // The catalogue is paged, so the picker searches server-side rather than
   // listing whatever happened to be on page 1.
@@ -94,37 +100,58 @@ export function StockCellPicker({
     selectedLoc,
   ]);
 
+  const productSelect = (
+    <Select
+      label="Product"
+      placeholder="Search by name or SKU…"
+      value={value.productId}
+      options={productOptions}
+      selectedLabel={selectedProductLabel}
+      onSearch={setProductQuery}
+      loading={productsLoading}
+      onChange={(v) => onChange({ productId: v, ...EMPTY })}
+    />
+  );
+  const batchSelect = (
+    <Select
+      label="Batch"
+      placeholder={value.productId ? "Select batch" : "Pick a product first"}
+      value={value.batchId}
+      options={batchOptions}
+      onChange={(v) => onChange({ ...value, batchId: v, locationId: null })}
+    />
+  );
+  const locationSelect = (
+    <Select
+      label={locationLabel}
+      placeholder={value.batchId ? "Select location" : "Pick a batch first"}
+      value={value.locationId}
+      options={locationOptions}
+      onChange={(v) => onChange({ ...value, locationId: v })}
+    />
+  );
+  const availabilityNote = value.locationId ? (
+    <Text variant="caption" tone="tertiary">
+      Available here: {value.available} {value.baseUnit}
+    </Text>
+  ) : null;
+
   return (
-    <VStack gap={16}>
-      <Select
-        label="Product"
-        placeholder="Search by name or SKU…"
-        value={value.productId}
-        options={productOptions}
-        selectedLabel={selectedProductLabel}
-        onSearch={setProductQuery}
-        loading={productsLoading}
-        onChange={(v) => onChange({ productId: v, ...EMPTY })}
-      />
-      <Select
-        label="Batch"
-        placeholder={value.productId ? "Select batch" : "Pick a product first"}
-        value={value.batchId}
-        options={batchOptions}
-        onChange={(v) => onChange({ ...value, batchId: v, locationId: null })}
-      />
-      <Select
-        label={locationLabel}
-        placeholder={value.batchId ? "Select location" : "Pick a batch first"}
-        value={value.locationId}
-        options={locationOptions}
-        onChange={(v) => onChange({ ...value, locationId: v })}
-      />
-      {value.locationId ? (
-        <Text variant="caption" tone="tertiary">
-          Available here: {value.available} {value.baseUnit}
-        </Text>
-      ) : null}
+    <VStack gap={row ? 12 : 16}>
+      {row ? (
+        <HStack gap={12} wrap>
+          <View style={fieldWrap}>{productSelect}</View>
+          <View style={fieldWrap}>{batchSelect}</View>
+          <View style={fieldWrap}>{locationSelect}</View>
+        </HStack>
+      ) : (
+        <>
+          {productSelect}
+          {batchSelect}
+          {locationSelect}
+        </>
+      )}
+      {availabilityNote}
     </VStack>
   );
 }

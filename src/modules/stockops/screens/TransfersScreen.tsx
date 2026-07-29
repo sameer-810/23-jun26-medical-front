@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { View } from "react-native";
 import { ArrowLeftRight } from "lucide-react-native";
 import { useAllLocations } from "@modules/warehouse/hooks/useWarehouse";
 import {
@@ -100,29 +101,36 @@ export default function TransfersScreen() {
       )}
 
       <Card style={{ marginBottom: 16 }}>
-        <VStack gap={16}>
+        <VStack gap={12}>
           <StockCellPicker
             value={cell}
             onChange={setCell}
             locationLabel="From location"
+            row
           />
-          <Select
-            label="To location"
-            placeholder={
-              cell.locationId ? "Select destination" : "Pick a source first"
-            }
-            value={toLocationId}
-            options={destOptions}
-            onChange={setToLocationId}
-          />
-          <TextField
-            label={`Quantity (${cell.baseUnit || "base units"})`}
-            value={quantity}
-            onChangeText={setQuantity}
-            keyboardType="decimal-pad"
-            placeholder="0"
-            error={tooMuch ? `Only ${cell.available} available` : undefined}
-          />
+          <HStack gap={12} wrap>
+            <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 160 }}>
+              <Select
+                label="To location"
+                placeholder={
+                  cell.locationId ? "Select destination" : "Pick a source first"
+                }
+                value={toLocationId}
+                options={destOptions}
+                onChange={setToLocationId}
+              />
+            </View>
+            <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 160 }}>
+              <TextField
+                label={`Quantity (${cell.baseUnit || "base units"})`}
+                value={quantity}
+                onChangeText={setQuantity}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                error={tooMuch ? `Only ${cell.available} available` : undefined}
+              />
+            </View>
+          </HStack>
           <TextField
             label="Note (optional)"
             value={note}

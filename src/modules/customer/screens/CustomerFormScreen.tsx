@@ -13,7 +13,15 @@ import { customerSchema } from "@modules/customer/customer.validation";
 import { apiErrorMessage } from "@api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Screen, Text, VStack, Card, Button, BackLink } from "@shared/ui";
+import {
+  Screen,
+  Text,
+  VStack,
+  HStack,
+  Card,
+  Button,
+  BackLink,
+} from "@shared/ui";
 
 export default function CustomerFormScreen() {
   const navigation = useNavigation<any>();
@@ -73,51 +81,71 @@ export default function CustomerFormScreen() {
       )}
 
       <Card style={{ marginBottom: 16 }}>
-        <VStack gap={16}>
-          <ControlledTextField
-            control={control}
-            name="name"
-            label="Name"
-            leading={
-              <User size={18} color={palette.text.tertiary} strokeWidth={1.8} />
-            }
-            placeholder="Customer name"
-          />
-          <ControlledTextField
-            control={control}
-            name="mobile"
-            label="Mobile"
-            leading={
-              <Phone
-                size={18}
-                color={palette.text.tertiary}
-                strokeWidth={1.8}
+        <VStack gap={12}>
+          <HStack gap={12} wrap>
+            <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 150 }}>
+              <ControlledTextField
+                control={control}
+                name="name"
+                label="Name"
+                leading={
+                  <User
+                    size={18}
+                    color={palette.text.tertiary}
+                    strokeWidth={1.8}
+                  />
+                }
+                placeholder="Customer name"
               />
-            }
-            keyboardType="phone-pad"
-            placeholder="9876543210"
-          />
-          <ControlledTextField
-            control={control}
-            name="email"
-            label="Email (optional)"
-            leading={
-              <Mail size={18} color={palette.text.tertiary} strokeWidth={1.8} />
-            }
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+            </View>
+            <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 150 }}>
+              <ControlledTextField
+                control={control}
+                name="mobile"
+                label="Mobile"
+                leading={
+                  <Phone
+                    size={18}
+                    color={palette.text.tertiary}
+                    strokeWidth={1.8}
+                  />
+                }
+                keyboardType="phone-pad"
+                placeholder="9876543210"
+              />
+            </View>
+          </HStack>
+          <HStack gap={12} wrap>
+            <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 150 }}>
+              <ControlledTextField
+                control={control}
+                name="email"
+                label="Email (optional)"
+                leading={
+                  <Mail
+                    size={18}
+                    color={palette.text.tertiary}
+                    strokeWidth={1.8}
+                  />
+                }
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+            <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 150 }}>
+              <ControlledTextField
+                control={control}
+                name="gstin"
+                label="GSTIN (optional, for B2B)"
+                autoCapitalize="characters"
+              />
+            </View>
+          </HStack>
           <ControlledTextField
             control={control}
             name="address"
             label="Address (optional)"
             placeholder="Address"
-          />
-          <ControlledTextField
-            control={control}
-            name="gstin"
-            label="GSTIN (optional, for B2B)"
-            autoCapitalize="characters"
           />
         </VStack>
       </Card>

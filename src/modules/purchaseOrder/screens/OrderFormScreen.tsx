@@ -1,23 +1,30 @@
 import React, { useMemo, useState } from "react";
-import { View, Pressable } from "react-native";
+import {
+  View,
+  Pressable,
+  TextInput,
+  ScrollView,
+  StyleSheet,
+} from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useMutation } from "@tanstack/react-query";
-import { ArrowLeft, X, Search } from "lucide-react-native";
+import { ArrowLeft, X, Search, PackageSearch } from "lucide-react-native";
 import { purchaseOrderApi } from "@modules/purchaseOrder/api/purchaseOrderApi";
 import type { SeededLine } from "@modules/purchaseOrder/types";
 import { useProducts } from "@modules/product/hooks/useProducts";
 import { apiErrorMessage } from "@api/apiClient";
-import { palette } from "@shared/designSystem";
+import { fmtMoney } from "@shared/format";
+import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
   Text,
-  VStack,
   HStack,
   Card,
   Button,
   TextField,
   Combobox,
   Banner,
+  EmptyState,
 } from "@shared/ui";
 
 interface Line {
@@ -170,41 +177,94 @@ export default function OrderFormScreen() {
         />
       </View>
 
-      <VStack gap={8}>
-        {lines.map((l, i) => (
-          <Card key={l.productId}>
-            <HStack gap={10} align="center">
-              <VStack gap={2} flex={1}>
-                <Text variant="label-lg" tone="primary" numberOfLines={1}>
-                  {l.productName}
-                </Text>
-                <Text variant="caption" tone="tertiary">
-                  {l.sku}
-                </Text>
-              </VStack>
-              <View style={{ width: 66 }}>
-                <TextField
-                  value={l.quantity}
-                  onChangeText={(v) => setLine(i, "quantity", v)}
-                  keyboardType="number-pad"
-                  placeholder="Qty"
-                />
+      {lines.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={PackageSearch}
+            title="No items yet"
+            message="Search a medicine above to add it to this order."
+          />
+        </Card>
+      ) : (
+        <Card padded={false} style={{ overflow: "hidden" }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ minWidth: "100%" }}
+          >
+            <View style={{ minWidth: "100%" }}>
+              <View style={pog.head}>
+                <PoHead w={POC.idx} label="#" />
+                <PoHead w={POC.product} label="PRODUCT" left />
+                <PoHead w={POC.qty} label="QTY" />
+                <PoHead w={POC.price} label="EST ₹/UNIT" right />
+                <PoHead w={POC.amount} label="AMOUNT" right />
+                <View style={{ width: POC.rm }} />
               </View>
-              <View style={{ width: 74 }}>
-                <TextField
-                  value={l.estimatedPrice}
-                  onChangeText={(v) => setLine(i, "estimatedPrice", v)}
-                  keyboardType="numeric"
-                  placeholder="₹/unit"
-                />
-              </View>
-              <Pressable onPress={() => removeLine(i)} hitSlop={8}>
-                <X size={18} color={palette.danger.text} strokeWidth={2} />
-              </Pressable>
-            </HStack>
-          </Card>
-        ))}
-      </VStack>
+              {lines.map((l, i) => {
+                const amt =
+                  (Number(l.quantity) || 0) * (Number(l.estimatedPrice) || 0);
+                return (
+                  <View
+                    key={l.productId}
+                    style={[
+                      pog.row,
+                      i % 2 === 1 ? { backgroundColor: palette.ink[50] } : null,
+                    ]}
+                  >
+                    <Text
+                      style={{ width: POC.idx, textAlign: "center" }}
+                      variant="caption"
+                      tone="tertiary"
+                    >
+                      {i + 1}
+                    </Text>
+                    <View style={{ width: POC.product }}>
+                      <Text variant="body-sm" tone="primary" numberOfLines={1}>
+                        {l.productName}
+                      </Text>
+                      <Text variant="caption" tone="tertiary" numberOfLines={1}>
+                        {l.sku}
+                      </Text>
+                    </View>
+                    <PoCell
+                      w={POC.qty}
+                      value={l.quantity}
+                      onChangeText={(v) => setLine(i, "quantity", v)}
+                      align="center"
+                    />
+                    <PoCell
+                      w={POC.price}
+                      value={l.estimatedPrice}
+                      onChangeText={(v) => setLine(i, "estimatedPrice", v)}
+                      align="right"
+                    />
+                    <Text
+                      style={{ width: POC.amount, textAlign: "right" }}
+                      variant="label-sm"
+                      tone="primary"
+                    >
+                      {amt > 0 ? fmtMoney(amt) : "—"}
+                    </Text>
+                    <Pressable
+                      onPress={() => removeLine(i)}
+                      style={{ width: POC.rm, alignItems: "center" }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Remove line"
+                    >
+                      <X
+                        size={15}
+                        color={palette.text.tertiary}
+                        strokeWidth={2}
+                      />
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </View>
+          </ScrollView>
+        </Card>
+      )}
 
       <Card style={{ marginTop: 12 }}>
         <TextField
@@ -235,3 +295,91 @@ export default function OrderFormScreen() {
     </Screen>
   );
 }
+
+// ---- PO line grid ----
+const POC = { idx: 26, product: 240, qty: 64, price: 96, amount: 96, rm: 30 };
+
+function PoHead({
+  w,
+  label,
+  left,
+  right,
+}: {
+  w: number;
+  label: string;
+  left?: boolean;
+  right?: boolean;
+}) {
+  return (
+    <Text
+      style={{
+        width: w,
+        textAlign: left ? "left" : right ? "right" : "center",
+      }}
+      variant="overline"
+      tone="tertiary"
+      numberOfLines={1}
+    >
+      {label}
+    </Text>
+  );
+}
+
+function PoCell({
+  w,
+  value,
+  onChangeText,
+  align = "left",
+}: {
+  w: number;
+  value: string;
+  onChangeText: (v: string) => void;
+  align?: "left" | "center" | "right";
+}) {
+  return (
+    <TextInput
+      value={value}
+      onChangeText={onChangeText}
+      keyboardType="decimal-pad"
+      selectTextOnFocus
+      style={[
+        pog.cell,
+        { width: w, textAlign: align },
+        // @ts-expect-error web-only outline reset
+        { outlineStyle: "none" },
+      ]}
+    />
+  );
+}
+
+const pog = StyleSheet.create({
+  head: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: palette.neutral[50],
+    borderBottomWidth: 1.5,
+    borderBottomColor: palette.border.strong,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border.subtle,
+  },
+  cell: {
+    height: 38,
+    borderWidth: 1,
+    borderColor: palette.border.default,
+    borderRadius: radius.sm,
+    paddingHorizontal: 8,
+    fontSize: 13,
+    color: palette.text.primary,
+    backgroundColor: palette.surface.primary,
+  },
+});

@@ -101,45 +101,55 @@ export default function DamagedScreen() {
       )}
 
       <Card style={{ marginBottom: 16 }}>
-        <VStack gap={16}>
-          <View>
-            <Text variant="label" tone="secondary" style={{ marginBottom: 8 }}>
-              Reason type
-            </Text>
-            <ChipsRow
-              chips={TYPES}
-              active={type}
-              onChange={(k) => setType(k as AdjustmentType)}
-            />
-          </View>
-          {type === "correction" && (
-            <View>
+        <VStack gap={12}>
+          <HStack gap={12} wrap align="flex-start">
+            <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 160 }}>
               <Text
                 variant="label"
                 tone="secondary"
                 style={{ marginBottom: 8 }}
               >
-                Direction
+                Reason type
               </Text>
               <ChipsRow
-                chips={[
-                  { key: "out", label: "Remove (−)" },
-                  { key: "in", label: "Add (+)" },
-                ]}
-                active={direction}
-                onChange={(k) => setDirection(k as never)}
+                chips={TYPES}
+                active={type}
+                onChange={(k) => setType(k as AdjustmentType)}
               />
             </View>
-          )}
-          <StockCellPicker value={cell} onChange={setCell} />
-          <TextField
-            label={`Quantity (${cell.baseUnit || "base units"})`}
-            value={quantity}
-            onChangeText={setQuantity}
-            keyboardType="decimal-pad"
-            placeholder="0"
-            error={tooMuch ? `Only ${cell.available} available` : undefined}
-          />
+            {type === "correction" && (
+              <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 160 }}>
+                <Text
+                  variant="label"
+                  tone="secondary"
+                  style={{ marginBottom: 8 }}
+                >
+                  Direction
+                </Text>
+                <ChipsRow
+                  chips={[
+                    { key: "out", label: "Remove (−)" },
+                    { key: "in", label: "Add (+)" },
+                  ]}
+                  active={direction}
+                  onChange={(k) => setDirection(k as never)}
+                />
+              </View>
+            )}
+          </HStack>
+          <StockCellPicker value={cell} onChange={setCell} row />
+          <HStack gap={12} wrap>
+            <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 160 }}>
+              <TextField
+                label={`Quantity (${cell.baseUnit || "base units"})`}
+                value={quantity}
+                onChangeText={setQuantity}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                error={tooMuch ? `Only ${cell.available} available` : undefined}
+              />
+            </View>
+          </HStack>
           <TextField
             label="Reason / note"
             value={reason}

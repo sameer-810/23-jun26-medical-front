@@ -13,7 +13,15 @@ import { supplierSchema } from "@modules/supplier/supplier.validation";
 import { apiErrorMessage } from "@api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Screen, Text, VStack, Card, Button, BackLink } from "@shared/ui";
+import {
+  Screen,
+  Text,
+  VStack,
+  HStack,
+  Card,
+  Button,
+  BackLink,
+} from "@shared/ui";
 
 export default function SupplierFormScreen() {
   const navigation = useNavigation<any>();
@@ -77,62 +85,88 @@ export default function SupplierFormScreen() {
         </View>
       )}
       <Card style={{ marginBottom: 16 }}>
-        <VStack gap={16}>
-          <ControlledTextField
-            control={control}
-            name="name"
-            label="Supplier name"
-            leading={
-              <Truck
-                size={18}
-                color={palette.text.tertiary}
-                strokeWidth={1.8}
+        <VStack gap={12}>
+          <HStack gap={12} wrap>
+            <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 150 }}>
+              <ControlledTextField
+                control={control}
+                name="name"
+                label="Supplier name"
+                leading={
+                  <Truck
+                    size={18}
+                    color={palette.text.tertiary}
+                    strokeWidth={1.8}
+                  />
+                }
+                placeholder="MedSupply Co"
               />
-            }
-            placeholder="MedSupply Co"
-          />
-          <ControlledTextField
-            control={control}
-            name="contactPerson"
-            label="Contact person"
-            leading={
-              <User size={18} color={palette.text.tertiary} strokeWidth={1.8} />
-            }
-          />
-          <ControlledTextField
-            control={control}
-            name="mobile"
-            label="Mobile"
-            leading={
-              <Phone
-                size={18}
-                color={palette.text.tertiary}
-                strokeWidth={1.8}
+            </View>
+            <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 150 }}>
+              <ControlledTextField
+                control={control}
+                name="contactPerson"
+                label="Contact person"
+                leading={
+                  <User
+                    size={18}
+                    color={palette.text.tertiary}
+                    strokeWidth={1.8}
+                  />
+                }
               />
-            }
-            keyboardType="phone-pad"
-          />
-          <ControlledTextField
-            control={control}
-            name="email"
-            label="Email"
-            leading={
-              <Mail size={18} color={palette.text.tertiary} strokeWidth={1.8} />
-            }
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          <ControlledTextField
-            control={control}
-            name="address"
-            label="Address"
-          />
-          <ControlledTextField
-            control={control}
-            name="gstin"
-            label="GSTIN"
-            autoCapitalize="characters"
-          />
+            </View>
+          </HStack>
+          <HStack gap={12} wrap>
+            <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 150 }}>
+              <ControlledTextField
+                control={control}
+                name="mobile"
+                label="Mobile"
+                leading={
+                  <Phone
+                    size={18}
+                    color={palette.text.tertiary}
+                    strokeWidth={1.8}
+                  />
+                }
+                keyboardType="phone-pad"
+              />
+            </View>
+            <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 150 }}>
+              <ControlledTextField
+                control={control}
+                name="email"
+                label="Email"
+                leading={
+                  <Mail
+                    size={18}
+                    color={palette.text.tertiary}
+                    strokeWidth={1.8}
+                  />
+                }
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+          </HStack>
+          <HStack gap={12} wrap>
+            <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 150 }}>
+              <ControlledTextField
+                control={control}
+                name="address"
+                label="Address"
+              />
+            </View>
+            <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 150 }}>
+              <ControlledTextField
+                control={control}
+                name="gstin"
+                label="GSTIN"
+                autoCapitalize="characters"
+              />
+            </View>
+          </HStack>
         </VStack>
       </Card>
       <Button
