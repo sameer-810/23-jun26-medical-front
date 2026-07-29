@@ -19,7 +19,7 @@ import { PackUnit, ScheduleDrug } from "@modules/product/types";
 import { apiErrorMessage } from "@api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { ControlledSelect } from "@shared/form/ControlledSelect";
-import { palette, radius } from "@shared/designSystem";
+import { palette } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -27,10 +27,22 @@ import {
   HStack,
   Card,
   Button,
+  Banner,
   ConfirmDialog,
   BackLink,
 } from "@shared/ui";
 import { PacksEditor } from "@modules/product/components/PacksEditor";
+
+/** Grid column: grows to fill, wraps to 1-per-row on narrow screens. */
+const col = { flexGrow: 1, flexBasis: 180, minWidth: 150 } as const;
+/** Small uppercase group label inside a card. */
+function GroupLabel({ children }: { children: string }) {
+  return (
+    <Text variant="overline" tone="tertiary" style={{ marginBottom: 2 }}>
+      {children}
+    </Text>
+  );
+}
 
 const SCHEDULES: { value: ScheduleDrug; label: string }[] = [
   { value: "", label: "None" },
@@ -146,24 +158,59 @@ export default function ProductFormScreen() {
       <BackLink label="Back to products" onPress={() => navigation.goBack()} />
 
       {mut.isError && (
-        <View style={errorBox}>
-          <Text variant="body-sm" tone="danger">
-            {apiErrorMessage(mut.error)}
-          </Text>
-        </View>
+        <Banner
+          tone="danger"
+          message={apiErrorMessage(mut.error)}
+          style={{ marginBottom: 12 }}
+        />
       )}
 
-      {/* Identity */}
-      <Card style={{ marginBottom: 16 }}>
-        <VStack gap={16}>
+      {/* Identity & classification */}
+      <Card style={{ marginBottom: 12 }}>
+        <VStack gap={12}>
+          <GroupLabel>PRODUCT DETAILS</GroupLabel>
           <ControlledTextField
             control={control}
             name="name"
             label="Product name"
             placeholder="Amoxicillin 500mg"
           />
-          <HStack gap={12}>
-            <View style={{ flex: 1 }}>
+          {/* Staff search by molecule as often as by brand, and substitutes are
+              chosen on the salt. */}
+          <ControlledTextField
+            control={control}
+            name="saltComposition"
+            label="Salt / composition"
+            placeholder="e.g. Paracetamol 500mg + Caffeine 30mg"
+          />
+          <HStack gap={12} wrap>
+            <View style={col}>
+              <ControlledSelect
+                control={control}
+                name="categoryId"
+                label="Category"
+                options={categoryOptions}
+                onCreate={async (label) => {
+                  const cat = await createCategory.mutateAsync(label);
+                  return { value: cat.id, label: cat.name };
+                }}
+                allowClear
+              />
+            </View>
+            <View style={col}>
+              <ControlledSelect
+                control={control}
+                name="brandId"
+                label="Brand"
+                options={brandOptions}
+                onCreate={async (label) => {
+                  const b = await createBrand.mutateAsync(label);
+                  return { value: b.id, label: b.name };
+                }}
+                allowClear
+              />
+            </View>
+            <View style={col}>
               <ControlledTextField
                 control={control}
                 name="sku"
@@ -172,7 +219,7 @@ export default function ProductFormScreen() {
                 autoCapitalize="characters"
               />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={col}>
               <ControlledTextField
                 control={control}
                 name="barcode"
@@ -182,51 +229,69 @@ export default function ProductFormScreen() {
               />
             </View>
           </HStack>
-          {/* Staff search by molecule as often as by brand ("something with
-              pantoprazole"), and substitutes are chosen on the salt. */}
-          <ControlledTextField
-            control={control}
-            name="saltComposition"
-            label="Salt / composition"
-            placeholder="e.g. Paracetamol 500mg + Caffeine 30mg"
-          />
-          <ControlledSelect
-            control={control}
-            name="categoryId"
-            label="Category"
-            options={categoryOptions}
-            onCreate={async (label) => {
-              const cat = await createCategory.mutateAsync(label);
-              return { value: cat.id, label: cat.name };
-            }}
-            allowClear
-          />
-          <ControlledSelect
-            control={control}
-            name="brandId"
-            label="Brand"
-            options={brandOptions}
-            onCreate={async (label) => {
-              const b = await createBrand.mutateAsync(label);
-              return { value: b.id, label: b.name };
-            }}
-            allowClear
-          />
         </VStack>
       </Card>
 
-      {/* Units */}
-      <Text variant="h3" tone="primary" style={{ marginBottom: 12 }}>
-        Units of measure
-      </Text>
-      <Card style={{ marginBottom: 16 }}>
-        <VStack gap={16}>
-          <ControlledTextField
-            control={control}
-            name="baseUnit"
-            label="Base unit"
-            placeholder="tablet / pcs / ml"
-          />
+      {/* Units, pricing & tax */}
+      <Card style={{ marginBottom: 12 }}>
+        <VStack gap={12}>
+          <GroupLabel>UNITS · PRICING · TAX</GroupLabel>
+          <HStack gap={12} wrap>
+            <View style={col}>
+              <ControlledTextField
+                control={control}
+                name="baseUnit"
+                label="Base unit"
+                placeholder="tablet / pcs / ml"
+              />
+            </View>
+            <View style={col}>
+              <ControlledTextField
+                control={control}
+                name="sellingPrice"
+                label="Selling price (₹)"
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+              />
+            </View>
+            <View style={col}>
+              <ControlledTextField
+                control={control}
+                name="mrp"
+                label="MRP (₹)"
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+              />
+            </View>
+          </HStack>
+          <HStack gap={12} wrap>
+            <View style={col}>
+              <ControlledTextField
+                control={control}
+                name="taxRatePct"
+                label="GST %"
+                keyboardType="decimal-pad"
+                placeholder="from settings"
+              />
+            </View>
+            <View style={col}>
+              <ControlledTextField
+                control={control}
+                name="hsnCode"
+                label="HSN code"
+                placeholder="3004"
+              />
+            </View>
+            <View style={col}>
+              <ControlledTextField
+                control={control}
+                name="reorderLevel"
+                label="Reorder level"
+                keyboardType="number-pad"
+                placeholder="from settings"
+              />
+            </View>
+          </HStack>
           <Controller
             control={control}
             name="packs"
@@ -241,100 +306,53 @@ export default function ProductFormScreen() {
         </VStack>
       </Card>
 
-      {/* Pricing */}
-      <Text variant="h3" tone="primary" style={{ marginBottom: 12 }}>
-        Pricing & tax
-      </Text>
-      <Card style={{ marginBottom: 16 }}>
-        <VStack gap={16}>
-          <HStack gap={12}>
-            <View style={{ flex: 1 }}>
-              <ControlledTextField
-                control={control}
-                name="sellingPrice"
-                label="Selling price (₹)"
-                keyboardType="decimal-pad"
-                placeholder="0.00"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <ControlledTextField
-                control={control}
-                name="mrp"
-                label="MRP (₹)"
-                keyboardType="decimal-pad"
-                placeholder="0.00"
-              />
-            </View>
-          </HStack>
-          <HStack gap={12}>
-            <View style={{ flex: 1 }}>
-              <ControlledTextField
-                control={control}
-                name="taxRatePct"
-                label="GST %"
-                keyboardType="decimal-pad"
-                placeholder="from settings"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <ControlledTextField
-                control={control}
-                name="hsnCode"
-                label="HSN code"
-                placeholder="3004"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <ControlledTextField
-                control={control}
-                name="reorderLevel"
-                label="Reorder level"
-                keyboardType="number-pad"
-                placeholder="from settings"
-              />
-            </View>
-          </HStack>
-        </VStack>
-      </Card>
-
-      {/* Pharma */}
-      <Text variant="h3" tone="primary" style={{ marginBottom: 12 }}>
-        Pharmacy
-      </Text>
+      {/* Pharmacy */}
       <Card style={{ marginBottom: 20 }}>
-        <VStack gap={16}>
-          <HStack align="center" justify="space-between">
-            <VStack gap={2} flex={1}>
-              <Text variant="label-lg" tone="primary">
-                Prescription required
-              </Text>
-              <Text variant="body-sm" tone="tertiary">
-                Warn at point of sale (Rx / Schedule drugs).
-              </Text>
-            </VStack>
-            <Controller
-              control={control}
-              name="prescriptionRequired"
-              render={({ field }) => (
-                <Switch
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  trackColor={{
-                    true: palette.teal[500],
-                    false: palette.ink[200],
-                  }}
-                  thumbColor="#FFFFFF"
-                />
-              )}
-            />
+        <VStack gap={12}>
+          <GroupLabel>PHARMACY</GroupLabel>
+          <HStack gap={12} wrap align="flex-end">
+            <View style={col}>
+              <ControlledSelect
+                control={control}
+                name="scheduleDrug"
+                label="Drug schedule"
+                options={SCHEDULES.map((s) => ({
+                  value: s.value,
+                  label: s.label,
+                }))}
+              />
+            </View>
+            <HStack
+              align="center"
+              justify="space-between"
+              gap={12}
+              style={{ ...col, minHeight: 50 }}
+            >
+              <VStack gap={1} flex={1}>
+                <Text variant="label" tone="primary">
+                  Prescription required
+                </Text>
+                <Text variant="caption" tone="tertiary">
+                  Warn at sale (Rx / Schedule)
+                </Text>
+              </VStack>
+              <Controller
+                control={control}
+                name="prescriptionRequired"
+                render={({ field }) => (
+                  <Switch
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    trackColor={{
+                      true: palette.teal[500],
+                      false: palette.ink[200],
+                    }}
+                    thumbColor="#FFFFFF"
+                  />
+                )}
+              />
+            </HStack>
           </HStack>
-          <ControlledSelect
-            control={control}
-            name="scheduleDrug"
-            label="Drug schedule"
-            options={SCHEDULES.map((s) => ({ value: s.value, label: s.label }))}
-          />
         </VStack>
       </Card>
 
@@ -371,12 +389,3 @@ export default function ProductFormScreen() {
     </Screen>
   );
 }
-
-const errorBox = {
-  padding: 14,
-  borderRadius: radius.md,
-  backgroundColor: palette.danger.bg,
-  borderWidth: 1,
-  borderColor: palette.danger.border,
-  marginBottom: 16,
-} as const;

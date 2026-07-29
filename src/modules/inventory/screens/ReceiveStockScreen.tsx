@@ -1,5 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Pressable, StyleSheet } from "react-native";
+import {
+  View,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  ScrollView,
+} from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import {
   Plus,
@@ -8,6 +14,7 @@ import {
   ScanLine,
   Printer,
   Search,
+  Trash2,
 } from "lucide-react-native";
 import {
   useProducts,
@@ -19,7 +26,6 @@ import {
   useCreateSupplier,
 } from "@modules/supplier/hooks/useSuppliers";
 import { useReceiveStock } from "@modules/inventory/hooks/useInventory";
-import { ReceiveLineRow } from "@modules/inventory/components/ReceiveLineRow";
 import { QuickAddProduct } from "@modules/inventory/components/QuickAddProduct";
 import {
   NewProductDraft,
@@ -44,7 +50,8 @@ import {
   totalBaseUnits,
 } from "@modules/inventory/receiveDraft";
 import { apiErrorMessage } from "@api/apiClient";
-import { palette } from "@shared/designSystem";
+import { fmtMoney } from "@shared/format";
+import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -60,10 +67,9 @@ import {
 import { useAuthStore } from "@shared/store/useAuthStore";
 
 /**
- * Receive Stock — goods-received note.
- *
- * Orchestration only: state, data fetching and wiring. The draft rules live in
- * `receiveDraft.ts` and a line's UI in `components/ReceiveLineRow`.
+ * Receive Stock — goods-received note, entered as a dense spreadsheet-style grid
+ * (one row per medicine: Batch · Expiry · Qty · Unit · Rate · MRP · Location),
+ * the way Marg / eVitalRx / GoFrugal do it. Draft rules live in `receiveDraft.ts`.
  */
 export default function ReceiveStockScreen() {
   const navigation = useNavigation<any>();
@@ -102,22 +108,12 @@ export default function ReceiveStockScreen() {
   const [knownProducts, setKnownProducts] = useState<
     Record<string, ProductLite>
   >({});
-  /** Open rows. Collapsed by default so a 25-line bill fits on one screen. */
-  const [expanded, setExpanded] = useState<Set<number>>(new Set([0]));
   /** Which line asked to create a product, and what it should open with. */
   const [creatingFor, setCreatingFor] = useState<{
     index: number;
     initial: NewProductDraft;
     fromBill: boolean;
   } | null>(null);
-
-  const toggleExpanded = (i: number) =>
-    setExpanded((cur) => {
-      const next = new Set(cur);
-      if (next.has(i)) next.delete(i);
-      else next.add(i);
-      return next;
-    });
 
   // A scanned bill arrives as a route param — consume it once, then clear it so
   // a re-render can't wipe the pharmacist's edits.
@@ -128,7 +124,6 @@ export default function ReceiveStockScreen() {
     if (!scanned) return;
     setKnownProducts((cur) => ({ ...cur, ...productsFromScan(scanned) }));
     setLines(linesFromScan(scanned));
-    setExpanded(new Set()); // all collapsed — the point is to see them all
     setReference(scanned.invoiceNo || "");
     if (scanned.supplierMatch) setSupplierId(scanned.supplierMatch.id);
     setScanNote(scanSummary(scanned));
@@ -165,16 +160,6 @@ export default function ReceiveStockScreen() {
     return map;
   }, [searchResults, knownProducts]);
 
-  /** The picker lists search results only — the catalogue is far too big to list. */
-  const productOptions = useMemo(
-    () =>
-      searchResults.map((p) => ({
-        value: p.id,
-        label: `${p.name} · ${p.sku}`,
-      })),
-    [searchResults],
-  );
-
   // Keyboard-first "add a line" search — filling the first blank line, else
   // appending. Mirrors the POS add-bar so building a multi-line GRN is fast.
   const productItems = useMemo(
@@ -192,12 +177,10 @@ export default function ReceiveStockScreen() {
     setLines((cur) => {
       const blank = cur.findIndex((l) => !l.productId);
       if (blank >= 0) {
-        setExpanded((e) => new Set(e).add(blank));
         return cur.map((l, k) =>
           k === blank ? { ...l, productId: id, unit: p?.baseUnit || null } : l,
         );
       }
-      setExpanded((e) => new Set(e).add(cur.length));
       return [
         ...cur,
         { ...emptyLine(), productId: id, unit: p?.baseUnit || null },
@@ -209,13 +192,6 @@ export default function ReceiveStockScreen() {
     setLines((cur) =>
       cur.map((l, idx) => (idx === i ? { ...l, ...patch } : l)),
     );
-
-  /** Remember every pick so its name/unit survives the next search. */
-  const pickProduct = (i: number, id: string | null) => {
-    const p = id ? productsById[id] : null;
-    if (p) setKnownProducts((cur) => ({ ...cur, [p.id]: p }));
-    setLine(i, { productId: id, unit: p?.baseUnit || null });
-  };
 
   /**
    * The picker had nothing — open the create form for this line.
@@ -245,12 +221,7 @@ export default function ReceiveStockScreen() {
     });
   };
 
-  // A manually-added line is the one you want to fill in next.
-  const addLine = () =>
-    setLines((cur) => {
-      setExpanded((e) => new Set(e).add(cur.length));
-      return [...cur, emptyLine()];
-    });
+  const addLine = () => setLines((cur) => [...cur, emptyLine()]);
 
   const removeLine = (i: number) =>
     setLines((cur) =>
@@ -259,6 +230,10 @@ export default function ReceiveStockScreen() {
 
   const validLines = toReceiptLines(lines);
   const totalBase = totalBaseUnits(lines, productsById);
+  const totalValue = lines.reduce(
+    (s, l) => s + (Number(l.quantity) || 0) * (Number(l.purchasePrice) || 0),
+    0,
+  );
 
   /**
    * Print a shelf label for every unit just received. One label per unit is the
@@ -291,7 +266,6 @@ export default function ReceiveStockScreen() {
         onSuccess: (r) => {
           setDone(r);
           setLines([emptyLine()]);
-          setExpanded(new Set([0]));
           setSupplierId(null);
           setReference("");
           setScanNote(null);
@@ -423,28 +397,159 @@ export default function ReceiveStockScreen() {
         />
       </View>
 
-      <VStack gap={10}>
-        {lines.map((line, i) => (
-          <ReceiveLineRow
-            key={i}
-            index={i}
-            line={line}
-            product={line.productId ? productsById[line.productId] : null}
-            open={expanded.has(i)}
-            onToggle={() => toggleExpanded(i)}
-            onChange={(patch) => setLine(i, patch)}
-            onPickProduct={(id) => pickProduct(i, id)}
-            onRemove={lines.length > 1 ? () => removeLine(i) : undefined}
-            productOptions={productOptions}
-            onSearchProducts={setProductQuery}
-            productsLoading={productsLoading}
-            locationOptions={locationOptions}
-            onRequestCreateProduct={
-              canManageProducts ? (q) => requestCreateProduct(i, q) : undefined
-            }
-          />
-        ))}
-      </VStack>
+      <Card padded={false} style={{ overflow: "hidden", marginBottom: 8 }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ minWidth: "100%" }}
+        >
+          <View style={{ minWidth: "100%" }}>
+            <View style={grn.head}>
+              <GrnHead w={COL.idx} label="#" />
+              <GrnHead w={COL.product} label="PRODUCT" left />
+              <GrnHead w={COL.batch} label="BATCH" />
+              <GrnHead w={COL.mfg} label="MFG" />
+              <GrnHead w={COL.expiry} label="EXPIRY" />
+              <GrnHead w={COL.qty} label="QTY" />
+              <GrnHead w={COL.unit} label="UNIT" />
+              <GrnHead w={COL.rate} label="RATE" right />
+              <GrnHead w={COL.mrp} label="MRP" right />
+              <GrnHead w={COL.loc} label="LOCATION" />
+              <GrnHead w={COL.amount} label="AMOUNT" right />
+              <View style={{ width: COL.rm }} />
+            </View>
+            {lines.map((line, i) => {
+              const p = line.productId ? productsById[line.productId] : null;
+              const qtyN = Number(line.quantity) || 0;
+              const rateN = Number(line.purchasePrice) || 0;
+              const amount = qtyN * rateN;
+              const started = Boolean(line.productId);
+              const units = p
+                ? [
+                    { value: p.baseUnit, label: p.baseUnit },
+                    ...(p.packs || []).map((pk) => ({
+                      value: pk.unit,
+                      label: pk.unit,
+                    })),
+                  ]
+                : line.unit
+                  ? [{ value: line.unit, label: line.unit }]
+                  : [];
+              return (
+                <View
+                  key={i}
+                  style={[
+                    grn.row,
+                    i % 2 === 1 ? { backgroundColor: palette.ink[50] } : null,
+                  ]}
+                >
+                  <Text
+                    style={{ width: COL.idx, textAlign: "center" }}
+                    variant="caption"
+                    tone="tertiary"
+                  >
+                    {i + 1}
+                  </Text>
+                  <View style={{ width: COL.product }}>
+                    {p ? (
+                      <Text variant="body-sm" tone="primary" numberOfLines={1}>
+                        {p.name}
+                      </Text>
+                    ) : (
+                      <Pressable
+                        onPress={() =>
+                          canManageProducts &&
+                          requestCreateProduct(
+                            i,
+                            line.fromBill?.productName || "",
+                          )
+                        }
+                      >
+                        <Text variant="body-sm" tone="link" numberOfLines={1}>
+                          {line.fromBill?.productName || "Set product…"}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                  <GrnCell
+                    w={COL.batch}
+                    value={line.batchNumber}
+                    onChangeText={(v) => setLine(i, { batchNumber: v })}
+                    error={started && !line.batchNumber.trim()}
+                  />
+                  <GrnCell
+                    w={COL.mfg}
+                    value={line.mfgDate}
+                    onChangeText={(v) => setLine(i, { mfgDate: v })}
+                    placeholder="YYYY-MM"
+                  />
+                  <GrnCell
+                    w={COL.expiry}
+                    value={line.expiryDate}
+                    onChangeText={(v) => setLine(i, { expiryDate: v })}
+                    placeholder="YYYY-MM"
+                  />
+                  <GrnCell
+                    w={COL.qty}
+                    value={line.quantity}
+                    onChangeText={(v) => setLine(i, { quantity: v })}
+                    numeric
+                    align="center"
+                    error={started && !(qtyN > 0)}
+                  />
+                  <View style={{ width: COL.unit }}>
+                    <Select
+                      value={line.unit}
+                      options={units}
+                      onChange={(v) => setLine(i, { unit: v })}
+                    />
+                  </View>
+                  <GrnCell
+                    w={COL.rate}
+                    value={line.purchasePrice}
+                    onChangeText={(v) => setLine(i, { purchasePrice: v })}
+                    numeric
+                    align="right"
+                  />
+                  <GrnCell
+                    w={COL.mrp}
+                    value={line.mrp}
+                    onChangeText={(v) => setLine(i, { mrp: v })}
+                    numeric
+                    align="right"
+                  />
+                  <View style={{ width: COL.loc }}>
+                    <Select
+                      value={line.locationId}
+                      options={locationOptions}
+                      onChange={(v) => setLine(i, { locationId: v })}
+                    />
+                  </View>
+                  <Text
+                    style={{ width: COL.amount, textAlign: "right" }}
+                    variant="label-sm"
+                    tone="primary"
+                  >
+                    {amount > 0 ? fmtMoney(amount) : "—"}
+                  </Text>
+                  <Pressable
+                    onPress={() => lines.length > 1 && removeLine(i)}
+                    style={{ width: COL.rm, alignItems: "center" }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove line"
+                  >
+                    <Trash2
+                      size={15}
+                      color={palette.text.tertiary}
+                      strokeWidth={2}
+                    />
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </Card>
 
       <Pressable onPress={addLine} style={styles.addRow}>
         <Plus size={18} color={palette.teal[600]} strokeWidth={2.2} />
@@ -455,12 +560,22 @@ export default function ReceiveStockScreen() {
 
       <Card style={{ marginTop: 8, marginBottom: 16 }}>
         <HStack align="center" justify="space-between">
-          <Text variant="label-lg" tone="primary">
-            Total to receive
-          </Text>
-          <Text variant="h3" tone="accent">
-            {totalBase} units
-          </Text>
+          <VStack gap={2}>
+            <Text variant="label-lg" tone="primary">
+              Total to receive
+            </Text>
+            <Text variant="caption" tone="tertiary">
+              {totalBase} base units
+            </Text>
+          </VStack>
+          <VStack gap={2} align="flex-end">
+            <Text variant="caption" tone="tertiary">
+              Purchase value
+            </Text>
+            <Text variant="h3" tone="accent">
+              {fmtMoney(totalValue)}
+            </Text>
+          </VStack>
         </HStack>
       </Card>
 
@@ -501,5 +616,120 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     justifyContent: "center",
+  },
+});
+
+// ---- GRN spreadsheet grid ----
+const COL = {
+  idx: 26,
+  product: 190,
+  batch: 88,
+  mfg: 82,
+  expiry: 82,
+  qty: 52,
+  unit: 90,
+  rate: 76,
+  mrp: 76,
+  loc: 132,
+  amount: 82,
+  rm: 30,
+};
+
+function GrnHead({
+  w,
+  label,
+  left,
+  right,
+}: {
+  w: number;
+  label: string;
+  left?: boolean;
+  right?: boolean;
+}) {
+  return (
+    <Text
+      style={{
+        width: w,
+        textAlign: left ? "left" : right ? "right" : "center",
+      }}
+      variant="overline"
+      tone="tertiary"
+      numberOfLines={1}
+    >
+      {label}
+    </Text>
+  );
+}
+
+function GrnCell({
+  w,
+  value,
+  onChangeText,
+  numeric,
+  align = "left",
+  placeholder,
+  error,
+}: {
+  w: number;
+  value: string;
+  onChangeText: (v: string) => void;
+  numeric?: boolean;
+  align?: "left" | "center" | "right";
+  placeholder?: string;
+  error?: boolean;
+}) {
+  return (
+    <TextInput
+      value={value}
+      onChangeText={onChangeText}
+      keyboardType={numeric ? "decimal-pad" : "default"}
+      placeholder={placeholder}
+      placeholderTextColor={palette.text.tertiary}
+      selectTextOnFocus
+      style={[
+        grn.cell,
+        { width: w, textAlign: align },
+        error
+          ? {
+              borderColor: palette.danger.text,
+              backgroundColor: palette.danger.bg,
+            }
+          : null,
+        // @ts-expect-error web-only outline reset
+        { outlineStyle: "none" },
+      ]}
+    />
+  );
+}
+
+const grn = StyleSheet.create({
+  head: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: palette.neutral[50],
+    borderBottomWidth: 1.5,
+    borderBottomColor: palette.border.strong,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border.subtle,
+  },
+  cell: {
+    height: 38,
+    borderWidth: 1,
+    borderColor: palette.border.default,
+    borderRadius: radius.sm,
+    paddingHorizontal: 8,
+    fontSize: 13,
+    color: palette.text.primary,
+    backgroundColor: palette.surface.primary,
   },
 });
