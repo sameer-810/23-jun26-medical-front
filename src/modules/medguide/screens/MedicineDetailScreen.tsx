@@ -1,10 +1,13 @@
-import React from "react";
-import { Image, StyleSheet } from "react-native";
+import React, { useState } from "react";
+import { View, Image, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react-native";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { ArrowLeft, PlusCircle, CheckCircle2 } from "lucide-react-native";
 import { medguideApi } from "@modules/medguide/api/medguideApi";
 import type { Medicine } from "@modules/medguide/types";
+import { useAuthStore } from "@shared/store/useAuthStore";
+import { PERMISSIONS } from "@shared/permissions";
+import { apiErrorMessage } from "@api/apiClient";
 import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
@@ -69,6 +72,16 @@ export default function MedicineDetailScreen() {
     enabled: Boolean(id),
   });
 
+  const canManage = useAuthStore((s) =>
+    s.hasPermission(PERMISSIONS.PRODUCTS_MANAGE),
+  );
+  const [notice, setNotice] = useState<string | null>(null);
+  const addMut = useMutation({
+    mutationFn: () => medguideApi.addToStore(id),
+    onSuccess: (p) => setNotice(`Added "${p.name}" to your store.`),
+    onError: (err) => setNotice(apiErrorMessage(err)),
+  });
+
   const info = m?.medicineInfo;
   const inter = info?.interactions;
   const interRows = inter
@@ -130,6 +143,30 @@ export default function MedicineDetailScreen() {
               </VStack>
             </HStack>
           </Card>
+
+          {canManage ? (
+            <Button
+              label="Add to my store"
+              icon={<PlusCircle size={16} color="#FFFFFF" strokeWidth={2} />}
+              loading={addMut.isPending}
+              onPress={() => {
+                setNotice(null);
+                addMut.mutate();
+              }}
+            />
+          ) : null}
+          {notice ? (
+            <View style={styles.notice}>
+              <CheckCircle2
+                size={16}
+                color={palette.success.text}
+                strokeWidth={2}
+              />
+              <Text variant="body-sm" tone="secondary" style={{ flex: 1 }}>
+                {notice}
+              </Text>
+            </View>
+          ) : null}
 
           <Chips title="Uses" items={m.uses} />
           <Section title="Overview" body={info?.introduction} />
@@ -212,5 +249,15 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: radius.md,
     backgroundColor: palette.ink[100],
+  },
+  notice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: palette.success.bg,
+    borderWidth: 1,
+    borderColor: palette.success.border,
   },
 });

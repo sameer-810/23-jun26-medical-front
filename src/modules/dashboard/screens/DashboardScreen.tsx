@@ -15,6 +15,8 @@ import {
   Truck,
   BarChart3,
   Wallet,
+  BadgeIndianRupee,
+  CalendarClock,
   TrendingUp,
   Landmark,
   Percent,
@@ -194,6 +196,25 @@ export default function DashboardScreen() {
         </View>
         <View style={{ width: tileWidth, padding: 6 }}>
           <StatTile
+            label="Need to pay"
+            value={money(fin?.needToPay.total ?? 0)}
+            icon={BadgeIndianRupee}
+            accent={accents.amber}
+            onPress={() => go("Suppliers")}
+          />
+        </View>
+        <View style={{ width: tileWidth, padding: 6 }}>
+          <StatTile
+            label="Upcoming PDC (out)"
+            value={money(fin?.upcomingPDC.payable.total ?? 0)}
+            hint={`${fin?.upcomingPDC.payable.count ?? 0} cheque${(fin?.upcomingPDC.payable.count ?? 0) === 1 ? "" : "s"}`}
+            icon={CalendarClock}
+            accent={accents.blue}
+            onPress={() => go("PDC")}
+          />
+        </View>
+        <View style={{ width: tileWidth, padding: 6 }}>
+          <StatTile
             label="Stock at cost (PTR)"
             value={money(fin?.stock.cost ?? 0)}
             icon={Landmark}
@@ -285,6 +306,39 @@ export default function DashboardScreen() {
                   style={{ color: palette.danger.text }}
                 >
                   {money(c.outstanding)}
+                </Text>
+              </HStack>
+            ))}
+          </VStack>
+        </Card>
+      ) : null}
+
+      {fin && fin.needToPay.top.length > 0 ? (
+        <Card style={{ marginTop: 12 }}>
+          <VStack gap={10}>
+            <HStack justify="space-between" align="center">
+              <Text variant="label-lg" tone="primary">
+                Need to pay
+              </Text>
+              <Button
+                label="Suppliers"
+                size="sm"
+                variant="secondary"
+                fullWidth={false}
+                onPress={() => go("Suppliers")}
+              />
+            </HStack>
+            {fin.needToPay.top.map((s) => (
+              <HStack key={s.supplierId} justify="space-between" align="center">
+                <Text variant="body-sm" tone="secondary" numberOfLines={1}>
+                  {s.supplierName}
+                </Text>
+                <Text
+                  variant="label"
+                  weight="600"
+                  style={{ color: palette.danger.text }}
+                >
+                  {money(s.outstanding)}
                 </Text>
               </HStack>
             ))}

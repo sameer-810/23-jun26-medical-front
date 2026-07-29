@@ -146,6 +146,7 @@ const linking = {
               SupplierDetail: ":id",
             },
           },
+          PDC: "pdc",
           Team: {
             path: "team",
             screens: { TeamList: "", AddUser: "add", UserDetail: ":id" },

@@ -20,4 +20,13 @@ export const medguideApi = {
     );
     return res.data.data;
   },
+
+  /** Copy a catalogue medicine into this pharmacy's own product list. */
+  addToStore: async (catalogProductId: string) => {
+    const res = await apiClient.post<{
+      success: boolean;
+      data: { id: string; name: string };
+    }>("/products/from-catalog", { catalogProductId });
+    return res.data.data;
+  },
 };

@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Pressable, Platform, Alert } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Pencil,
@@ -9,12 +10,14 @@ import {
   MapPin,
   PackageCheck,
   Trash2,
+  Wallet,
 } from "lucide-react-native";
 import {
   useSupplier,
   useSupplierPurchases,
   useRemoveSupplier,
 } from "@modules/supplier/hooks/useSuppliers";
+import { supplierApi } from "@modules/supplier/api/supplierApi";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { palette } from "@shared/designSystem";
@@ -53,6 +56,33 @@ export default function SupplierDetailScreen() {
   const canManage = useAuthStore((s) => s.hasPermission)(
     PERMISSIONS.SUPPLIERS_MANAGE,
   );
+
+  const queryClient = useQueryClient();
+  const { data: statement } = useQuery({
+    queryKey: ["supplier", "statement", id],
+    queryFn: () => supplierApi.statement(id, { limit: 50 }),
+    enabled: Boolean(id),
+  });
+  const outstanding = statement?.data.outstanding ?? 0;
+  const ledger = statement?.data.rows ?? [];
+
+  const payMut = useMutation({
+    mutationFn: (amount: number) =>
+      supplierApi.recordPayment(id, { amount, mode: "cash" }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ["supplier", "statement", id],
+      }),
+  });
+
+  const pay = () => {
+    if (Platform.OS !== "web") return;
+    const raw = window.prompt(
+      `Pay ${supplier?.name || "supplier"} (outstanding ₹${Math.round(outstanding)}):`,
+    );
+    const amt = Number(raw);
+    if (raw && amt > 0) payMut.mutate(amt);
+  };
 
   return (
     <Screen
@@ -135,7 +165,7 @@ export default function SupplierDetailScreen() {
         </HStack>
       </Card>
 
-      <HStack gap={12} style={{ marginBottom: 24 }}>
+      <HStack gap={12} style={{ marginBottom: 16 }}>
         <View style={{ flex: 1 }}>
           <StatTile
             label="Purchases"
@@ -150,7 +180,39 @@ export default function SupplierDetailScreen() {
             tone="teal"
           />
         </View>
+        <View style={{ flex: 1 }}>
+          <StatTile
+            label="Need to pay"
+            value={money(outstanding)}
+            accent={
+              outstanding > 0
+                ? { color: palette.danger.text, tint: palette.danger.bg }
+                : undefined
+            }
+          />
+        </View>
       </HStack>
+
+      {canManage ? (
+        <Button
+          label={
+            outstanding > 0
+              ? `Pay supplier (₹${Math.round(outstanding)} due)`
+              : "Pay supplier"
+          }
+          variant={outstanding > 0 ? "primary" : "secondary"}
+          icon={
+            <Wallet
+              size={16}
+              color={outstanding > 0 ? "#FFFFFF" : palette.text.secondary}
+              strokeWidth={2}
+            />
+          }
+          style={{ marginBottom: 24 }}
+          loading={payMut.isPending}
+          onPress={pay}
+        />
+      ) : null}
 
       <Text variant="h3" tone="primary" style={{ marginBottom: 12 }}>
         Purchase history
@@ -184,6 +246,63 @@ export default function SupplierDetailScreen() {
           ))}
         </VStack>
       )}
+
+      {ledger.length > 0 ? (
+        <VStack gap={12} style={{ marginTop: 24 }}>
+          <Text variant="h3" tone="primary">
+            Account statement
+          </Text>
+          <Card padded={false} style={{ paddingVertical: 4 }}>
+            {ledger.map((r, i) => (
+              <View key={i}>
+                {i > 0 ? (
+                  <View
+                    style={{
+                      height: 1,
+                      backgroundColor: palette.border.subtle,
+                    }}
+                  />
+                ) : null}
+                <HStack
+                  gap={10}
+                  align="center"
+                  justify="space-between"
+                  style={{ paddingVertical: 10, paddingHorizontal: 12 }}
+                >
+                  <VStack gap={1} flex={1}>
+                    <Text variant="body-sm" tone="primary">
+                      {r.type} {r.ref ? `· ${r.ref}` : ""}
+                    </Text>
+                    <Text variant="caption" tone="tertiary">
+                      {new Date(r.date).toLocaleDateString("en-IN")}
+                      {r.note ? ` · ${r.note}` : ""}
+                    </Text>
+                  </VStack>
+                  <Text
+                    variant="body-sm"
+                    weight="600"
+                    style={{
+                      color: r.debit
+                        ? palette.danger.text
+                        : palette.success.text,
+                    }}
+                  >
+                    {r.debit ? `+${money(r.debit)}` : `−${money(r.credit)}`}
+                  </Text>
+                  <Text
+                    variant="body-sm"
+                    weight="700"
+                    tone="primary"
+                    style={{ width: 74, textAlign: "right" }}
+                  >
+                    {money(r.balance)}
+                  </Text>
+                </HStack>
+              </View>
+            ))}
+          </Card>
+        </VStack>
+      ) : null}
 
       {canManage && supplier?.isActive && (
         <Button

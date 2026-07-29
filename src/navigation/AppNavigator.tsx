@@ -37,6 +37,7 @@ import MedGuideNavigator from "@modules/medguide/MedGuideNavigator";
 import SalesNavigator from "@modules/sale/SalesNavigator";
 import CustomersNavigator from "@modules/customer/CustomersNavigator";
 import SuppliersNavigator from "@modules/supplier/SuppliersNavigator";
+import PdcScreen from "@modules/cheque/screens/PdcScreen";
 import ExpiryScreen from "@modules/expiry/screens/ExpiryScreen";
 import DamagedScreen from "@modules/stockops/screens/DamagedScreen";
 import TransfersScreen from "@modules/stockops/screens/TransfersScreen";
@@ -75,6 +76,7 @@ const SCREENS: Record<string, React.ComponentType> = {
   Damaged: DamagedScreen,
   Customers: CustomersNavigator,
   Suppliers: SuppliersNavigator,
+  PDC: PdcScreen,
   Search: SearchScreen,
   Reports: ReportsScreen,
   Team: TeamNavigator,

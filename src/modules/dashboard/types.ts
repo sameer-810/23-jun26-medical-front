@@ -12,6 +12,22 @@ export interface DashboardFinance {
     total: number;
     top: { customerId: string; customerName: string; outstanding: number }[];
   };
+  needToPay: {
+    total: number;
+    top: { supplierId: string; supplierName: string; outstanding: number }[];
+  };
+  upcomingPDC: {
+    payable: { total: number; count: number };
+    receivable: { total: number; count: number };
+    cheques: {
+      _id: string;
+      direction: "issued" | "received";
+      partyName: string;
+      amount: number;
+      chequeDate: string;
+      status: string;
+    }[];
+  };
   stock: { cost: number; mrp: number; retail: number; units: number };
   sales: {
     last7: number;

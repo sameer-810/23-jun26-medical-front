@@ -10,6 +10,7 @@ import {
   ShoppingCart,
   Contact,
   Truck,
+  CalendarClock,
   AlarmClock,
   ShieldAlert,
   ArrowLeftRight,
@@ -117,6 +118,12 @@ export const NAV_ITEMS: NavItem[] = [
     name: "Suppliers",
     label: "Suppliers",
     icon: Truck,
+    permission: PERMISSIONS.SUPPLIERS_MANAGE,
+  },
+  {
+    name: "PDC",
+    label: "Cheques / PDC",
+    icon: CalendarClock,
     permission: PERMISSIONS.SUPPLIERS_MANAGE,
   },
   {
