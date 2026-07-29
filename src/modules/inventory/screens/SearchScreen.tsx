@@ -1,15 +1,10 @@
 import React, { useState } from "react";
-import { View, TextInput, StyleSheet } from "react-native";
-import {
-  Search,
-  PackageSearch,
-  MapPin,
-  CalendarClock,
-} from "lucide-react-native";
+import { View, StyleSheet } from "react-native";
+import { PackageSearch, MapPin, CalendarClock } from "lucide-react-native";
 import { useSectionNav } from "@navigation/AppNavigator";
 import { useInventorySearch } from "@modules/inventory/hooks/useInventory";
 import { StockSummaryItem, SearchBatchResult } from "@modules/inventory/types";
-import { palette, radius, outline } from "@shared/designSystem";
+import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -18,6 +13,7 @@ import {
   Card,
   StatusChip,
   ChipsRow,
+  SearchInput,
   EmptyState,
 } from "@shared/ui";
 
@@ -60,18 +56,12 @@ export default function SearchScreen() {
       title="Product search"
       subtitle="By name, SKU, barcode, batch or expiry — with exact locations"
     >
-      <View style={styles.searchWrap}>
-        <Search size={18} color={palette.text.tertiary} strokeWidth={1.8} />
-        <TextInput
-          placeholder="Name, SKU, barcode or batch number"
-          placeholderTextColor={palette.text.tertiary}
-          value={q}
-          onChangeText={setQ}
-          style={styles.searchInput}
-          autoCapitalize="none"
-          autoFocus
-        />
-      </View>
+      <SearchInput
+        value={q}
+        onChangeText={setQ}
+        placeholder="Name, SKU, barcode or batch number"
+        autoFocus
+      />
       <View style={{ marginHorizontal: -24, marginTop: 12 }}>
         <ChipsRow chips={EXP_FILTERS} active={exp} onChange={setExp} />
       </View>
@@ -194,23 +184,6 @@ function BatchResult({ batch }: { batch: SearchBatchResult }) {
 }
 
 const styles = StyleSheet.create({
-  searchWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    height: 50,
-    borderRadius: radius.md,
-    borderWidth: outline.width,
-    borderColor: outline.color,
-    backgroundColor: palette.surface.primary,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: palette.text.primary,
-    paddingVertical: 0,
-  },
   locPill: {
     flexDirection: "row",
     alignItems: "center",

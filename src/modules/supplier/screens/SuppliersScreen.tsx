@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { View, TextInput, StyleSheet } from "react-native";
+import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Search, Plus, Truck, ChevronRight } from "lucide-react-native";
+import { Plus, Truck, ChevronRight } from "lucide-react-native";
 import { useSuppliers } from "@modules/supplier/hooks/useSuppliers";
 import { Supplier } from "@modules/supplier/types";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
-import { palette, radius, outline } from "@shared/designSystem";
+import { palette } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -16,9 +16,14 @@ import {
   Avatar,
   Button,
   StatusChip,
-  EmptyState,
+  SearchInput,
   Pagination,
+  DataTable,
+  Column,
+  Skeleton,
 } from "@shared/ui";
+
+const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 export default function SuppliersScreen() {
   const navigation = useNavigation<any>();
@@ -48,6 +53,69 @@ export default function SuppliersScreen() {
 
   if (!isLoading && totalPages > 0 && page > totalPages) setPage(totalPages);
 
+  const open = (s: Supplier) =>
+    navigation.navigate("SupplierDetail", { id: s.id });
+
+  const columns: Column<Supplier>[] = [
+    {
+      key: "name",
+      header: "Name",
+      width: 220,
+      sortable: true,
+      sortValue: (s) => s.name.toLowerCase(),
+      render: (s) => (
+        <Text variant="label" tone="primary" numberOfLines={1}>
+          {s.name}
+        </Text>
+      ),
+    },
+    {
+      key: "contactPerson",
+      header: "Contact",
+      width: 180,
+      sortable: true,
+      sortValue: (s) => (s.contactPerson || "").toLowerCase(),
+      render: (s) => (
+        <Text variant="body-sm" tone="secondary" numberOfLines={1}>
+          {s.contactPerson || "—"}
+        </Text>
+      ),
+    },
+    {
+      key: "mobile",
+      header: "Mobile",
+      width: 150,
+      render: (s) => (
+        <Text variant="body-sm" tone="secondary">
+          {s.mobile || "—"}
+        </Text>
+      ),
+    },
+    {
+      key: "purchases",
+      header: "Purchases",
+      width: 150,
+      align: "right",
+      sortable: true,
+      sortValue: (s) => s.purchases?.value ?? 0,
+      render: (s) =>
+        s.purchases && s.purchases.count > 0 ? (
+          <VStack gap={1} align="flex-end">
+            <Text variant="label" tone="primary">
+              {money(s.purchases.value)}
+            </Text>
+            <Text variant="caption" tone="tertiary">
+              {s.purchases.count} order{s.purchases.count === 1 ? "" : "s"}
+            </Text>
+          </VStack>
+        ) : (
+          <Text variant="body-sm" tone="tertiary">
+            —
+          </Text>
+        ),
+    },
+  ];
+
   return (
     <Screen
       overline="Partners"
@@ -66,47 +134,62 @@ export default function SuppliersScreen() {
         ) : undefined
       }
     >
-      <View style={styles.searchWrap}>
-        <Search size={18} color={palette.text.tertiary} strokeWidth={1.8} />
-        <TextInput
-          placeholder="Search supplier"
-          placeholderTextColor={palette.text.tertiary}
-          value={search}
-          onChangeText={setSearch}
-          style={styles.searchInput}
-          autoCapitalize="none"
-        />
-      </View>
+      <SearchInput
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search supplier"
+      />
 
-      {suppliers.length === 0 ? (
-        <EmptyState
-          icon={Truck}
-          title={isLoading ? "Loading…" : "No suppliers yet"}
-          message="Add suppliers to record purchases and track supplied products."
-        />
+      {isLoading && suppliers.length === 0 ? (
+        <ListSkeleton />
       ) : (
-        <VStack gap={12} style={{ marginTop: 16 }}>
-          {suppliers.map((s) => (
-            <SupplierRow
-              key={s.id}
-              supplier={s}
-              onPress={() =>
-                navigation.navigate("SupplierDetail", { id: s.id })
-              }
-            />
-          ))}
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            total={total}
-            limit={limit}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
-            label="suppliers"
+        <View style={{ marginTop: 16 }}>
+          <DataTable<Supplier>
+            columns={columns}
+            rows={suppliers}
+            keyExtractor={(s) => s.id}
+            onRowPress={open}
+            mobileCard={(s) => (
+              <SupplierRow supplier={s} onPress={() => open(s)} />
+            )}
+            emptyIcon={Truck}
+            emptyTitle="No suppliers yet"
+            emptyMessage="Add suppliers to record purchases and track supplied products."
           />
-        </VStack>
+          {suppliers.length > 0 ? (
+            <View style={{ marginTop: 16 }}>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                limit={limit}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
+                label="suppliers"
+              />
+            </View>
+          ) : null}
+        </View>
       )}
     </Screen>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <VStack gap={12} style={{ marginTop: 16 }}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <Card key={i} elevation="base">
+          <HStack gap={14} align="center">
+            <Skeleton width={46} height={46} rounded="full" />
+            <VStack gap={6} flex={1}>
+              <Skeleton width="45%" height={16} />
+              <Skeleton width="60%" height={12} />
+            </VStack>
+          </HStack>
+        </Card>
+      ))}
+    </VStack>
   );
 }
 
@@ -139,23 +222,3 @@ function SupplierRow({
     </Card>
   );
 }
-
-const styles = StyleSheet.create({
-  searchWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    height: 48,
-    borderRadius: radius.md,
-    borderWidth: outline.width,
-    borderColor: outline.color,
-    backgroundColor: palette.surface.primary,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: palette.text.primary,
-    paddingVertical: 0,
-  },
-});

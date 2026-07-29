@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Switch, Platform, StyleSheet } from "react-native";
+import { View, Switch, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useForm, Controller } from "react-hook-form";
 import { ArrowLeft, Trash2 } from "lucide-react-native";
@@ -12,7 +12,15 @@ import {
 import { apiErrorMessage } from "@shared/api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Screen, Text, VStack, HStack, Card, Button } from "@shared/ui";
+import {
+  Screen,
+  Text,
+  VStack,
+  HStack,
+  Card,
+  Button,
+  ConfirmDialog,
+} from "@shared/ui";
 
 export default function CatalogFormScreen() {
   const navigation = useNavigation<any>();
@@ -25,6 +33,7 @@ export default function CatalogFormScreen() {
   const updateMut = useUpdateCatalog(id || "");
   const deleteMut = useDeleteCatalog();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { control, handleSubmit, reset } = useForm({
     defaultValues: {
@@ -74,8 +83,6 @@ export default function CatalogFormScreen() {
 
   const onDelete = () => {
     if (!id) return;
-    if (Platform.OS === "web" && !window.confirm("Delete this product?"))
-      return;
     deleteMut.mutate(id, { onSuccess: () => navigation.goBack() });
   };
 
@@ -185,9 +192,19 @@ export default function CatalogFormScreen() {
           icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2} />}
           style={{ marginTop: 16 }}
           loading={deleteMut.isPending}
-          onPress={onDelete}
+          onPress={() => setConfirmOpen(true)}
         />
       ) : null}
+
+      <ConfirmDialog
+        visible={confirmOpen}
+        title="Delete this product?"
+        confirmLabel="Delete"
+        destructive
+        loading={deleteMut.isPending}
+        onConfirm={onDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </Screen>
   );
 }

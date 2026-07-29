@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Platform, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { ArrowLeft, UserRound, KeyRound } from "lucide-react-native";
 import {
@@ -18,6 +18,7 @@ import {
   Button,
   StatusChip,
   EmptyState,
+  PromptDialog,
 } from "@shared/ui";
 
 export default function PharmacyUsersScreen() {
@@ -29,20 +30,10 @@ export default function PharmacyUsersScreen() {
   const resetPw = useResetUserPassword(id);
   const setActive = useSetUserActive(id);
   const [msg, setMsg] = useState<string | null>(null);
-
-  const doReset = (userId: string, name: string) => {
-    if (Platform.OS !== "web") return;
-    const pw = window.prompt(`New password for ${name} (min 8 chars):`);
-    if (!pw) return;
-    if (pw.length < 8) {
-      setMsg("Password must be at least 8 characters.");
-      return;
-    }
-    resetPw.mutate(
-      { userId, password: pw },
-      { onSuccess: () => setMsg(`Password reset for ${name}.`) },
-    );
-  };
+  const [resetTarget, setResetTarget] = useState<{
+    userId: string;
+    name: string;
+  } | null>(null);
 
   return (
     <Screen
@@ -114,7 +105,7 @@ export default function PharmacyUsersScreen() {
                           />
                         }
                         loading={resetPw.isPending}
-                        onPress={() => doReset(u._id, name)}
+                        onPress={() => setResetTarget({ userId: u._id, name })}
                       />
                     </View>
                     <View style={{ flex: 1 }}>
@@ -138,6 +129,39 @@ export default function PharmacyUsersScreen() {
           })}
         </VStack>
       )}
+
+      <PromptDialog
+        visible={resetTarget !== null}
+        title="Reset password"
+        message={
+          resetTarget ? `Set a new password for ${resetTarget.name}.` : ""
+        }
+        label="New password"
+        placeholder="At least 8 characters"
+        secureTextEntry
+        confirmLabel="Reset password"
+        leading={
+          <KeyRound size={18} color={palette.text.tertiary} strokeWidth={1.8} />
+        }
+        loading={resetPw.isPending}
+        validate={(v) =>
+          v.length >= 8 ? null : "Password must be at least 8 characters"
+        }
+        onSubmit={(pw) => {
+          if (!resetTarget) return;
+          const name = resetTarget.name;
+          resetPw.mutate(
+            { userId: resetTarget.userId, password: pw },
+            {
+              onSuccess: () => {
+                setMsg(`Password reset for ${name}.`);
+                setResetTarget(null);
+              },
+            },
+          );
+        }}
+        onCancel={() => setResetTarget(null)}
+      />
     </Screen>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Platform, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useForm } from "react-hook-form";
 import { ArrowLeft, Trash2 } from "lucide-react-native";
@@ -12,7 +12,7 @@ import {
 import { apiErrorMessage } from "@shared/api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Screen, Text, VStack, Card, Button } from "@shared/ui";
+import { Screen, Text, VStack, Card, Button, ConfirmDialog } from "@shared/ui";
 
 export default function PlanFormScreen() {
   const navigation = useNavigation<any>();
@@ -26,6 +26,7 @@ export default function PlanFormScreen() {
   const updateMut = useUpdatePlan(id || "");
   const deleteMut = useDeletePlan();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { control, handleSubmit, reset } = useForm({
     defaultValues: {
@@ -78,7 +79,6 @@ export default function PlanFormScreen() {
 
   const onDelete = () => {
     if (!id) return;
-    if (Platform.OS === "web" && !window.confirm("Delete this plan?")) return;
     deleteMut.mutate(id, { onSuccess: () => navigation.goBack() });
   };
 
@@ -176,9 +176,19 @@ export default function PlanFormScreen() {
           icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2} />}
           style={{ marginTop: 16 }}
           loading={deleteMut.isPending}
-          onPress={onDelete}
+          onPress={() => setConfirmOpen(true)}
         />
       ) : null}
+
+      <ConfirmDialog
+        visible={confirmOpen}
+        title="Delete this plan?"
+        confirmLabel="Delete"
+        destructive
+        loading={deleteMut.isPending}
+        onConfirm={onDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </Screen>
   );
 }

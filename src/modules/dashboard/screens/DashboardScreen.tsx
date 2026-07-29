@@ -1,18 +1,15 @@
 import React from "react";
-import { View, useWindowDimensions } from "react-native";
+import { View, Pressable, useWindowDimensions } from "react-native";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigation } from "@react-navigation/native";
 import {
   Boxes,
-  PackageSearch,
   AlarmClock,
   ReceiptIndianRupee,
   Users,
   Package,
-  Warehouse,
-  ArrowLeftRight,
   ShoppingCart,
-  ShieldAlert,
-  Truck,
+  PackagePlus,
   BarChart3,
   Wallet,
   BadgeIndianRupee,
@@ -20,12 +17,16 @@ import {
   TrendingUp,
   Landmark,
   Percent,
+  ChevronRight,
+  CheckCircle2,
+  PackageX,
 } from "lucide-react-native";
 import { useAuthStore } from "@shared/store/useAuthStore";
+import { PERMISSIONS } from "@shared/permissions";
 import { useDashboardSummary } from "@modules/dashboard/hooks/useDashboard";
 import { dashboardApi } from "@modules/dashboard/api/dashboardApi";
 import { useSectionNav } from "@navigation/AppNavigator";
-import { palette, accents } from "@shared/designSystem";
+import { palette, accents, radius } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -34,316 +35,371 @@ import {
   Card,
   StatTile,
   GradientHero,
-  StatusChip,
   Button,
 } from "@shared/ui";
 
-const MODULES: {
-  icon: typeof Package;
-  label: string;
-  phase: number;
-  nav?: string;
-}[] = [
-  { icon: Package, label: "Products & Catalogue", phase: 2, nav: "Products" },
-  { icon: Warehouse, label: "Warehouse Locations", phase: 2, nav: "Warehouse" },
-  { icon: Boxes, label: "Inventory & Stock Value", phase: 3, nav: "Inventory" },
-  {
-    icon: PackageSearch,
-    label: "Receive Stock & Batches",
-    phase: 3,
-    nav: "Receive",
-  },
-  {
-    icon: ShoppingCart,
-    label: "Sales · FEFO · Invoices",
-    phase: 4,
-    nav: "Sales",
-  },
-  { icon: Users, label: "Customers", phase: 4, nav: "Customers" },
-  {
-    icon: ArrowLeftRight,
-    label: "Stock Transfers",
-    phase: 5,
-    nav: "Transfers",
-  },
-  { icon: AlarmClock, label: "Expiry Alerts", phase: 5, nav: "Expiry" },
-  { icon: ShieldAlert, label: "Damaged Inventory", phase: 5, nav: "Damaged" },
-  { icon: Truck, label: "Suppliers & Purchases", phase: 5, nav: "Suppliers" },
-  { icon: BarChart3, label: "Reports & Exports", phase: 6, nav: "Reports" },
-];
+const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+
+type AttnTone = "danger" | "warning";
+interface Attn {
+  key: string;
+  tone: AttnTone;
+  icon: typeof Boxes;
+  title: string;
+  hint: string;
+  nav: string;
+}
 
 export default function DashboardScreen() {
   const { width } = useWindowDimensions();
-  const cols = width >= 1100 ? 4 : width >= 700 ? 2 : 2;
+  const cols = width >= 1100 ? 4 : 2;
   const user = useAuthStore((s) => s.user);
   const isAdmin = useAuthStore((s) => s.isAdmin);
+  const has = useAuthStore((s) => s.hasPermission);
   const go = useSectionNav();
+  const navigation = useNavigation<any>();
   const { data, isLoading, refetch, isRefetching } = useDashboardSummary();
   const { data: fin } = useQuery({
     queryKey: ["dashboard", "finance"],
     queryFn: dashboardApi.finance,
   });
-  const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
-  const tiles = [
+  const tileWidth = `${100 / cols}%` as const;
+
+  const kpis = [
     {
       label: "Products",
       value: String(data?.products.total ?? 0),
       icon: Package,
       accent: accents.teal,
+      nav: "Products",
     },
     {
       label: "Low stock",
       value: String(data?.inventory.lowStock ?? 0),
       icon: Boxes,
       accent: accents.amber,
+      nav: "Inventory",
     },
     {
       label: "Expiring soon",
       value: String(data?.expiry.expiringSoon ?? 0),
       icon: AlarmClock,
       accent: accents.red,
+      nav: "Expiry",
     },
     {
       label: "Today's sales",
-      value: `₹${data?.sales.todayAmount ?? 0}`,
+      value: money(data?.sales.todayAmount ?? 0),
       icon: ReceiptIndianRupee,
       accent: accents.blue,
+      nav: "Sales",
     },
   ];
-  const tileWidth = `${100 / cols}%` as const;
+
+  // ---- "Needs attention" — the operational board (QS/1 Pharmacy-at-a-Glance) --
+  const attn: Attn[] = [];
+  const lowStock = data?.inventory.lowStock ?? 0;
+  const expiringSoon = data?.expiry.expiringSoon ?? 0;
+  const expired = data?.expiry.expired ?? 0;
+  const receivable = fin?.receivables.total ?? 0;
+  const payable = fin?.needToPay.total ?? 0;
+  const pdcCount = fin?.upcomingPDC.payable.count ?? 0;
+  const pdcTotal = fin?.upcomingPDC.payable.total ?? 0;
+  if (expired > 0)
+    attn.push({
+      key: "expired",
+      tone: "danger",
+      icon: PackageX,
+      title: `${expired} expired batch${expired === 1 ? "" : "es"} to write off`,
+      hint: "Remove from sellable stock",
+      nav: "Expiry",
+    });
+  if (expiringSoon > 0)
+    attn.push({
+      key: "expiring",
+      tone: "warning",
+      icon: AlarmClock,
+      title: `${expiringSoon} batch${expiringSoon === 1 ? "" : "es"} expiring soon`,
+      hint: "Sell-through or return before expiry",
+      nav: "Expiry",
+    });
+  if (lowStock > 0)
+    attn.push({
+      key: "low",
+      tone: "warning",
+      icon: Boxes,
+      title: `${lowStock} product${lowStock === 1 ? "" : "s"} low on stock`,
+      hint: "Reorder to avoid stock-outs",
+      nav: "ShortBook",
+    });
+  if (receivable > 0)
+    attn.push({
+      key: "receivable",
+      tone: "warning",
+      icon: Wallet,
+      title: `${money(receivable)} to collect`,
+      hint: "Outstanding customer credit",
+      nav: "Customers",
+    });
+  if (payable > 0)
+    attn.push({
+      key: "payable",
+      tone: "warning",
+      icon: BadgeIndianRupee,
+      title: `${money(payable)} to pay suppliers`,
+      hint: "Outstanding purchase credit",
+      nav: "Suppliers",
+    });
+  if (pdcCount > 0)
+    attn.push({
+      key: "pdc",
+      tone: "warning",
+      icon: CalendarClock,
+      title: `${pdcCount} post-dated cheque${pdcCount === 1 ? "" : "s"} · ${money(pdcTotal)}`,
+      hint: "Payable cheques coming due",
+      nav: "PDC",
+    });
+
+  const quickActions = [
+    {
+      label: "New sale",
+      icon: ShoppingCart,
+      perm: PERMISSIONS.SALES_MANAGE,
+      onPress: () => navigation.navigate("Sales", { screen: "NewSale" }),
+    },
+    {
+      label: "Receive stock",
+      icon: PackagePlus,
+      perm: PERMISSIONS.STOCK_INWARD_MANAGE,
+      onPress: () => navigation.navigate("Receive", { screen: "ReceiveStock" }),
+    },
+    {
+      label: "Add product",
+      icon: Package,
+      perm: PERMISSIONS.PRODUCTS_MANAGE,
+      onPress: () => navigation.navigate("Products", { screen: "ProductForm" }),
+    },
+    {
+      label: "Reports",
+      icon: BarChart3,
+      perm: PERMISSIONS.REPORTS_VIEW,
+      onPress: () => go("Reports"),
+    },
+  ].filter((a) => has(a.perm));
 
   return (
     <Screen
       overline={greeting()}
       title={user?.firstName ? `Hello, ${user.firstName}` : "Dashboard"}
-      subtitle="Your inventory at a glance"
+      subtitle="Your pharmacy at a glance"
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
     >
+      {/* Operational hero — quick daily actions, not marketing copy. */}
       <GradientHero variant="hero">
-        <VStack gap={10}>
-          <StatusChip
-            label="All modules live · reports & exports ready"
-            tone="success"
-          />
-          <Text variant="h2" tone="inverse">
-            Welcome to Plusveda
+        <VStack gap={12}>
+          <Text variant="h3" tone="inverse">
+            What would you like to do?
           </Text>
-          <Text variant="body" style={{ color: "rgba(255,255,255,0.86)" }}>
-            Products, warehouse, inventory, sales with FEFO & GST, expiry,
-            transfers, suppliers and reporting — your full medical inventory
-            platform.
-          </Text>
-          {isAdmin() && (
-            <HStack gap={10} style={{ marginTop: 8 }} wrap>
+          <HStack gap={10} wrap>
+            {quickActions.map((a) => (
               <Button
-                label="Invite a teammate"
+                key={a.label}
+                label={a.label}
                 variant="accent"
                 fullWidth={false}
-                onPress={() => go("Team")}
+                icon={<a.icon size={16} color="#FFFFFF" strokeWidth={2} />}
+                onPress={a.onPress}
               />
-              <Button
-                label="Company settings"
-                variant="secondary"
-                fullWidth={false}
-                onPress={() => go("Settings")}
-              />
-            </HStack>
-          )}
+            ))}
+          </HStack>
         </VStack>
       </GradientHero>
 
       {/* KPI bento */}
-      <View
-        style={{
-          flexDirection: "row",
-          flexWrap: "wrap",
-          marginTop: 20,
-          marginHorizontal: -6,
-        }}
-      >
-        {tiles.map((t) => (
+      <View style={styles.grid}>
+        {kpis.map((t) => (
           <View key={t.label} style={{ width: tileWidth, padding: 6 }}>
             <StatTile
               label={t.label}
               value={t.value}
               icon={t.icon}
               accent={t.accent}
+              onPress={() => go(t.nav)}
             />
           </View>
         ))}
       </View>
 
+      {/* Needs attention */}
+      <Text variant="h3" tone="primary" style={styles.sectionH}>
+        Needs attention
+      </Text>
+      {attn.length === 0 ? (
+        <Card>
+          <HStack gap={12} align="center">
+            <View
+              style={[styles.attnIcon, { backgroundColor: palette.success.bg }]}
+            >
+              <CheckCircle2
+                size={20}
+                color={palette.success.text}
+                strokeWidth={2}
+              />
+            </View>
+            <VStack gap={2} flex={1}>
+              <Text variant="label-lg" tone="primary">
+                All clear
+              </Text>
+              <Text variant="body-sm" tone="tertiary">
+                No low stock, expiries or dues need action right now.
+              </Text>
+            </VStack>
+          </HStack>
+        </Card>
+      ) : (
+        <Card padded={false} style={{ paddingVertical: 4 }}>
+          {attn.map((a, i) => {
+            const tone = a.tone === "danger" ? palette.danger : palette.warning;
+            return (
+              <View key={a.key}>
+                {i > 0 ? <View style={styles.rowDivider} /> : null}
+                <Pressable
+                  onPress={() => go(a.nav)}
+                  style={({ pressed }) => [
+                    styles.attnRow,
+                    pressed && { backgroundColor: palette.ink[50] },
+                  ]}
+                >
+                  <HStack gap={12} align="center">
+                    <View
+                      style={[styles.attnIcon, { backgroundColor: tone.bg }]}
+                    >
+                      <a.icon size={18} color={tone.text} strokeWidth={2} />
+                    </View>
+                    <VStack gap={1} flex={1}>
+                      <Text variant="label-lg" tone="primary" numberOfLines={1}>
+                        {a.title}
+                      </Text>
+                      <Text variant="caption" tone="tertiary" numberOfLines={1}>
+                        {a.hint}
+                      </Text>
+                    </VStack>
+                    <ChevronRight
+                      size={18}
+                      color={palette.text.tertiary}
+                      strokeWidth={2}
+                    />
+                  </HStack>
+                </Pressable>
+              </View>
+            );
+          })}
+        </Card>
+      )}
+
       {/* Finance */}
-      <Text
-        variant="h3"
-        tone="primary"
-        style={{ marginTop: 28, marginBottom: 12 }}
-      >
+      <Text variant="h3" tone="primary" style={styles.sectionH}>
         Finance
       </Text>
-      <View
-        style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 }}
-      >
-        <View style={{ width: tileWidth, padding: 6 }}>
-          <StatTile
-            label="Need to collect"
-            value={money(fin?.receivables.total ?? 0)}
-            icon={Wallet}
-            accent={accents.red}
-          />
-        </View>
-        <View style={{ width: tileWidth, padding: 6 }}>
-          <StatTile
-            label="Need to pay"
-            value={money(fin?.needToPay.total ?? 0)}
-            icon={BadgeIndianRupee}
-            accent={accents.amber}
-            onPress={() => go("Suppliers")}
-          />
-        </View>
-        <View style={{ width: tileWidth, padding: 6 }}>
-          <StatTile
-            label="Upcoming PDC (out)"
-            value={money(fin?.upcomingPDC.payable.total ?? 0)}
-            hint={`${fin?.upcomingPDC.payable.count ?? 0} cheque${(fin?.upcomingPDC.payable.count ?? 0) === 1 ? "" : "s"}`}
-            icon={CalendarClock}
-            accent={accents.blue}
-            onPress={() => go("PDC")}
-          />
-        </View>
-        <View style={{ width: tileWidth, padding: 6 }}>
-          <StatTile
-            label="Stock at cost (PTR)"
-            value={money(fin?.stock.cost ?? 0)}
-            icon={Landmark}
-            accent={accents.teal}
-          />
-        </View>
-        <View style={{ width: tileWidth, padding: 6 }}>
-          <StatTile
-            label="Stock at MRP"
-            value={money(fin?.stock.mrp ?? 0)}
-            icon={Boxes}
-            accent={accents.blue}
-          />
-        </View>
-        <View style={{ width: tileWidth, padding: 6 }}>
-          <StatTile
-            label="Margin (30d)"
-            value={`${fin?.margin.marginPct ?? 0}%`}
-            icon={Percent}
-            accent={accents.amber}
-          />
-        </View>
+      <View style={[styles.grid, { marginHorizontal: -6 }]}>
+        <FinTile
+          w={tileWidth}
+          label="Need to collect"
+          value={money(fin?.receivables.total ?? 0)}
+          icon={Wallet}
+          accent={accents.red}
+          onPress={() => go("Customers")}
+        />
+        <FinTile
+          w={tileWidth}
+          label="Need to pay"
+          value={money(fin?.needToPay.total ?? 0)}
+          icon={BadgeIndianRupee}
+          accent={accents.amber}
+          onPress={() => go("Suppliers")}
+        />
+        <FinTile
+          w={tileWidth}
+          label="Upcoming PDC (out)"
+          value={money(fin?.upcomingPDC.payable.total ?? 0)}
+          hint={`${fin?.upcomingPDC.payable.count ?? 0} cheque${(fin?.upcomingPDC.payable.count ?? 0) === 1 ? "" : "s"}`}
+          icon={CalendarClock}
+          accent={accents.blue}
+          onPress={() => go("PDC")}
+        />
+        <FinTile
+          w={tileWidth}
+          label="Stock at cost (PTR)"
+          value={money(fin?.stock.cost ?? 0)}
+          icon={Landmark}
+          accent={accents.teal}
+        />
+        <FinTile
+          w={tileWidth}
+          label="Stock at MRP"
+          value={money(fin?.stock.mrp ?? 0)}
+          icon={Boxes}
+          accent={accents.blue}
+        />
+        <FinTile
+          w={tileWidth}
+          label="Margin (30d)"
+          value={`${fin?.margin.marginPct ?? 0}%`}
+          icon={Percent}
+          accent={accents.amber}
+        />
       </View>
 
       <Card style={{ marginTop: 12 }}>
         <VStack gap={12}>
-          <HStack justify="space-between" align="center">
-            <HStack gap={8} align="center">
-              <TrendingUp size={18} color={palette.teal[600]} strokeWidth={2} />
-              <Text variant="label-lg" tone="primary">
-                Sales &amp; purchases
-              </Text>
-            </HStack>
+          <HStack gap={8} align="center">
+            <TrendingUp size={18} color={palette.teal[600]} strokeWidth={2} />
+            <Text variant="label-lg" tone="primary">
+              Sales &amp; purchases
+            </Text>
           </HStack>
-          <HStack gap={16} style={{ flexWrap: "wrap" }}>
-            <VStack gap={1}>
-              <Text variant="caption" tone="tertiary">
-                Sales (7d / 30d)
-              </Text>
-              <Text variant="body-sm" tone="secondary">
-                {money(fin?.sales.last7 ?? 0)} / {money(fin?.sales.last30 ?? 0)}
-              </Text>
-            </VStack>
-            <VStack gap={1}>
-              <Text variant="caption" tone="tertiary">
-                Purchases (30d)
-              </Text>
-              <Text variant="body-sm" tone="secondary">
-                {money(fin?.purchases.last30 ?? 0)}
-              </Text>
-            </VStack>
-            <VStack gap={1}>
-              <Text variant="caption" tone="tertiary">
-                Gross margin (30d)
-              </Text>
-              <Text variant="body-sm" tone="secondary">
-                {money(fin?.margin.grossMargin ?? 0)} (
-                {fin?.margin.marginPct ?? 0}
-                %)
-              </Text>
-            </VStack>
+          <HStack gap={20} style={{ flexWrap: "wrap" }}>
+            <Metric
+              label="Sales (7d / 30d)"
+              value={`${money(fin?.sales.last7 ?? 0)} / ${money(fin?.sales.last30 ?? 0)}`}
+            />
+            <Metric
+              label="Purchases (30d)"
+              value={money(fin?.purchases.last30 ?? 0)}
+            />
+            <Metric
+              label="Gross margin (30d)"
+              value={`${money(fin?.margin.grossMargin ?? 0)} · ${fin?.margin.marginPct ?? 0}%`}
+            />
           </HStack>
         </VStack>
       </Card>
 
       {fin && fin.receivables.top.length > 0 ? (
-        <Card style={{ marginTop: 12 }}>
-          <VStack gap={10}>
-            <HStack justify="space-between" align="center">
-              <Text variant="label-lg" tone="primary">
-                Need to collect
-              </Text>
-              <Button
-                label="Customers"
-                size="sm"
-                variant="secondary"
-                fullWidth={false}
-                onPress={() => go("Customers")}
-              />
-            </HStack>
-            {fin.receivables.top.map((c) => (
-              <HStack key={c.customerId} justify="space-between" align="center">
-                <Text variant="body-sm" tone="secondary" numberOfLines={1}>
-                  {c.customerName}
-                </Text>
-                <Text
-                  variant="label"
-                  weight="600"
-                  style={{ color: palette.danger.text }}
-                >
-                  {money(c.outstanding)}
-                </Text>
-              </HStack>
-            ))}
-          </VStack>
-        </Card>
+        <TopList
+          title="Top receivables"
+          cta="Customers"
+          onCta={() => go("Customers")}
+          rows={fin.receivables.top.map((c) => ({
+            id: c.customerId,
+            name: c.customerName,
+            amount: c.outstanding,
+          }))}
+        />
       ) : null}
-
       {fin && fin.needToPay.top.length > 0 ? (
-        <Card style={{ marginTop: 12 }}>
-          <VStack gap={10}>
-            <HStack justify="space-between" align="center">
-              <Text variant="label-lg" tone="primary">
-                Need to pay
-              </Text>
-              <Button
-                label="Suppliers"
-                size="sm"
-                variant="secondary"
-                fullWidth={false}
-                onPress={() => go("Suppliers")}
-              />
-            </HStack>
-            {fin.needToPay.top.map((s) => (
-              <HStack key={s.supplierId} justify="space-between" align="center">
-                <Text variant="body-sm" tone="secondary" numberOfLines={1}>
-                  {s.supplierName}
-                </Text>
-                <Text
-                  variant="label"
-                  weight="600"
-                  style={{ color: palette.danger.text }}
-                >
-                  {money(s.outstanding)}
-                </Text>
-              </HStack>
-            ))}
-          </VStack>
-        </Card>
+        <TopList
+          title="Top payables"
+          cta="Suppliers"
+          onCta={() => go("Suppliers")}
+          rows={fin.needToPay.top.map((s) => ({
+            id: s.supplierId,
+            name: s.supplierName,
+            amount: s.outstanding,
+          }))}
+        />
       ) : null}
 
       {/* Team snapshot */}
@@ -351,14 +407,7 @@ export default function DashboardScreen() {
         <HStack align="center" justify="space-between">
           <HStack gap={12} align="center">
             <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                backgroundColor: palette.teal[50],
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+              style={[styles.attnIcon, { backgroundColor: palette.teal[50] }]}
             >
               <Users size={20} color={palette.teal[600]} strokeWidth={2} />
             </View>
@@ -381,64 +430,92 @@ export default function DashboardScreen() {
           )}
         </HStack>
       </Card>
-
-      {/* Module roadmap */}
-      <Text
-        variant="h3"
-        tone="primary"
-        style={{ marginTop: 28, marginBottom: 12 }}
-      >
-        Modules
-      </Text>
-      <View
-        style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 }}
-      >
-        {MODULES.map((m) => {
-          const live = Boolean(m.nav);
-          return (
-            <View
-              key={m.label}
-              style={{
-                width: cols >= 4 ? "33.33%" : width >= 700 ? "50%" : "100%",
-                padding: 6,
-              }}
-            >
-              <Card padded onPress={live ? () => go(m.nav!) : undefined}>
-                <HStack gap={12} align="center">
-                  <View
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 10,
-                      backgroundColor: live
-                        ? palette.teal[50]
-                        : palette.ink[50],
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <m.icon
-                      size={18}
-                      color={live ? palette.teal[600] : palette.ink[500]}
-                      strokeWidth={1.9}
-                    />
-                  </View>
-                  <VStack gap={3} flex={1}>
-                    <Text variant="label-lg" tone="primary" numberOfLines={1}>
-                      {m.label}
-                    </Text>
-                    <StatusChip
-                      label={live ? "Live" : `Phase ${m.phase}`}
-                      tone={live ? "success" : "neutral"}
-                    />
-                  </VStack>
-                </HStack>
-              </Card>
-            </View>
-          );
-        })}
-      </View>
     </Screen>
+  );
+}
+
+function FinTile({
+  w,
+  label,
+  value,
+  icon,
+  accent,
+  hint,
+  onPress,
+}: {
+  w: `${number}%`;
+  label: string;
+  value: string;
+  icon: typeof Boxes;
+  accent: { color: string; tint: string };
+  hint?: string;
+  onPress?: () => void;
+}) {
+  return (
+    <View style={{ width: w, padding: 6 }}>
+      <StatTile
+        label={label}
+        value={value}
+        icon={icon}
+        accent={accent}
+        hint={hint}
+        onPress={onPress}
+      />
+    </View>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <VStack gap={1}>
+      <Text variant="caption" tone="tertiary">
+        {label}
+      </Text>
+      <Text variant="label-lg" tone="primary">
+        {value}
+      </Text>
+    </VStack>
+  );
+}
+
+function TopList({
+  title,
+  cta,
+  onCta,
+  rows,
+}: {
+  title: string;
+  cta: string;
+  onCta: () => void;
+  rows: { id: string; name: string; amount: number }[];
+}) {
+  return (
+    <Card style={{ marginTop: 12 }}>
+      <VStack gap={10}>
+        <HStack justify="space-between" align="center">
+          <Text variant="label-lg" tone="primary">
+            {title}
+          </Text>
+          <Button
+            label={cta}
+            size="sm"
+            variant="secondary"
+            fullWidth={false}
+            onPress={onCta}
+          />
+        </HStack>
+        {rows.map((r) => (
+          <HStack key={r.id} justify="space-between" align="center">
+            <Text variant="body-sm" tone="secondary" numberOfLines={1}>
+              {r.name}
+            </Text>
+            <Text variant="label" style={{ color: palette.danger.text }}>
+              {money(r.amount)}
+            </Text>
+          </HStack>
+        ))}
+      </VStack>
+    </Card>
   );
 }
 
@@ -448,3 +525,30 @@ function greeting() {
   if (h < 17) return "Good afternoon";
   return "Good evening";
 }
+
+const styles = {
+  grid: {
+    flexDirection: "row" as const,
+    flexWrap: "wrap" as const,
+    marginTop: 20,
+    marginHorizontal: -6,
+  },
+  sectionH: { marginTop: 28, marginBottom: 12 },
+  attnIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  rowDivider: {
+    height: 1,
+    backgroundColor: palette.border.subtle,
+    marginHorizontal: 16,
+  },
+  attnRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+  },
+};

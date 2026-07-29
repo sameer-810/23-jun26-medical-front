@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Pressable, Platform, Alert } from "react-native";
+import React, { useState } from "react";
+import { View, Pressable } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -32,19 +32,11 @@ import {
   StatusChip,
   StatTile,
   EmptyState,
+  ConfirmDialog,
+  PromptDialog,
 } from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
-
-function confirm(msg: string, onYes: () => void) {
-  if (Platform.OS === "web") {
-    if (window.confirm(msg)) onYes();
-  } else
-    Alert.alert("Please confirm", msg, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: onYes },
-    ]);
-}
 
 export default function SupplierDetailScreen() {
   const navigation = useNavigation<any>();
@@ -66,23 +58,18 @@ export default function SupplierDetailScreen() {
   const outstanding = statement?.data.outstanding ?? 0;
   const ledger = statement?.data.rows ?? [];
 
+  const [payOpen, setPayOpen] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
   const payMut = useMutation({
     mutationFn: (amount: number) =>
       supplierApi.recordPayment(id, { amount, mode: "cash" }),
-    onSuccess: () =>
+    onSuccess: () => {
+      setPayOpen(false);
       queryClient.invalidateQueries({
         queryKey: ["supplier", "statement", id],
-      }),
+      });
+    },
   });
-
-  const pay = () => {
-    if (Platform.OS !== "web") return;
-    const raw = window.prompt(
-      `Pay ${supplier?.name || "supplier"} (outstanding ₹${Math.round(outstanding)}):`,
-    );
-    const amt = Number(raw);
-    if (raw && amt > 0) payMut.mutate(amt);
-  };
 
   return (
     <Screen
@@ -210,7 +197,7 @@ export default function SupplierDetailScreen() {
           }
           style={{ marginBottom: 24 }}
           loading={payMut.isPending}
-          onPress={pay}
+          onPress={() => setPayOpen(true)}
         />
       ) : null}
 
@@ -311,13 +298,44 @@ export default function SupplierDetailScreen() {
           icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2} />}
           style={{ marginTop: 24 }}
           loading={removeMut.isPending}
-          onPress={() =>
-            confirm("Deactivate this supplier?", () =>
-              removeMut.mutate(id, { onSuccess: () => navigation.goBack() }),
-            )
-          }
+          onPress={() => setRemoveOpen(true)}
         />
       )}
+
+      <PromptDialog
+        visible={payOpen}
+        title={`Pay ${supplier?.name || "supplier"}`}
+        message={
+          outstanding > 0
+            ? `Outstanding ₹${Math.round(outstanding)}. Enter the amount paid.`
+            : "Enter the amount paid to this supplier."
+        }
+        label="Amount (₹)"
+        placeholder="0"
+        keyboardType="decimal-pad"
+        confirmLabel="Record payment"
+        leading={
+          <Wallet size={18} color={palette.text.tertiary} strokeWidth={1.8} />
+        }
+        loading={payMut.isPending}
+        validate={(v) =>
+          Number(v) > 0 ? null : "Enter an amount greater than 0"
+        }
+        onSubmit={(v) => payMut.mutate(Number(v))}
+        onCancel={() => setPayOpen(false)}
+      />
+      <ConfirmDialog
+        visible={removeOpen}
+        title="Deactivate supplier?"
+        message={`${supplier?.name || "This supplier"} will be hidden from new purchases. You can reactivate later.`}
+        confirmLabel="Deactivate"
+        destructive
+        loading={removeMut.isPending}
+        onConfirm={() =>
+          removeMut.mutate(id, { onSuccess: () => navigation.goBack() })
+        }
+        onCancel={() => setRemoveOpen(false)}
+      />
     </Screen>
   );
 }

@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { View, Pressable, Switch, Platform, Alert } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Pressable, Switch } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useForm, useWatch, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,7 +20,15 @@ import { apiErrorMessage } from "@api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { ControlledSelect } from "@shared/form/ControlledSelect";
 import { palette, radius } from "@shared/designSystem";
-import { Screen, Text, VStack, HStack, Card, Button } from "@shared/ui";
+import {
+  Screen,
+  Text,
+  VStack,
+  HStack,
+  Card,
+  Button,
+  ConfirmDialog,
+} from "@shared/ui";
 import { PacksEditor } from "@modules/product/components/PacksEditor";
 
 const SCHEDULES: { value: ScheduleDrug; label: string }[] = [
@@ -31,18 +39,6 @@ const SCHEDULES: { value: ScheduleDrug; label: string }[] = [
   { value: "G", label: "Schedule G" },
   { value: "C", label: "Schedule C" },
 ];
-
-function confirm(message: string, onYes: () => void) {
-  if (Platform.OS === "web") {
-    // eslint-disable-next-line no-alert
-    if (window.confirm(message)) onYes();
-  } else {
-    Alert.alert("Please confirm", message, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Confirm", style: "destructive", onPress: onYes },
-    ]);
-  }
-}
 
 export default function ProductFormScreen() {
   const navigation = useNavigation<any>();
@@ -59,6 +55,7 @@ export default function ProductFormScreen() {
   const updateMut = useUpdateProduct(id || "");
   const removeMut = useRemoveProduct();
   const mut = editing ? updateMut : createMut;
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   // One form holds every value — text, numbers, dropdowns, switch and packs —
   // so the edit screen populates with a single reset() and nothing side-syncs.
@@ -365,13 +362,22 @@ export default function ProductFormScreen() {
           icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2} />}
           style={{ marginTop: 12 }}
           loading={removeMut.isPending}
-          onPress={() =>
-            confirm("Deactivate this product? History is preserved.", () =>
-              removeMut.mutate(id!, { onSuccess: () => navigation.goBack() }),
-            )
-          }
+          onPress={() => setConfirmOpen(true)}
         />
       )}
+
+      <ConfirmDialog
+        visible={confirmOpen}
+        title="Deactivate this product?"
+        message="History is preserved."
+        confirmLabel="Deactivate"
+        destructive
+        loading={removeMut.isPending}
+        onConfirm={() =>
+          removeMut.mutate(id!, { onSuccess: () => navigation.goBack() })
+        }
+        onCancel={() => setConfirmOpen(false)}
+      />
     </Screen>
   );
 }

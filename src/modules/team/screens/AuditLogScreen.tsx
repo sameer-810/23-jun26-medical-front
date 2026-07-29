@@ -1,9 +1,8 @@
 import React, { useState } from "react";
-import { View, TextInput, StyleSheet } from "react-native";
-import { Search, ScrollText } from "lucide-react-native";
+import { View } from "react-native";
+import { ScrollText } from "lucide-react-native";
 import { useAuditLogs } from "@modules/team/hooks/useTeam";
 import { ActivityLog } from "@modules/team/types";
-import { palette, radius, outline } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -11,8 +10,11 @@ import {
   HStack,
   Card,
   StatusChip,
-  EmptyState,
+  SearchInput,
   Pagination,
+  DataTable,
+  Column,
+  Skeleton,
 } from "@shared/ui";
 
 const ACTION_TONE = (
@@ -54,6 +56,58 @@ export default function AuditLogScreen() {
 
   if (!isLoading && totalPages > 0 && page > totalPages) setPage(totalPages);
 
+  const columns: Column<ActivityLog>[] = [
+    {
+      key: "createdAt",
+      header: "When",
+      width: 180,
+      sortable: true,
+      sortValue: (log) => log.createdAt,
+      render: (log) => (
+        <Text variant="body-sm" tone="tertiary">
+          {formatWhen(log.createdAt)}
+        </Text>
+      ),
+    },
+    {
+      key: "userName",
+      header: "Actor",
+      width: 180,
+      sortable: true,
+      sortValue: (log) => (log.userName || "").toLowerCase(),
+      render: (log) => (
+        <VStack gap={1}>
+          <Text variant="label" tone="primary" numberOfLines={1}>
+            {log.userName || "System"}
+          </Text>
+          {log.userRole ? (
+            <Text variant="caption" tone="tertiary">
+              {log.userRole}
+            </Text>
+          ) : null}
+        </VStack>
+      ),
+    },
+    {
+      key: "action",
+      header: "Action",
+      width: 170,
+      render: (log) => (
+        <StatusChip label={log.action} tone={ACTION_TONE(log.action)} />
+      ),
+    },
+    {
+      key: "description",
+      header: "Description",
+      width: 280,
+      render: (log) => (
+        <Text variant="body-sm" tone="secondary" numberOfLines={2}>
+          {log.description || `${log.entityType} ${log.action}`}
+        </Text>
+      ),
+    },
+  ];
+
   return (
     <Screen
       overline="Compliance"
@@ -62,41 +116,60 @@ export default function AuditLogScreen() {
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
     >
-      <View style={styles.searchWrap}>
-        <Search size={18} color={palette.text.tertiary} strokeWidth={1.8} />
-        <TextInput
-          placeholder="Search actions, users or descriptions"
-          placeholderTextColor={palette.text.tertiary}
-          value={search}
-          onChangeText={setSearch}
-          style={styles.searchInput}
-          autoCapitalize="none"
-        />
-      </View>
+      <SearchInput
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search actions, users or descriptions"
+      />
 
-      {logs.length === 0 ? (
-        <EmptyState
-          icon={ScrollText}
-          title={isLoading ? "Loading…" : "No activity yet"}
-          message="Every sign-in and change will appear here."
-        />
+      {isLoading && logs.length === 0 ? (
+        <ListSkeleton />
       ) : (
-        <VStack gap={10} style={{ marginTop: 16 }}>
-          {logs.map((log) => (
-            <LogRow key={log.id} log={log} />
-          ))}
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            total={total}
-            limit={limit}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
-            label="entries"
+        <View style={{ marginTop: 16 }}>
+          <DataTable<ActivityLog>
+            columns={columns}
+            rows={logs}
+            keyExtractor={(log) => log.id}
+            mobileCard={(log) => <LogRow log={log} />}
+            emptyIcon={ScrollText}
+            emptyTitle="No activity yet"
+            emptyMessage="Every sign-in and change will appear here."
           />
-        </VStack>
+          {logs.length > 0 ? (
+            <View style={{ marginTop: 16 }}>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                limit={limit}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
+                label="entries"
+              />
+            </View>
+          ) : null}
+        </View>
       )}
     </Screen>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <VStack gap={10} style={{ marginTop: 16 }}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <Card key={i} elevation="base">
+          <VStack gap={8}>
+            <HStack align="center" justify="space-between" gap={8}>
+              <Skeleton width={90} height={18} rounded="full" />
+              <Skeleton width={70} height={12} />
+            </HStack>
+            <Skeleton width="80%" height={13} />
+            <Skeleton width="40%" height={12} />
+          </VStack>
+        </Card>
+      ))}
+    </VStack>
   );
 }
 
@@ -137,23 +210,3 @@ function formatWhen(iso: string) {
   const d = new Date(iso);
   return d.toLocaleString();
 }
-
-const styles = StyleSheet.create({
-  searchWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    height: 48,
-    borderRadius: radius.md,
-    borderWidth: outline.width,
-    borderColor: outline.color,
-    backgroundColor: palette.surface.primary,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: palette.text.primary,
-    paddingVertical: 0,
-  },
-});

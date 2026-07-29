@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { View, Pressable, Switch, Alert, Platform } from "react-native";
+import React, { useState } from "react";
+import { View, Pressable, Switch } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { ArrowLeft, ShieldCheck, KeyRound, Trash2 } from "lucide-react-native";
 import {
@@ -23,20 +23,10 @@ import {
   TextField,
   ChipsRow,
   StatusChip,
+  ConfirmDialog,
+  Skeleton,
 } from "@shared/ui";
 import { PermissionEditor } from "@modules/team/components/PermissionEditor";
-
-function confirm(message: string, onYes: () => void) {
-  if (Platform.OS === "web") {
-    // eslint-disable-next-line no-alert
-    if (window.confirm(message)) onYes();
-  } else {
-    Alert.alert("Please confirm", message, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Confirm", style: "destructive", onPress: onYes },
-    ]);
-  }
-}
 
 export default function UserDetailScreen() {
   const navigation = useNavigation<any>();
@@ -53,18 +43,41 @@ export default function UserDetailScreen() {
   const [roleLabel, setRoleLabel] = useState("");
   const [permissions, setPermissions] = useState<string[]>([]);
   const [newPassword, setNewPassword] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  useEffect(() => {
+  // Sync the editable fields from the loaded user — adjusted during render when
+  // the user reference changes (React's "reset state on prop change" pattern),
+  // not in an effect.
+  const [syncedUser, setSyncedUser] = useState(user);
+  if (user !== syncedUser) {
+    setSyncedUser(user);
     if (user) {
       setRoleLabel(user.roleLabel || "");
       setPermissions(user.permissions || []);
     }
-  }, [user]);
+  }
 
   if (!user) {
     return (
-      <Screen title="Member">
-        <Text tone="tertiary">Loading…</Text>
+      <Screen overline="Team" title="Member">
+        <VStack gap={12}>
+          <Card>
+            <HStack gap={14} align="center">
+              <Skeleton width={54} height={54} rounded="full" />
+              <VStack gap={8} flex={1}>
+                <Skeleton width="50%" height={18} />
+                <Skeleton width="70%" height={14} />
+              </VStack>
+            </HStack>
+          </Card>
+          <Card>
+            <VStack gap={10}>
+              <Skeleton width="30%" height={16} />
+              <Skeleton height={40} />
+              <Skeleton height={40} />
+            </VStack>
+          </Card>
+        </VStack>
       </Screen>
     );
   }
@@ -266,18 +279,26 @@ export default function UserDetailScreen() {
                 fullWidth={false}
                 icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2} />}
                 loading={removeMut.isPending}
-                onPress={() =>
-                  confirm(`Remove ${user.fullName}?`, () =>
-                    removeMut.mutate(id, {
-                      onSuccess: () => navigation.goBack(),
-                    }),
-                  )
-                }
+                onPress={() => setConfirmOpen(true)}
               />
             </HStack>
           </Card>
         </>
       )}
+
+      <ConfirmDialog
+        visible={confirmOpen}
+        title={`Remove ${user.fullName}?`}
+        confirmLabel="Remove"
+        destructive
+        loading={removeMut.isPending}
+        onConfirm={() =>
+          removeMut.mutate(id, {
+            onSuccess: () => navigation.goBack(),
+          })
+        }
+        onCancel={() => setConfirmOpen(false)}
+      />
     </Screen>
   );
 }

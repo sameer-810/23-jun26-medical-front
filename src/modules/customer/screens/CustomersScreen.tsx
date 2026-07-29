@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { View, TextInput, StyleSheet } from "react-native";
+import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Search, Plus, Users, Phone, ChevronRight } from "lucide-react-native";
+import { Plus, Users, Phone, ChevronRight } from "lucide-react-native";
 import { useCustomers } from "@modules/customer/hooks/useCustomers";
 import { Customer } from "@modules/customer/types";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
-import { palette, radius, outline } from "@shared/designSystem";
+import { palette } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -16,8 +16,11 @@ import {
   Avatar,
   Button,
   StatusChip,
-  EmptyState,
+  SearchInput,
   Pagination,
+  DataTable,
+  Column,
+  Skeleton,
 } from "@shared/ui";
 
 export default function CustomersScreen() {
@@ -49,6 +52,49 @@ export default function CustomersScreen() {
 
   if (!isLoading && totalPages > 0 && page > totalPages) setPage(totalPages);
 
+  const open = (c: Customer) =>
+    navigation.navigate("CustomerDetail", { id: c.id });
+
+  const columns: Column<Customer>[] = [
+    {
+      key: "name",
+      header: "Name",
+      width: 240,
+      sortable: true,
+      sortValue: (c) => c.name.toLowerCase(),
+      render: (c) => (
+        <Text variant="label" tone="primary" numberOfLines={1}>
+          {c.name}
+        </Text>
+      ),
+    },
+    {
+      key: "mobile",
+      header: "Mobile",
+      width: 150,
+      sortable: true,
+      sortValue: (c) => c.mobile || "",
+      render: (c) => (
+        <Text variant="body-sm" tone="secondary">
+          {c.mobile || "—"}
+        </Text>
+      ),
+    },
+    {
+      key: "gstin",
+      header: "GSTIN",
+      width: 220,
+      render: (c) =>
+        c.gstin ? (
+          <StatusChip label={c.gstin} tone="neutral" />
+        ) : (
+          <Text variant="body-sm" tone="tertiary">
+            —
+          </Text>
+        ),
+    },
+  ];
+
   return (
     <Screen
       overline="Partners"
@@ -67,47 +113,62 @@ export default function CustomersScreen() {
         ) : undefined
       }
     >
-      <View style={styles.searchWrap}>
-        <Search size={18} color={palette.text.tertiary} strokeWidth={1.8} />
-        <TextInput
-          placeholder="Search by name or mobile"
-          placeholderTextColor={palette.text.tertiary}
-          value={search}
-          onChangeText={setSearch}
-          style={styles.searchInput}
-          autoCapitalize="none"
-        />
-      </View>
+      <SearchInput
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search by name or mobile"
+      />
 
-      {customers.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title={isLoading ? "Loading…" : "No customers yet"}
-          message="Add customers to track purchase history and speed up billing."
-        />
+      {isLoading && customers.length === 0 ? (
+        <ListSkeleton />
       ) : (
-        <VStack gap={12} style={{ marginTop: 16 }}>
-          {customers.map((c) => (
-            <CustomerRow
-              key={c.id}
-              customer={c}
-              onPress={() =>
-                navigation.navigate("CustomerDetail", { id: c.id })
-              }
-            />
-          ))}
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            total={total}
-            limit={limit}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
-            label="customers"
+        <View style={{ marginTop: 16 }}>
+          <DataTable<Customer>
+            columns={columns}
+            rows={customers}
+            keyExtractor={(c) => c.id}
+            onRowPress={open}
+            mobileCard={(c) => (
+              <CustomerRow customer={c} onPress={() => open(c)} />
+            )}
+            emptyIcon={Users}
+            emptyTitle="No customers yet"
+            emptyMessage="Add customers to track purchase history and speed up billing."
           />
-        </VStack>
+          {customers.length > 0 ? (
+            <View style={{ marginTop: 16 }}>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                limit={limit}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
+                label="customers"
+              />
+            </View>
+          ) : null}
+        </View>
       )}
     </Screen>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <VStack gap={12} style={{ marginTop: 16 }}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <Card key={i} elevation="base">
+          <HStack gap={14} align="center">
+            <Skeleton width={46} height={46} rounded="full" />
+            <VStack gap={6} flex={1}>
+              <Skeleton width="45%" height={16} />
+              <Skeleton width="30%" height={12} />
+            </VStack>
+          </HStack>
+        </Card>
+      ))}
+    </VStack>
   );
 }
 
@@ -153,23 +214,3 @@ function CustomerRow({
     </Card>
   );
 }
-
-const styles = StyleSheet.create({
-  searchWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    height: 48,
-    borderRadius: radius.md,
-    borderWidth: outline.width,
-    borderColor: outline.color,
-    backgroundColor: palette.surface.primary,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: palette.text.primary,
-    paddingVertical: 0,
-  },
-});

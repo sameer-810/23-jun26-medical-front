@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Switch, Platform, StyleSheet } from "react-native";
+import { View, Switch, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useForm, Controller } from "react-hook-form";
 import { ArrowLeft, Trash2 } from "lucide-react-native";
@@ -12,7 +12,15 @@ import {
 import { apiErrorMessage } from "@shared/api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Screen, Text, VStack, HStack, Card, Button } from "@shared/ui";
+import {
+  Screen,
+  Text,
+  VStack,
+  HStack,
+  Card,
+  Button,
+  ConfirmDialog,
+} from "@shared/ui";
 
 export default function AdminFormScreen() {
   const navigation = useNavigation<any>();
@@ -26,6 +34,7 @@ export default function AdminFormScreen() {
   const updateMut = useUpdateAdmin();
   const removeMut = useRemoveAdmin();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { control, handleSubmit, reset } = useForm({
     defaultValues: { name: "", email: "", password: "", isActive: true },
@@ -69,8 +78,6 @@ export default function AdminFormScreen() {
 
   const onRemove = () => {
     if (!id) return;
-    if (Platform.OS === "web" && !window.confirm("Remove this platform admin?"))
-      return;
     removeMut.mutate(id, {
       onSuccess: () => navigation.goBack(),
       onError: (err) => setServerError(apiErrorMessage(err)),
@@ -166,9 +173,19 @@ export default function AdminFormScreen() {
           icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2} />}
           style={{ marginTop: 16 }}
           loading={removeMut.isPending}
-          onPress={onRemove}
+          onPress={() => setConfirmOpen(true)}
         />
       ) : null}
+
+      <ConfirmDialog
+        visible={confirmOpen}
+        title="Remove this platform admin?"
+        confirmLabel="Remove"
+        destructive
+        loading={removeMut.isPending}
+        onConfirm={onRemove}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </Screen>
   );
 }

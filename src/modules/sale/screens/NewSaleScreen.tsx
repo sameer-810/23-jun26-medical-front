@@ -1,13 +1,20 @@
-import React, { useMemo, useState } from "react";
-import { View, Pressable, StyleSheet, ActivityIndicator } from "react-native";
+import React, { useMemo, useState, useRef, useEffect } from "react";
+import {
+  View,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
-  Plus,
-  X,
   History,
   ShoppingCart,
   ScanLine,
-  AlertTriangle,
+  Search,
+  Trash2,
+  PackageX,
 } from "lucide-react-native";
 import { useProducts } from "@modules/product/hooks/useProducts";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
@@ -27,60 +34,47 @@ import {
   HStack,
   Card,
   Button,
-  TextField,
   Select,
   ChipsRow,
+  Combobox,
+  Banner,
+  EmptyState,
 } from "@shared/ui";
 
 interface DraftLine {
-  productId: string | null;
+  productId: string;
+  productName: string;
+  salt?: string | null;
+  baseUnit: string;
   /** Set when the line came from a scanned label — pins the sale to this lot. */
   batchId?: string | null;
   batchNumber?: string | null;
   expiry?: string | null;
-  /**
-   * Sellable BASE units behind this line — the scanned lot's stock, or the
-   * product's total when FEFO will choose. Lets the form say "only 3 left"
-   * while the cashier types, instead of failing at checkout.
-   */
+  /** Sellable BASE units behind this line (scanned lot's stock, or product total). */
   available?: number | null;
   unit: string | null;
   quantity: string;
   unitPrice: string;
   discount: string;
-  /** Whether `discount` is a flat ₹ amount or a % of the line's gross. */
   discountMode: "amount" | "pct";
   taxRate: string;
 }
-const emptyLine = (): DraftLine => ({
-  productId: null,
-  batchId: null,
-  batchNumber: null,
-  expiry: null,
-  available: null,
-  unit: null,
-  quantity: "1",
-  unitPrice: "",
-  discount: "",
-  discountMode: "amount",
-  taxRate: "",
-});
 
-/** "2028-01-31" / ISO -> "Jan 2028" for a quick human read on a line. */
+/** "2028-01-31" / ISO -> "Jan 28" for a compact expiry read on a line. */
 const prettyExp = (iso: string | null | undefined) => {
   if (!iso) return "";
   const [y, m] = String(iso).slice(0, 10).split("-");
   const months = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
-  return `${months[Number(m) - 1] || m} ${y}`;
+  return `${months[Number(m) - 1] || m} ${String(y).slice(2)}`;
 };
 const money = (n: number) =>
   `₹${(Math.round(n * 100) / 100).toLocaleString("en-IN")}`;
 
 export default function NewSaleScreen() {
   const navigation = useNavigation<any>();
-  // Catalogue and customer list are both paged — the pickers search server-side
-  // and we cache what's been resolved. Without the cache a product outside the
-  // current results loses its price and the line total silently computes to ₹0.
+  const { width } = useWindowDimensions();
+  const wide = width >= 1200;
+
   const [productQuery, setProductQuery] = useState("");
   const { data: products, isFetching: productsLoading } = useProducts({
     search: productQuery || undefined,
@@ -96,10 +90,9 @@ export default function NewSaleScreen() {
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [taxType, setTaxType] = useState<"intra" | "inter">("intra");
   const [paymentMode, setPaymentMode] = useState("cash");
-  const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
-  const [scanValue, setScanValue] = useState("");
+  const [lines, setLines] = useState<DraftLine[]>([]);
   const [scanError, setScanError] = useState<string | null>(null);
-  const [scanBusy, setScanBusy] = useState(false);
+  const scanBusy = useRef(false);
   type ProductRow = NonNullable<typeof products>["data"][number];
   type CustomerRow = NonNullable<typeof customers>["data"][number];
   const [knownProducts, setKnownProducts] = useState<
@@ -109,42 +102,37 @@ export default function NewSaleScreen() {
     Record<string, CustomerRow>
   >({});
 
-  /** Cache + live results — this is what the pricing maths reads from. */
+  /** Cache + live results — what the pricing maths reads from. */
   const productsById = useMemo(() => {
     const map: Record<string, ProductRow> = { ...knownProducts };
     for (const p of products?.data || []) map[p.id] = p;
     return map;
   }, [products, knownProducts]);
 
-  /** Pickers list search results only; the catalogue is far too big to list. */
-  // Show the salt too: a search for "pantoprazole" returns brand names, and the
-  // molecule is what tells you why each one matched.
-  const productOptions = (products?.data || []).map((p) => ({
+  const productItems = (products?.data || []).map((p) => ({
     value: p.id,
-    label: p.saltComposition
-      ? `${p.name} · ${money(p.sellingPrice)}/${p.baseUnit} — ${p.saltComposition}`
-      : `${p.name} · ${money(p.sellingPrice)}/${p.baseUnit}`,
+    label: p.name,
+    sublabel: p.saltComposition || p.sku,
+    right: `${money(p.sellingPrice)}/${p.baseUnit}`,
   }));
   const customerOptions = (customers?.data || []).map((c) => ({
     value: c.id,
     label: c.mobile ? `${c.name} · ${c.mobile}` : c.name,
   }));
-
   const selectedCustomer = customerId
     ? knownCustomers[customerId] ||
       (customers?.data || []).find((c) => c.id === customerId)
     : null;
 
-  /** Remember each pick so its label/price survives the next search. */
   const pickCustomer = (id: string | null) => {
     const c = id ? (customers?.data || []).find((x) => x.id === id) : null;
     if (c) setKnownCustomers((cur) => ({ ...cur, [c.id]: c }));
     setCustomerId(id);
   };
 
-  const unitOptions = (productId: string | null) => {
-    const p = productId ? productsById[productId] : null;
-    if (!p) return [];
+  const unitOptions = (line: DraftLine) => {
+    const p = productsById[line.productId];
+    if (!p) return [{ value: line.baseUnit, label: line.baseUnit }];
     return [
       { value: p.baseUnit, label: `${p.baseUnit} (base)` },
       ...(p.packs || []).map((pk) => ({
@@ -158,20 +146,16 @@ export default function NewSaleScreen() {
     setLines((cur) =>
       cur.map((l, idx) => (idx === i ? { ...l, ...patch } : l)),
     );
-  const addLine = () => setLines((cur) => [...cur, emptyLine()]);
+  const removeLine = (i: number) =>
+    setLines((cur) => cur.filter((_, idx) => idx !== i));
 
-  /**
-   * How many units of a hand-picked product can actually be sold. Scanned lines
-   * already know (the scan says so); a dropdown pick has to ask.
-   */
-  const loadAvailability = async (index: number, productId: string) => {
+  /** How many BASE units of a hand-picked product can actually be sold. */
+  const loadAvailabilityForProduct = async (productId: string) => {
     try {
       const inv = await inventoryApi.productInventory(productId);
       setLines((cur) =>
-        cur.map((l, k) =>
-          // Only if this line still holds the product we asked about — a slow
-          // reply must never overwrite a line the cashier has moved on from.
-          k === index && l.productId === productId
+        cur.map((l) =>
+          l.productId === productId && !l.batchId
             ? { ...l, available: inv.summary.available }
             : l,
         ),
@@ -181,36 +165,60 @@ export default function NewSaleScreen() {
     }
   };
 
-  /** Drop a resolved line into the first blank slot, else append. */
-  const placeLine = (line: DraftLine) =>
+  /** Add a product from the search — a fresh FEFO line, or bump if already in. */
+  const addProduct = (id: string) => {
+    const p = productsById[id];
+    if (!p) return;
+    setKnownProducts((cur) => ({ ...cur, [id]: p }));
     setLines((cur) => {
-      const blank = cur.findIndex((l) => !l.productId);
-      return blank >= 0
-        ? cur.map((l, k) => (k === blank ? line : l))
-        : [...cur, line];
+      const idx = cur.findIndex((l) => l.productId === id && !l.batchId);
+      if (idx >= 0)
+        return cur.map((l, k) =>
+          k === idx
+            ? { ...l, quantity: String((Number(l.quantity) || 0) + 1) }
+            : l,
+        );
+      return [
+        ...cur,
+        {
+          productId: id,
+          productName: p.name,
+          salt: p.saltComposition,
+          baseUnit: p.baseUnit,
+          batchId: null,
+          batchNumber: null,
+          expiry: null,
+          available: null,
+          unit: p.baseUnit,
+          quantity: "1",
+          unitPrice: String(p.sellingPrice),
+          discount: "",
+          discountMode: "amount",
+          taxRate: String(p.taxRatePct),
+        },
+      ];
     });
+    void loadAvailabilityForProduct(id);
+  };
 
   /**
-   * A scanned barcode/QR from the counter's scanner (which types the code +
-   * Enter). A shelf label resolves to an exact lot and pins the sale to it; a
-   * product barcode adds a normal FEFO line. Scanning the same lot again just
-   * bumps its quantity — the supermarket-till behaviour.
+   * A scanned/typed barcode or shelf label. A label resolves to an exact lot and
+   * pins the sale to it; a product barcode adds a normal FEFO line. Re-scanning
+   * the same lot just bumps its quantity — supermarket-till behaviour.
    */
   const handleScan = async (raw: string) => {
     const code = raw.trim();
-    if (!code || scanBusy) return;
+    if (!code || scanBusy.current) return;
     setScanError(null);
-    setScanBusy(true);
+    scanBusy.current = true;
     try {
       const res = await inventoryApi.scan(code);
       const sp = res.product;
       if (!sp) throw new Error("Nothing matched that code.");
-      // Cache it so the pricing maths can read this product after searches move on.
       setKnownProducts((cur) => ({
         ...cur,
         [sp.id]: sp as unknown as ProductRow,
       }));
-
       if (res.kind === "batch" && res.batch) {
         const b = res.batch;
         if (b.expired) {
@@ -225,95 +233,72 @@ export default function NewSaleScreen() {
         }
         setLines((cur) => {
           const idx = cur.findIndex((l) => l.batchId === b.id);
-          if (idx >= 0) {
+          if (idx >= 0)
             return cur.map((l, k) =>
               k === idx
                 ? { ...l, quantity: String((Number(l.quantity) || 0) + 1) }
                 : l,
             );
-          }
-          const line: DraftLine = {
-            productId: sp.id,
-            batchId: b.id,
-            batchNumber: b.batchNumber,
-            expiry: b.expiryDate,
-            available: res.available,
-            unit: sp.baseUnit,
-            quantity: "1",
-            unitPrice: String(b.mrp || sp.sellingPrice),
-            discount: "",
-            discountMode: "amount",
-            taxRate: String(sp.taxRatePct),
-          };
-          const blank = cur.findIndex((l) => !l.productId);
-          return blank >= 0
-            ? cur.map((l, k) => (k === blank ? line : l))
-            : [...cur, line];
+          return [
+            ...cur,
+            {
+              productId: sp.id,
+              productName: sp.name,
+              salt: sp.saltComposition,
+              baseUnit: sp.baseUnit,
+              batchId: b.id,
+              batchNumber: b.batchNumber,
+              expiry: b.expiryDate,
+              available: res.available,
+              unit: sp.baseUnit,
+              quantity: "1",
+              unitPrice: String(b.mrp || sp.sellingPrice),
+              discount: "",
+              discountMode: "amount",
+              taxRate: String(sp.taxRatePct),
+            },
+          ];
         });
       } else {
-        // Product barcode: a normal line, FEFO decides the batch at checkout.
-        placeLine({
-          productId: sp.id,
-          batchId: null,
-          batchNumber: null,
-          expiry: null,
-          available: res.available,
-          unit: sp.baseUnit,
-          quantity: "1",
-          unitPrice: String(sp.sellingPrice),
-          discount: "",
-          discountMode: "amount",
-          taxRate: String(sp.taxRatePct),
-        });
+        addProduct(sp.id);
       }
     } catch (e) {
       setScanError(apiErrorMessage(e));
     } finally {
-      setScanBusy(false);
+      scanBusy.current = false;
     }
   };
 
   // A USB scanner types wherever focus happens to be, so listen page-wide.
-  // Without this, a scan lands nowhere unless the cashier clicked the box first.
-  useScanGun((code) => void handleScan(code), { ignoreSelector: "#scanbox" });
-  const removeLine = (i: number) =>
-    setLines((cur) =>
-      cur.length === 1 ? cur : cur.filter((_, idx) => idx !== i),
-    );
+  useScanGun((code) => void handleScan(code), {
+    ignoreSelector: "#pos-search",
+  });
 
-  // Client-side preview (tax-exclusive). Backend computes the authoritative totals.
+  // Client-side preview (tax-exclusive). Backend computes authoritative totals.
   const calc = (l: DraftLine) => {
-    const p = l.productId ? productsById[l.productId] : null;
-    if (!p) return { gross: 0, discount: 0, taxable: 0, tax: 0, total: 0 };
+    const p = productsById[l.productId];
     const factor =
-      !l.unit || l.unit === p.baseUnit
+      !l.unit || !p || l.unit === p.baseUnit
         ? 1
         : (p.packs || []).find((x) => x.unit === l.unit)?.factor || 1;
     const qty = Number(l.quantity) || 0;
-    const unitPrice =
-      l.unitPrice === "" ? p.sellingPrice * factor : Number(l.unitPrice) || 0;
+    const fallback = (p?.sellingPrice || 0) * factor;
+    const unitPrice = l.unitPrice === "" ? fallback : Number(l.unitPrice) || 0;
     const gross = unitPrice * qty;
-    // A % discount is of this line's gross; a flat one is the rupee value typed.
     const discountInput = Number(l.discount) || 0;
     const discount =
       l.discountMode === "pct"
         ? (gross * Math.min(discountInput, 100)) / 100
         : discountInput;
     const taxable = Math.max(gross - discount, 0);
-    const rate = l.taxRate === "" ? p.taxRatePct : Number(l.taxRate) || 0;
+    const rate = l.taxRate === "" ? p?.taxRatePct || 0 : Number(l.taxRate) || 0;
     const tax = (taxable * rate) / 100;
     return { gross, discount, taxable, tax, total: taxable + tax };
   };
 
-  /**
-   * Is this line asking for more than exists?
-   *
-   * Compared in BASE units on purpose: quantity is entered in the line's unit,
-   * so "2 strips" of a 15-tablet strip needs 30, not 2. Returns null when the
-   * stock isn't known yet — we warn about facts, never guesses.
-   */
+  /** Is this line asking for more than exists? Compared in BASE units. */
   const stockIssue = (l: DraftLine) => {
-    if (l.available == null || !l.productId) return null;
+    if (l.available == null) return null;
     const p = productsById[l.productId];
     const factor =
       !l.unit || !p || l.unit === p.baseUnit
@@ -321,14 +306,13 @@ export default function NewSaleScreen() {
         : (p.packs || []).find((x) => x.unit === l.unit)?.factor || 1;
     const needBase = (Number(l.quantity) || 0) * factor;
     if (needBase <= l.available) return null;
-    const baseUnit = p?.baseUnit || "units";
     return {
       needBase,
       available: l.available,
       message:
         l.available <= 0
-          ? `Out of stock${l.batchNumber ? ` in batch ${l.batchNumber}` : ""}`
-          : `Only ${l.available} ${baseUnit} available${l.batchNumber ? ` in batch ${l.batchNumber}` : ""}`,
+          ? `Out of stock${l.batchNumber ? ` · batch ${l.batchNumber}` : ""}`
+          : `Only ${l.available} ${l.baseUnit} left`,
     };
   };
 
@@ -348,11 +332,13 @@ export default function NewSaleScreen() {
     { subtotal: 0, discount: 0, taxable: 0, tax: 0 },
   );
   const grand = Math.round(totals.taxable + totals.tax);
+  const itemCount = lines.length;
+  const qtyCount = lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
 
   const validLines: SaleLineInput[] = lines
     .filter((l) => l.productId && Number(l.quantity) > 0)
     .map((l) => ({
-      productId: l.productId!,
+      productId: l.productId,
       batchId: l.batchId || undefined,
       unit: l.unit || undefined,
       quantity: Number(l.quantity),
@@ -368,6 +354,7 @@ export default function NewSaleScreen() {
       taxRatePct: l.taxRate === "" ? undefined : Number(l.taxRate),
     }));
 
+  const canSubmit = validLines.length > 0 && shortLines.length === 0;
   const submit = () => {
     if (!validLines.length) return;
     mut.mutate(
@@ -383,11 +370,441 @@ export default function NewSaleScreen() {
     );
   };
 
+  // Keyboard-first (web): F2 focuses search, Ctrl/Cmd+Enter completes the sale.
+  // Latest submit/canSubmit are stashed in a ref (updated in an effect, never
+  // during render) so the one-time key listener always calls the current one.
+  const handlersRef = useRef({ submit, canSubmit });
+  useEffect(() => {
+    handlersRef.current = { submit, canSubmit };
+  });
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F2") {
+        e.preventDefault();
+        document.getElementById("pos-search")?.focus();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        if (handlersRef.current.canSubmit) handlersRef.current.submit();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // ---- Sub-renderers -------------------------------------------------------
+
+  const addBar = (
+    <Combobox
+      nativeID="pos-search"
+      autoFocus
+      placeholder="Search medicine by name or salt — or scan a barcode  (F2)"
+      query={productQuery}
+      onQueryChange={setProductQuery}
+      items={productItems}
+      loading={productsLoading}
+      onSelect={(id) => addProduct(id)}
+      onSubmitRaw={(code) => void handleScan(code)}
+      leading={<Search size={18} color={palette.teal[600]} strokeWidth={2} />}
+      emptyText="No medicine matches — try a salt name, or scan the pack"
+    />
+  );
+
+  const cart = (
+    <View style={{ marginTop: 14 }}>
+      {wide && lines.length > 0 ? (
+        <HStack style={styles.gridHead} gap={8} align="center">
+          <Text style={{ flex: 1 }} variant="label-sm" tone="tertiary">
+            ITEM
+          </Text>
+          <HeadCell w={COL.qty} label="QTY" />
+          <HeadCell w={COL.unit} label="UNIT" />
+          <HeadCell w={COL.price} label="PRICE" />
+          <HeadCell w={COL.disc} label="DISCOUNT" />
+          <HeadCell w={COL.gst} label="GST%" />
+          <HeadCell w={COL.amount} label="AMOUNT" right />
+          <View style={{ width: COL.rm }} />
+        </HStack>
+      ) : null}
+
+      {lines.length === 0 ? (
+        <Card style={{ marginTop: 4 }}>
+          <EmptyState
+            icon={ScanLine}
+            title="No items yet"
+            message="Search a medicine above or scan a pack to start billing. FEFO picks the nearest-expiry batch automatically."
+          />
+        </Card>
+      ) : (
+        <VStack gap={wide ? 0 : 12}>
+          {lines.map((line, i) => {
+            const c = calc(line);
+            const issue = stockIssue(line);
+            return wide ? (
+              <View
+                key={i}
+                style={[styles.gridRow, i % 2 === 1 && styles.gridRowAlt]}
+              >
+                <HStack gap={8} align="center">
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text variant="label" tone="primary" numberOfLines={1}>
+                      {line.productName}
+                    </Text>
+                    <HStack gap={6} align="center" style={{ marginTop: 2 }}>
+                      {line.salt ? (
+                        <Text
+                          variant="caption"
+                          tone="tertiary"
+                          numberOfLines={1}
+                        >
+                          {line.salt}
+                        </Text>
+                      ) : null}
+                      {line.batchId ? (
+                        <View style={styles.lotBadge}>
+                          <Text
+                            variant="label-sm"
+                            style={{ color: palette.teal[700] }}
+                          >
+                            {line.batchNumber}
+                            {line.expiry ? ` · ${prettyExp(line.expiry)}` : ""}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={styles.fefoBadge}>
+                          <Text
+                            variant="label-sm"
+                            style={{ color: palette.text.tertiary }}
+                          >
+                            FEFO
+                          </Text>
+                        </View>
+                      )}
+                      {issue ? (
+                        <Text variant="caption" tone="danger">
+                          {issue.message}
+                        </Text>
+                      ) : line.available != null ? (
+                        <Text variant="caption" tone="success">
+                          {line.available} in stock
+                        </Text>
+                      ) : null}
+                    </HStack>
+                  </View>
+                  <Cell
+                    w={COL.qty}
+                    value={line.quantity}
+                    onChangeText={(v) => setLine(i, { quantity: v })}
+                    error={!!issue}
+                    align="center"
+                  />
+                  <View style={{ width: COL.unit }}>
+                    <Select
+                      value={line.unit}
+                      options={unitOptions(line)}
+                      onChange={(v) => setLine(i, { unit: v })}
+                    />
+                  </View>
+                  <Cell
+                    w={COL.price}
+                    value={line.unitPrice}
+                    onChangeText={(v) => setLine(i, { unitPrice: v })}
+                  />
+                  <DiscCell
+                    w={COL.disc}
+                    line={line}
+                    onValue={(v) => setLine(i, { discount: v })}
+                    onMode={(m) => setLine(i, { discountMode: m })}
+                  />
+                  <Cell
+                    w={COL.gst}
+                    value={line.taxRate}
+                    onChangeText={(v) => setLine(i, { taxRate: v })}
+                    align="center"
+                  />
+                  <Text
+                    variant="label"
+                    tone="primary"
+                    style={{ width: COL.amount, textAlign: "right" }}
+                  >
+                    {money(c.total)}
+                  </Text>
+                  <Pressable
+                    onPress={() => removeLine(i)}
+                    hitSlop={8}
+                    style={{ width: COL.rm, alignItems: "center" }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove ${line.productName}`}
+                  >
+                    <Trash2
+                      size={16}
+                      color={palette.text.tertiary}
+                      strokeWidth={2}
+                    />
+                  </Pressable>
+                </HStack>
+              </View>
+            ) : (
+              // ---- Narrow: compact line card ----
+              <Card key={i} elevation="base">
+                <HStack align="center" justify="space-between">
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text variant="label" tone="primary" numberOfLines={1}>
+                      {line.productName}
+                    </Text>
+                    {line.salt ? (
+                      <Text variant="caption" tone="tertiary" numberOfLines={1}>
+                        {line.salt}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Pressable
+                    onPress={() => removeLine(i)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove ${line.productName}`}
+                  >
+                    <Trash2
+                      size={16}
+                      color={palette.danger.text}
+                      strokeWidth={2}
+                    />
+                  </Pressable>
+                </HStack>
+                <HStack gap={6} align="center" style={{ marginTop: 6 }}>
+                  {line.batchId ? (
+                    <View style={styles.lotBadge}>
+                      <Text
+                        variant="label-sm"
+                        style={{ color: palette.teal[700] }}
+                      >
+                        {line.batchNumber}
+                        {line.expiry ? ` · ${prettyExp(line.expiry)}` : ""}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.fefoBadge}>
+                      <Text
+                        variant="label-sm"
+                        style={{ color: palette.text.tertiary }}
+                      >
+                        FEFO batch
+                      </Text>
+                    </View>
+                  )}
+                  {issue ? (
+                    <Text variant="caption" tone="danger">
+                      {issue.message}
+                    </Text>
+                  ) : line.available != null ? (
+                    <Text variant="caption" tone="success">
+                      {line.available} in stock
+                    </Text>
+                  ) : null}
+                </HStack>
+                <HStack gap={8} align="flex-end" wrap style={{ marginTop: 10 }}>
+                  <Field label="Qty" w={64}>
+                    <Cell
+                      w={64}
+                      value={line.quantity}
+                      onChangeText={(v) => setLine(i, { quantity: v })}
+                      error={!!issue}
+                      align="center"
+                    />
+                  </Field>
+                  <Field label="Unit" w={104}>
+                    <Select
+                      value={line.unit}
+                      options={unitOptions(line)}
+                      onChange={(v) => setLine(i, { unit: v })}
+                    />
+                  </Field>
+                  <Field label="Price" w={84}>
+                    <Cell
+                      w={84}
+                      value={line.unitPrice}
+                      onChangeText={(v) => setLine(i, { unitPrice: v })}
+                    />
+                  </Field>
+                  <Field label="Disc" w={104}>
+                    <DiscCell
+                      w={104}
+                      line={line}
+                      onValue={(v) => setLine(i, { discount: v })}
+                      onMode={(m) => setLine(i, { discountMode: m })}
+                    />
+                  </Field>
+                  <Field label="GST%" w={56}>
+                    <Cell
+                      w={56}
+                      value={line.taxRate}
+                      onChangeText={(v) => setLine(i, { taxRate: v })}
+                      align="center"
+                    />
+                  </Field>
+                  <View style={{ flex: 1, alignItems: "flex-end" }}>
+                    <Text variant="caption" tone="tertiary">
+                      Amount
+                    </Text>
+                    <Text variant="label-lg" tone="primary">
+                      {money(c.total)}
+                    </Text>
+                  </View>
+                </HStack>
+              </Card>
+            );
+          })}
+        </VStack>
+      )}
+    </View>
+  );
+
+  const configCard = (
+    <Card style={{ marginBottom: 12 }}>
+      <VStack gap={14}>
+        <Select
+          label="Customer (walk-in if blank)"
+          placeholder="Search name or mobile…"
+          value={customerId}
+          options={customerOptions}
+          selectedLabel={
+            selectedCustomer
+              ? selectedCustomer.mobile
+                ? `${selectedCustomer.name} · ${selectedCustomer.mobile}`
+                : selectedCustomer.name
+              : undefined
+          }
+          onSearch={setCustomerQuery}
+          loading={customersLoading}
+          onChange={pickCustomer}
+          onCreate={async (label) => {
+            const cst = await createCustomer.mutateAsync({ name: label });
+            setKnownCustomers((cur) => ({ ...cur, [cst.id]: cst }));
+            return { value: cst.id, label: cst.name };
+          }}
+          allowClear
+        />
+        <View>
+          <Text variant="label-sm" tone="tertiary" style={{ marginBottom: 6 }}>
+            GST TYPE
+          </Text>
+          <ChipsRow
+            chips={[
+              { key: "intra", label: "Intra (CGST+SGST)" },
+              { key: "inter", label: "Inter (IGST)" },
+            ]}
+            active={taxType}
+            onChange={(k) => setTaxType(k as never)}
+          />
+        </View>
+        <View>
+          <Text variant="label-sm" tone="tertiary" style={{ marginBottom: 6 }}>
+            PAYMENT
+          </Text>
+          <ChipsRow
+            chips={[
+              { key: "cash", label: "Cash" },
+              { key: "card", label: "Card" },
+              { key: "upi", label: "UPI" },
+              { key: "credit", label: "Credit" },
+            ]}
+            active={paymentMode}
+            onChange={setPaymentMode}
+          />
+        </View>
+      </VStack>
+    </Card>
+  );
+
+  const totalsCard = (
+    <Card style={{ marginBottom: 12 }}>
+      <VStack gap={8}>
+        <Row
+          label={`Subtotal · ${itemCount} item${itemCount === 1 ? "" : "s"}`}
+          value={money(totals.subtotal)}
+        />
+        {totals.discount > 0 && (
+          <Row label="Discount" value={`- ${money(totals.discount)}`} />
+        )}
+        <Row label="Taxable" value={money(totals.taxable)} />
+        {taxType === "intra" ? (
+          <>
+            <Row label="CGST" value={money(totals.tax / 2)} muted />
+            <Row label="SGST" value={money(totals.tax / 2)} muted />
+          </>
+        ) : (
+          <Row label="IGST" value={money(totals.tax)} muted />
+        )}
+        <View style={styles.divider} />
+        <HStack justify="space-between" align="center">
+          <Text variant="h3" tone="primary">
+            Grand total
+          </Text>
+          <Text variant="display-sm" tone="accent">
+            {money(grand)}
+          </Text>
+        </HStack>
+        <Text variant="caption" tone="tertiary">
+          {qtyCount} unit{qtyCount === 1 ? "" : "s"} · GST-rounded on the server
+        </Text>
+      </VStack>
+    </Card>
+  );
+
+  const rail = (
+    <View style={wide ? [styles.rail, stickyStyle] : undefined}>
+      {configCard}
+      {totalsCard}
+      {scanError ? (
+        <Banner
+          tone="warning"
+          message={scanError}
+          style={{ marginBottom: 12 }}
+        />
+      ) : null}
+      {shortLines.length > 0 ? (
+        <Banner
+          tone="warning"
+          title="Not enough stock to complete this sale"
+          style={{ marginBottom: 12 }}
+        >
+          {shortLines.map(({ i, issue }) => (
+            <Text key={i} variant="caption" tone="warning">
+              {lines[i].productName}: asked {issue!.needBase},{" "}
+              {issue!.message.charAt(0).toLowerCase() + issue!.message.slice(1)}
+            </Text>
+          ))}
+        </Banner>
+      ) : null}
+      {mut.isError ? (
+        <Banner
+          tone="danger"
+          message={apiErrorMessage(mut.error)}
+          style={{ marginBottom: 12 }}
+        />
+      ) : null}
+      <Button
+        label={grand > 0 ? `Complete sale · ${money(grand)}` : "Complete sale"}
+        size="lg"
+        loading={mut.isPending}
+        disabled={!canSubmit}
+        onPress={submit}
+        icon={<ShoppingCart size={18} color="#FFFFFF" strokeWidth={2} />}
+      />
+      {wide ? (
+        <HStack gap={8} justify="center" style={{ marginTop: 12 }}>
+          <KeyHint k="F2" label="Search" />
+          <KeyHint k="Ctrl ↵" label="Complete" />
+        </HStack>
+      ) : null}
+    </View>
+  );
+
   return (
     <Screen
       overline="Sales"
       title="New sale"
-      subtitle="FEFO auto-picks nearest-expiry batches at checkout"
+      subtitle="Scan or search · FEFO auto-picks nearest-expiry batches"
       right={
         <Button
           label="Invoices"
@@ -400,385 +817,182 @@ export default function NewSaleScreen() {
         />
       }
     >
-      {mut.isError && (
-        <View style={errorBox}>
-          <Text variant="body-sm" tone="danger">
-            {apiErrorMessage(mut.error)}
-          </Text>
-        </View>
-      )}
-
-      <Card style={{ marginBottom: 16 }}>
-        <VStack gap={16}>
-          <Select
-            label="Customer (optional — walk-in if blank)"
-            placeholder="Search name or mobile…"
-            value={customerId}
-            options={customerOptions}
-            selectedLabel={
-              selectedCustomer
-                ? selectedCustomer.mobile
-                  ? `${selectedCustomer.name} · ${selectedCustomer.mobile}`
-                  : selectedCustomer.name
-                : undefined
-            }
-            onSearch={setCustomerQuery}
-            loading={customersLoading}
-            onChange={pickCustomer}
-            onCreate={async (label) => {
-              const c = await createCustomer.mutateAsync({ name: label });
-              setKnownCustomers((cur) => ({ ...cur, [c.id]: c }));
-              return { value: c.id, label: c.name };
-            }}
-            allowClear
-          />
-          <View>
-            <Text variant="label" tone="secondary" style={{ marginBottom: 8 }}>
-              GST type
-            </Text>
-            <ChipsRow
-              chips={[
-                { key: "intra", label: "Intra-state (CGST+SGST)" },
-                { key: "inter", label: "Inter-state (IGST)" },
-              ]}
-              active={taxType}
-              onChange={(k) => setTaxType(k as never)}
-            />
-          </View>
-          <View>
-            <Text variant="label" tone="secondary" style={{ marginBottom: 8 }}>
-              Payment
-            </Text>
-            <ChipsRow
-              chips={[
-                { key: "cash", label: "Cash" },
-                { key: "card", label: "Card" },
-                { key: "upi", label: "UPI" },
-                { key: "credit", label: "Credit" },
-              ]}
-              active={paymentMode}
-              onChange={setPaymentMode}
-            />
-          </View>
-        </VStack>
-      </Card>
-
-      {/* Scan to sell. A counter scanner types the code + Enter, so this box
-          stays focused and clears itself after each scan — scan, scan, scan.
-          Also accepts a typed code for shops without a scanner yet. */}
-      <Card style={{ marginBottom: 16 }}>
-        <VStack gap={8}>
-          {/* nativeID -> id="scanbox" on web, so the page-wide scanner listener
-              skips keys typed here (this field handles its own Enter). */}
-          <View nativeID="scanbox">
-            <TextField
-              label="Scan barcode / QR"
-              placeholder="Scan a label — or type its code / batch no. and press Enter"
-              value={scanValue}
-              onChangeText={setScanValue}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={() => {
-                handleScan(scanValue);
-                setScanValue("");
-              }}
-              leading={
-                scanBusy ? (
-                  <ActivityIndicator color={palette.teal[600]} />
-                ) : (
-                  <ScanLine
-                    size={18}
-                    color={palette.teal[600]}
-                    strokeWidth={2}
-                  />
-                )
-              }
-            />
-          </View>
-          {scanError && (
-            <HStack gap={6} align="center">
-              <AlertTriangle
+      <View
+        style={{
+          flexDirection: wide ? "row" : "column",
+          gap: 16,
+          alignItems: "flex-start",
+        }}
+      >
+        <View style={{ flex: 1, minWidth: 0, width: "100%" }}>
+          {addBar}
+          {cart}
+          {lines.length > 0 ? (
+            <HStack gap={6} align="center" style={{ marginTop: 12 }}>
+              <PackageX
                 size={14}
-                color={palette.warning.text}
-                strokeWidth={2.2}
+                color={palette.text.tertiary}
+                strokeWidth={2}
               />
-              <Text variant="caption" tone="warning">
-                {scanError}
+              <Text variant="caption" tone="tertiary">
+                Tip: scan the same pack again to add another unit · use the bin
+                icon to remove a line
               </Text>
             </HStack>
-          )}
-        </VStack>
-      </Card>
+          ) : null}
+        </View>
+        <View style={{ width: wide ? 344 : "100%" }}>{rail}</View>
+      </View>
+    </Screen>
+  );
+}
 
-      <VStack gap={14}>
-        {lines.map((line, i) => {
-          const c = calc(line);
+// ---- small building blocks -------------------------------------------------
+
+const COL = {
+  qty: 60,
+  unit: 96,
+  price: 82,
+  disc: 108,
+  gst: 52,
+  amount: 88,
+  rm: 30,
+};
+
+function HeadCell({
+  w,
+  label,
+  right,
+}: {
+  w: number;
+  label: string;
+  right?: boolean;
+}) {
+  return (
+    <Text
+      style={{ width: w, textAlign: right ? "right" : "center" }}
+      variant="label-sm"
+      tone="tertiary"
+    >
+      {label}
+    </Text>
+  );
+}
+
+function Cell({
+  w,
+  value,
+  onChangeText,
+  align = "left",
+  error,
+}: {
+  w: number;
+  value: string;
+  onChangeText: (v: string) => void;
+  align?: "left" | "center" | "right";
+  error?: boolean;
+}) {
+  return (
+    <TextInput
+      value={value}
+      onChangeText={onChangeText}
+      keyboardType="decimal-pad"
+      selectTextOnFocus
+      style={[
+        styles.cell,
+        { width: w, textAlign: align },
+        error && {
+          borderColor: palette.danger.text,
+          backgroundColor: palette.danger.bg,
+        },
+        // @ts-expect-error web-only outline reset
+        { outlineStyle: "none" },
+      ]}
+    />
+  );
+}
+
+function DiscCell({
+  w,
+  line,
+  onValue,
+  onMode,
+}: {
+  w: number;
+  line: DraftLine;
+  onValue: (v: string) => void;
+  onMode: (m: "amount" | "pct") => void;
+}) {
+  return (
+    <View style={[styles.discWrap, { width: w }]}>
+      <TextInput
+        value={line.discount}
+        onChangeText={onValue}
+        keyboardType="decimal-pad"
+        placeholder="0"
+        placeholderTextColor={palette.text.tertiary}
+        selectTextOnFocus
+        // @ts-expect-error web-only outline reset
+        style={[styles.discInput, { outlineStyle: "none" }]}
+      />
+      <View style={styles.discToggle}>
+        {(["amount", "pct"] as const).map((m) => {
+          const active = line.discountMode === m;
           return (
-            <Card key={i} elevation="base">
-              <VStack gap={14}>
-                <HStack align="center" justify="space-between">
-                  <HStack gap={8} align="center" flex={1}>
-                    <Text variant="label-lg" tone="primary">
-                      Item {i + 1}
-                    </Text>
-                    {/* A scanned line is pinned to one lot; a badge makes that
-                        obvious next to the FEFO-picked (typed) lines. */}
-                    {line.batchId && (
-                      <View style={styles.lotBadge}>
-                        <ScanLine
-                          size={11}
-                          color={palette.teal[700]}
-                          strokeWidth={2.2}
-                        />
-                        <Text
-                          variant="label-sm"
-                          style={{ color: palette.teal[700] }}
-                        >
-                          Batch {line.batchNumber}
-                          {line.expiry
-                            ? ` · exp ${prettyExp(line.expiry)}`
-                            : ""}
-                        </Text>
-                      </View>
-                    )}
-                  </HStack>
-                  {lines.length > 1 && (
-                    <Pressable
-                      onPress={() => removeLine(i)}
-                      hitSlop={8}
-                      style={styles.removeBtn}
-                    >
-                      <X
-                        size={16}
-                        color={palette.danger.text}
-                        strokeWidth={2}
-                      />
-                    </Pressable>
-                  )}
-                </HStack>
-                <Select
-                  label="Product"
-                  placeholder="Search by name or SKU…"
-                  value={line.productId}
-                  options={productOptions}
-                  selectedLabel={
-                    line.productId && productsById[line.productId]
-                      ? `${productsById[line.productId].name} · ${money(productsById[line.productId].sellingPrice)}/${productsById[line.productId].baseUnit}`
-                      : undefined
-                  }
-                  onSearch={setProductQuery}
-                  loading={productsLoading}
-                  onChange={(v) => {
-                    const p = v ? productsById[v] : null;
-                    // Cache it — the maths below needs its price after the
-                    // search results move on.
-                    if (p) setKnownProducts((cur) => ({ ...cur, [p.id]: p }));
-                    setLine(i, {
-                      productId: v,
-                      // Picking by hand clears any scanned lot: FEFO chooses now.
-                      batchId: null,
-                      batchNumber: null,
-                      expiry: null,
-                      available: null,
-                      unit: p?.baseUnit || null,
-                      unitPrice: p ? String(p.sellingPrice) : "",
-                      taxRate: p ? String(p.taxRatePct) : "",
-                    });
-                    if (v) void loadAvailability(i, v);
-                  }}
-                />
-                <HStack gap={12}>
-                  <View style={{ flex: 1 }}>
-                    <TextField
-                      label="Qty"
-                      value={line.quantity}
-                      onChangeText={(v) => setLine(i, { quantity: v })}
-                      keyboardType="decimal-pad"
-                      // Say it here, as they type — not after a failed checkout.
-                      error={stockIssue(line)?.message}
-                      hint={
-                        line.available != null && !stockIssue(line)
-                          ? `${line.available} available`
-                          : undefined
-                      }
-                    />
-                  </View>
-                  <View style={{ flex: 1.3 }}>
-                    <Select
-                      label="Unit"
-                      placeholder="unit"
-                      value={line.unit}
-                      options={unitOptions(line.productId)}
-                      onChange={(v) => setLine(i, { unit: v })}
-                    />
-                  </View>
-                </HStack>
-                <HStack gap={12}>
-                  <View style={{ flex: 1 }}>
-                    <TextField
-                      label="Price/unit ₹"
-                      value={line.unitPrice}
-                      onChangeText={(v) => setLine(i, { unitPrice: v })}
-                      keyboardType="decimal-pad"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <TextField
-                      label={
-                        line.discountMode === "pct"
-                          ? "Discount %"
-                          : "Discount ₹"
-                      }
-                      value={line.discount}
-                      onChangeText={(v) => setLine(i, { discount: v })}
-                      keyboardType="decimal-pad"
-                      placeholder="0"
-                      // Show the rupees a % works out to, so it's never a mystery.
-                      hint={
-                        line.discountMode === "pct" && Number(line.discount) > 0
-                          ? `= ${money(calc(line).discount)} off`
-                          : undefined
-                      }
-                      trailing={
-                        <View style={styles.discToggle}>
-                          {(["amount", "pct"] as const).map((m) => {
-                            const active = line.discountMode === m;
-                            return (
-                              <Pressable
-                                key={m}
-                                onPress={() => setLine(i, { discountMode: m })}
-                                accessibilityLabel={
-                                  m === "amount"
-                                    ? "Discount in rupees"
-                                    : "Discount in percent"
-                                }
-                                style={[
-                                  styles.discToggleBtn,
-                                  active && styles.discToggleBtnOn,
-                                ]}
-                              >
-                                <Text
-                                  variant="label-sm"
-                                  style={{
-                                    color: active
-                                      ? "#FFFFFF"
-                                      : palette.text.tertiary,
-                                  }}
-                                >
-                                  {m === "amount" ? "₹" : "%"}
-                                </Text>
-                              </Pressable>
-                            );
-                          })}
-                        </View>
-                      }
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <TextField
-                      label="GST %"
-                      value={line.taxRate}
-                      onChangeText={(v) => setLine(i, { taxRate: v })}
-                      keyboardType="decimal-pad"
-                    />
-                  </View>
-                </HStack>
-                {line.productId && (
-                  <HStack justify="space-between">
-                    <Text variant="caption" tone="tertiary">
-                      Taxable {money(c.taxable)} + tax {money(c.tax)}
-                    </Text>
-                    <Text variant="label" tone="accent">
-                      {money(c.total)}
-                    </Text>
-                  </HStack>
-                )}
-              </VStack>
-            </Card>
+            <Pressable
+              key={m}
+              onPress={() => onMode(m)}
+              style={[styles.discToggleBtn, active && styles.discToggleBtnOn]}
+              accessibilityRole="button"
+              accessibilityLabel={
+                m === "amount" ? "Discount in rupees" : "Discount in percent"
+              }
+            >
+              <Text
+                variant="label-sm"
+                style={{ color: active ? "#FFFFFF" : palette.text.tertiary }}
+              >
+                {m === "amount" ? "₹" : "%"}
+              </Text>
+            </Pressable>
           );
         })}
-      </VStack>
+      </View>
+    </View>
+  );
+}
 
-      <Pressable onPress={addLine} style={styles.addRow}>
-        <Plus size={18} color={palette.teal[600]} strokeWidth={2.2} />
-        <Text variant="label" tone="accent">
-          Add item
+function Field({
+  label,
+  w,
+  children,
+}: {
+  label: string;
+  w: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={{ width: w }}>
+      <Text variant="label-sm" tone="tertiary" style={{ marginBottom: 4 }}>
+        {label}
+      </Text>
+      {children}
+    </View>
+  );
+}
+
+function KeyHint({ k, label }: { k: string; label: string }) {
+  return (
+    <HStack gap={5} align="center">
+      <View style={styles.keycap}>
+        <Text variant="label-sm" style={{ color: palette.text.secondary }}>
+          {k}
         </Text>
-      </Pressable>
-
-      <Card style={{ marginTop: 8, marginBottom: 16 }}>
-        <VStack gap={8}>
-          <Row label="Subtotal" value={money(totals.subtotal)} />
-          {totals.discount > 0 && (
-            <Row label="Discount" value={`- ${money(totals.discount)}`} />
-          )}
-          <Row label="Taxable" value={money(totals.taxable)} />
-          {taxType === "intra" ? (
-            <>
-              <Row label="CGST" value={money(totals.tax / 2)} muted />
-              <Row label="SGST" value={money(totals.tax / 2)} muted />
-            </>
-          ) : (
-            <Row label="IGST" value={money(totals.tax)} muted />
-          )}
-          <View
-            style={{
-              height: 1,
-              backgroundColor: palette.border.default,
-              marginVertical: 4,
-            }}
-          />
-          <HStack justify="space-between" align="center">
-            <Text variant="h3" tone="primary">
-              Grand total
-            </Text>
-            <Text variant="h2" tone="accent">
-              {money(grand)}
-            </Text>
-          </HStack>
-          <Text variant="caption" tone="tertiary">
-            Final totals are GST-rounded on the server.
-          </Text>
-        </VStack>
-      </Card>
-
-      {/* Name the blocked lines before the button is pressed, so it's obvious
-          WHY checkout is disabled rather than the button just looking dead. */}
-      {shortLines.length > 0 && (
-        <View style={warnBox}>
-          <HStack gap={8} align="flex-start">
-            <AlertTriangle
-              size={16}
-              color={palette.warning.text}
-              strokeWidth={2.2}
-            />
-            <VStack gap={2} flex={1}>
-              <Text variant="label" tone="warning">
-                Not enough stock to complete this sale
-              </Text>
-              {shortLines.map(({ i, issue }) => (
-                <Text key={i} variant="caption" tone="warning">
-                  Item {i + 1}: asked for {issue!.needBase},{" "}
-                  {issue!.message.charAt(0).toLowerCase() +
-                    issue!.message.slice(1)}
-                </Text>
-              ))}
-            </VStack>
-          </HStack>
-        </View>
-      )}
-
-      <Button
-        label="Complete sale & invoice"
-        size="lg"
-        loading={mut.isPending}
-        disabled={!validLines.length || shortLines.length > 0}
-        onPress={submit}
-        icon={<ShoppingCart size={18} color="#FFFFFF" strokeWidth={2} />}
-      />
-    </Screen>
+      </View>
+      <Text variant="caption" tone="tertiary">
+        {label}
+      </Text>
+    </HStack>
   );
 }
 
@@ -803,61 +1017,85 @@ function Row({
   );
 }
 
+const stickyStyle =
+  Platform.OS === "web" ? ({ position: "sticky", top: 8 } as never) : undefined;
+
 const styles = StyleSheet.create({
-  removeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.sm,
-    backgroundColor: palette.danger.bg,
-    alignItems: "center",
-    justifyContent: "center",
+  rail: {},
+  gridHead: {
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border.default,
   },
-  lotBadge: {
+  gridRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+  },
+  gridRowAlt: { backgroundColor: palette.ink[50] },
+  cell: {
+    height: 40,
+    borderWidth: 1,
+    borderColor: palette.border.default,
+    borderRadius: radius.sm,
+    paddingHorizontal: 8,
+    fontSize: 14,
+    color: palette.text.primary,
+    backgroundColor: palette.surface.primary,
+  },
+  discWrap: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    height: 40,
+    borderWidth: 1,
+    borderColor: palette.border.default,
+    borderRadius: radius.sm,
+    backgroundColor: palette.surface.primary,
+    overflow: "hidden",
+  },
+  discInput: {
+    flex: 1,
+    height: 38,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.full,
-    backgroundColor: palette.teal[50],
+    fontSize: 14,
+    color: palette.text.primary,
   },
   discToggle: {
     flexDirection: "row",
-    borderRadius: radius.sm,
-    overflow: "hidden",
-    backgroundColor: palette.ink[100],
+    borderLeftWidth: 1,
+    borderLeftColor: palette.border.default,
   },
   discToggleBtn: {
-    width: 24,
-    height: 26,
+    width: 22,
+    height: 38,
     alignItems: "center",
     justifyContent: "center",
   },
-  discToggleBtnOn: {
-    backgroundColor: palette.teal[600],
+  discToggleBtnOn: { backgroundColor: palette.teal[600] },
+  lotBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    backgroundColor: palette.teal[50],
   },
-  addRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 14,
-    justifyContent: "center",
+  fefoBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    backgroundColor: palette.ink[100],
+  },
+  keycap: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: radius.xs,
+    borderWidth: 1,
+    borderColor: palette.border.strong,
+    backgroundColor: palette.surface.primary,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: palette.border.default,
+    marginVertical: 4,
   },
 });
-
-const errorBox = {
-  padding: 14,
-  borderRadius: radius.md,
-  backgroundColor: palette.danger.bg,
-  borderWidth: 1,
-  borderColor: palette.danger.border,
-  marginBottom: 16,
-} as const;
-const warnBox = {
-  padding: 14,
-  borderRadius: radius.md,
-  backgroundColor: palette.warning.bg,
-  borderWidth: 1,
-  borderColor: palette.warning.border,
-  marginBottom: 12,
-} as const;

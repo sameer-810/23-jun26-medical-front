@@ -10,7 +10,7 @@ import {
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { palette, radius, layout } from "@shared/designSystem";
 import { Text, VStack, HStack, Avatar } from "@shared/ui";
-import { NavItem, useVisibleNavItems } from "./navItems";
+import { NavItem, SECTION_ORDER, useVisibleNavItems } from "./navItems";
 
 interface Props {
   activeRoute: string;
@@ -101,20 +101,40 @@ export function Sidebar({
         </Pressable>
       )}
 
-      {/* Nav */}
+      {/* Nav — grouped into sections so 20+ items read as an information
+          architecture, not one long undifferentiated scroll. */}
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: collapsed ? 10 : 12 }}
       >
-        {items.map((item) => (
-          <NavRow
-            key={item.name}
-            item={item}
-            active={activeRoute === item.name}
-            collapsed={collapsed}
-            onPress={() => onNavigate(item.name)}
-          />
-        ))}
+        {SECTION_ORDER.map((section) => {
+          const group = items.filter((it) => it.section === section);
+          if (group.length === 0) return null;
+          return (
+            <View key={section}>
+              {collapsed ? (
+                <View style={styles.sectionDivider} />
+              ) : (
+                <Text
+                  variant="label-sm"
+                  tone="tertiary"
+                  style={styles.sectionLabel}
+                >
+                  {section.toUpperCase()}
+                </Text>
+              )}
+              {group.map((item) => (
+                <NavRow
+                  key={item.name}
+                  item={item}
+                  active={activeRoute === item.name}
+                  collapsed={collapsed}
+                  onPress={() => onNavigate(item.name)}
+                />
+              ))}
+            </View>
+          );
+        })}
       </ScrollView>
 
       {/* User footer */}
@@ -269,6 +289,18 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   navRowActive: { backgroundColor: palette.teal[50] },
+  sectionLabel: {
+    paddingHorizontal: 14,
+    marginTop: 14,
+    marginBottom: 4,
+    letterSpacing: 0.6,
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: palette.border.subtle,
+    marginVertical: 8,
+    marginHorizontal: 6,
+  },
   footer: {
     paddingTop: 14,
     borderTopWidth: 1,

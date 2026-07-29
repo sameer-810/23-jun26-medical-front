@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { View, TextInput, Pressable, StyleSheet } from "react-native";
+import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Search, Plus, Receipt, ChevronRight } from "lucide-react-native";
+import { Plus, Receipt, ChevronRight } from "lucide-react-native";
 import { useSales } from "@modules/sale/hooks/useSales";
 import { SaleListItem } from "@modules/sale/types";
-import { palette, radius, outline } from "@shared/designSystem";
+import { palette } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -14,8 +14,11 @@ import {
   Button,
   StatusChip,
   ChipsRow,
-  EmptyState,
+  SearchInput,
   Pagination,
+  DataTable,
+  Column,
+  Skeleton,
 } from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -56,6 +59,97 @@ export default function SalesListScreen() {
 
   if (!isLoading && totalPages > 0 && page > totalPages) setPage(totalPages);
 
+  const open = (s: SaleListItem) =>
+    navigation.navigate("SaleDetail", { id: s.id });
+
+  const columns: Column<SaleListItem>[] = [
+    {
+      key: "invoiceNo",
+      header: "Invoice",
+      width: 130,
+      sortable: true,
+      sortValue: (s) => s.invoiceNo,
+      render: (s) => (
+        <Text variant="label" tone="primary">
+          {s.invoiceNo}
+        </Text>
+      ),
+    },
+    {
+      key: "customerName",
+      header: "Customer",
+      width: 200,
+      sortable: true,
+      sortValue: (s) => (s.customerName || "").toLowerCase(),
+      render: (s) => (
+        <Text variant="body-sm" tone="secondary" numberOfLines={1}>
+          {s.customerName || "Walk-in"}
+        </Text>
+      ),
+    },
+    {
+      key: "saleDate",
+      header: "Date",
+      width: 120,
+      sortable: true,
+      sortValue: (s) => s.saleDate,
+      render: (s) => (
+        <Text variant="body-sm" tone="tertiary">
+          {new Date(s.saleDate).toLocaleDateString("en-IN")}
+        </Text>
+      ),
+    },
+    {
+      key: "itemCount",
+      header: "Items",
+      width: 70,
+      align: "center",
+      sortable: true,
+      sortValue: (s) => s.itemCount,
+      render: (s) => (
+        <Text variant="body-sm" tone="secondary">
+          {s.itemCount}
+        </Text>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      width: 150,
+      render: (s) => (
+        <HStack gap={6} wrap>
+          <StatusChip
+            label={s.status.replace("_", " ")}
+            tone={STATUS_TONE[s.status]}
+          />
+          {s.paymentMode ? (
+            <StatusChip label={s.paymentMode} tone="neutral" />
+          ) : null}
+        </HStack>
+      ),
+    },
+    {
+      key: "grandTotal",
+      header: "Total",
+      width: 120,
+      align: "right",
+      sortable: true,
+      sortValue: (s) => s.grandTotal,
+      render: (s) => (
+        <VStack gap={1} align="flex-end">
+          <Text variant="label" tone="primary">
+            {money(s.grandTotal)}
+          </Text>
+          {s.totalReturned > 0 ? (
+            <Text variant="caption" tone="danger">
+              -{money(s.totalReturned)}
+            </Text>
+          ) : null}
+        </VStack>
+      ),
+    },
+  ];
+
   return (
     <Screen
       overline="Sales"
@@ -72,17 +166,11 @@ export default function SalesListScreen() {
         />
       }
     >
-      <View style={styles.searchWrap}>
-        <Search size={18} color={palette.text.tertiary} strokeWidth={1.8} />
-        <TextInput
-          placeholder="Search invoice, customer or mobile"
-          placeholderTextColor={palette.text.tertiary}
-          value={search}
-          onChangeText={setSearch}
-          style={styles.searchInput}
-          autoCapitalize="none"
-        />
-      </View>
+      <SearchInput
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search invoice, customer or mobile"
+      />
       <View style={{ marginHorizontal: -24, marginTop: 12 }}>
         <ChipsRow
           chips={[
@@ -96,33 +184,55 @@ export default function SalesListScreen() {
         />
       </View>
 
-      {sales.length === 0 ? (
-        <EmptyState
-          icon={Receipt}
-          title={isLoading ? "Loading…" : "No sales yet"}
-          message="Create a sale to generate a GST invoice."
-        />
+      {isLoading && sales.length === 0 ? (
+        <ListSkeleton />
       ) : (
-        <VStack gap={12} style={{ marginTop: 16 }}>
-          {sales.map((s) => (
-            <SaleRow
-              key={s.id}
-              sale={s}
-              onPress={() => navigation.navigate("SaleDetail", { id: s.id })}
-            />
-          ))}
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            total={total}
-            limit={limit}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
-            label="sales"
+        <View style={{ marginTop: 16 }}>
+          <DataTable<SaleListItem>
+            columns={columns}
+            rows={sales}
+            keyExtractor={(s) => s.id}
+            onRowPress={open}
+            mobileCard={(s) => <SaleRow sale={s} onPress={() => open(s)} />}
+            emptyIcon={Receipt}
+            emptyTitle="No sales yet"
+            emptyMessage="Create a sale to generate a GST invoice."
           />
-        </VStack>
+          {sales.length > 0 ? (
+            <View style={{ marginTop: 16 }}>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                limit={limit}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
+                label="sales"
+              />
+            </View>
+          ) : null}
+        </View>
       )}
     </Screen>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <VStack gap={12} style={{ marginTop: 16 }}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <Card key={i} elevation="base">
+          <HStack gap={14} align="center">
+            <Skeleton width={22} height={22} rounded="sm" />
+            <VStack gap={6} flex={1}>
+              <Skeleton width="40%" height={16} />
+              <Skeleton width="70%" height={12} />
+            </VStack>
+            <Skeleton width={70} height={16} />
+          </HStack>
+        </Card>
+      ))}
+    </VStack>
   );
 }
 
@@ -173,23 +283,3 @@ function SaleRow({
     </Card>
   );
 }
-
-const styles = StyleSheet.create({
-  searchWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    height: 48,
-    borderRadius: radius.md,
-    borderWidth: outline.width,
-    borderColor: outline.color,
-    backgroundColor: palette.surface.primary,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: palette.text.primary,
-    paddingVertical: 0,
-  },
-});

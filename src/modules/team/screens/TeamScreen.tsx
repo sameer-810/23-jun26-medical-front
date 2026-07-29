@@ -1,16 +1,9 @@
 import React, { useState } from "react";
-import { View, Pressable, TextInput, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import {
-  Search,
-  Plus,
-  ChevronRight,
-  ShieldCheck,
-  Users,
-} from "lucide-react-native";
+import { Plus, ChevronRight, ShieldCheck, Users } from "lucide-react-native";
 import { useTeamUsers } from "@modules/team/hooks/useTeam";
 import { TeamUser } from "@modules/team/types";
-import { palette, radius, outline } from "@shared/designSystem";
+import { palette } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -20,6 +13,7 @@ import {
   Avatar,
   StatusChip,
   Button,
+  SearchInput,
   EmptyState,
 } from "@shared/ui";
 
@@ -47,17 +41,11 @@ export default function TeamScreen() {
         />
       }
     >
-      <View style={styles.searchWrap}>
-        <Search size={18} color={palette.text.tertiary} strokeWidth={1.8} />
-        <TextInput
-          placeholder="Search name, email or role"
-          placeholderTextColor={palette.text.tertiary}
-          value={search}
-          onChangeText={setSearch}
-          style={styles.searchInput}
-          autoCapitalize="none"
-        />
-      </View>
+      <SearchInput
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search name, email or role"
+      />
 
       {users.length === 0 ? (
         <EmptyState
@@ -125,23 +113,3 @@ function UserRow({ user, onPress }: { user: TeamUser; onPress: () => void }) {
     </Card>
   );
 }
-
-const styles = StyleSheet.create({
-  searchWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    height: 48,
-    borderRadius: radius.md,
-    borderWidth: outline.width,
-    borderColor: outline.color,
-    backgroundColor: palette.surface.primary,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: palette.text.primary,
-    paddingVertical: 0,
-  },
-});

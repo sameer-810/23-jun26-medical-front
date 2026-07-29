@@ -15,6 +15,7 @@ import {
   Card,
   Button,
   StatusChip,
+  Skeleton,
 } from "@shared/ui";
 import { ReturnModal } from "@modules/sale/components/ReturnModal";
 
@@ -38,8 +39,30 @@ export default function SaleDetailScreen() {
 
   if (isLoading || !sale) {
     return (
-      <Screen title="Invoice">
-        <Text tone="tertiary">Loading…</Text>
+      <Screen overline="Sales" title="Invoice">
+        <VStack gap={12}>
+          <Skeleton width={180} height={28} />
+          <Card>
+            <VStack gap={12}>
+              <Skeleton width="60%" height={18} />
+              <Skeleton width="40%" height={14} />
+              <Skeleton height={1} />
+              {[0, 1, 2].map((i) => (
+                <HStack key={i} justify="space-between">
+                  <Skeleton width="45%" height={14} />
+                  <Skeleton width={70} height={14} />
+                </HStack>
+              ))}
+            </VStack>
+          </Card>
+          <Card>
+            <VStack gap={10}>
+              <Skeleton width="30%" height={16} />
+              <Skeleton width="80%" height={14} />
+              <Skeleton width="70%" height={14} />
+            </VStack>
+          </Card>
+        </VStack>
       </Screen>
     );
   }

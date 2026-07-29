@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Platform, Alert } from "react-native";
+import { View } from "react-native";
 import {
   CalendarClock,
   Plus,
@@ -35,6 +35,7 @@ import {
   TextField,
   ChipsRow,
   EmptyState,
+  ConfirmDialog,
 } from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -63,16 +64,6 @@ const FILTERS = [
   { key: "cancelled", label: "Cancelled" },
 ];
 
-function confirm(msg: string, onYes: () => void) {
-  if (Platform.OS === "web") {
-    if (window.confirm(msg)) onYes();
-  } else
-    Alert.alert("Please confirm", msg, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: onYes },
-    ]);
-}
-
 const emptyForm = {
   direction: "issued" as "issued" | "received",
   partyName: "",
@@ -87,6 +78,7 @@ export default function PdcScreen() {
   const [filter, setFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const canManage = useAuthStore((s) => s.hasPermission)(
     PERMISSIONS.SUPPLIERS_MANAGE,
@@ -370,11 +362,7 @@ export default function PdcScreen() {
                           strokeWidth={2}
                         />
                       }
-                      onPress={() =>
-                        confirm("Delete this cheque?", () =>
-                          removeMut.mutate(c._id),
-                        )
-                      }
+                      onPress={() => setDeleteId(c._id)}
                     />
                   </HStack>
                 ) : null}
@@ -383,6 +371,22 @@ export default function PdcScreen() {
           })}
         </VStack>
       )}
+
+      <ConfirmDialog
+        visible={deleteId !== null}
+        title="Delete cheque?"
+        message="This removes the cheque from the register."
+        confirmLabel="Delete"
+        destructive
+        loading={removeMut.isPending}
+        onConfirm={() => {
+          if (deleteId)
+            removeMut.mutate(deleteId, {
+              onSuccess: () => setDeleteId(null),
+            });
+        }}
+        onCancel={() => setDeleteId(null)}
+      />
     </Screen>
   );
 }

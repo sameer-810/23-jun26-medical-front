@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { View, TextInput, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Search, Plus, Package, ChevronRight, Pill } from "lucide-react-native";
+import { Plus, Package, ChevronRight, Pill } from "lucide-react-native";
 import { useProducts, useCategories } from "@modules/product/hooks/useProducts";
 import { ProductListItem } from "@modules/product/types";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
-import { palette, radius, outline } from "@shared/designSystem";
+import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -16,6 +16,7 @@ import {
   Button,
   StatusChip,
   ChipsRow,
+  SearchInput,
   EmptyState,
   Pagination,
 } from "@shared/ui";
@@ -89,17 +90,11 @@ export default function ProductsScreen() {
         ) : undefined
       }
     >
-      <View style={styles.searchWrap}>
-        <Search size={18} color={palette.text.tertiary} strokeWidth={1.8} />
-        <TextInput
-          placeholder="Search name, SKU, barcode, HSN"
-          placeholderTextColor={palette.text.tertiary}
-          value={search}
-          onChangeText={setSearch}
-          style={styles.searchInput}
-          autoCapitalize="none"
-        />
-      </View>
+      <SearchInput
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search name, SKU, barcode, HSN"
+      />
 
       {categoryChips.length > 1 && (
         <View style={{ marginHorizontal: -24, marginTop: 12 }}>
@@ -202,23 +197,6 @@ function ProductRow({
 }
 
 const styles = StyleSheet.create({
-  searchWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    height: 48,
-    borderRadius: radius.md,
-    borderWidth: outline.width,
-    borderColor: outline.color,
-    backgroundColor: palette.surface.primary,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: palette.text.primary,
-    paddingVertical: 0,
-  },
   icon: {
     width: 46,
     height: 46,

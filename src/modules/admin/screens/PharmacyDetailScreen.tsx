@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Platform, Alert, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import {
   Building2,
@@ -36,18 +36,8 @@ import {
   StatusChip,
   StatTile,
   Select,
+  ConfirmDialog,
 } from "@shared/ui";
-
-function confirm(msg: string, onYes: () => void) {
-  if (Platform.OS === "web") {
-    if (window.confirm(msg)) onYes();
-  } else {
-    Alert.alert("Please confirm", msg, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Confirm", style: "destructive", onPress: onYes },
-    ]);
-  }
-}
 
 export default function PharmacyDetailScreen() {
   const navigation = useNavigation<any>();
@@ -61,6 +51,9 @@ export default function PharmacyDetailScreen() {
   const assignPlan = useAssignPlan(id);
 
   const [planCode, setPlanCode] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<
+    "suspend" | "archive" | null
+  >(null);
 
   const planOptions = (plans ?? []).map((p) => ({
     value: p.code,
@@ -283,12 +276,7 @@ export default function PharmacyDetailScreen() {
                 variant="destructive"
                 icon={<Ban size={16} color="#FFFFFF" strokeWidth={2} />}
                 loading={setSuspended.isPending}
-                onPress={() =>
-                  confirm(
-                    "Suspend this pharmacy? All its users will be signed out and unable to log in until reactivated.",
-                    () => setSuspended.mutate({ id, suspend: true }),
-                  )
-                }
+                onPress={() => setConfirmAction("suspend")}
               />
             ) : (
               <Button
@@ -306,19 +294,42 @@ export default function PharmacyDetailScreen() {
               variant="destructive"
               icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2} />}
               loading={archive.isPending}
-              onPress={() =>
-                confirm(
-                  "Archive this pharmacy? It will be hidden and everyone signed out. This is a soft-delete.",
-                  () =>
-                    archive.mutate(id, {
-                      onSuccess: () => navigation.goBack(),
-                    }),
-                )
-              }
+              onPress={() => setConfirmAction("archive")}
             />
           </VStack>
         </VStack>
       )}
+
+      <ConfirmDialog
+        visible={confirmAction !== null}
+        title={
+          confirmAction === "archive"
+            ? "Archive this pharmacy?"
+            : "Suspend this pharmacy?"
+        }
+        message={
+          confirmAction === "archive"
+            ? "It will be hidden and everyone signed out. This is a soft-delete."
+            : "All its users will be signed out and unable to log in until reactivated."
+        }
+        confirmLabel={confirmAction === "archive" ? "Archive" : "Suspend"}
+        destructive
+        loading={
+          confirmAction === "archive"
+            ? archive.isPending
+            : setSuspended.isPending
+        }
+        onConfirm={() => {
+          if (confirmAction === "suspend")
+            setSuspended.mutate(
+              { id, suspend: true },
+              { onSuccess: () => setConfirmAction(null) },
+            );
+          else if (confirmAction === "archive")
+            archive.mutate(id, { onSuccess: () => navigation.goBack() });
+        }}
+        onCancel={() => setConfirmAction(null)}
+      />
     </Screen>
   );
 }

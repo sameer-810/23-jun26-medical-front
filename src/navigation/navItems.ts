@@ -26,10 +26,31 @@ import {
 import { PERMISSIONS } from "@shared/permissions";
 import { useAuthStore } from "@shared/store/useAuthStore";
 
+export type NavSection =
+  | "Overview"
+  | "Catalogue"
+  | "Inventory"
+  | "Purchasing"
+  | "Sales"
+  | "Insights"
+  | "Workspace";
+
+/** Sidebar section order (Vyapar-style grouping; mirrors Sales vs Purchasing). */
+export const SECTION_ORDER: NavSection[] = [
+  "Overview",
+  "Catalogue",
+  "Inventory",
+  "Purchasing",
+  "Sales",
+  "Insights",
+  "Workspace",
+];
+
 export interface NavItem {
   name: string;
   label: string;
   icon: LucideIcon;
+  section: NavSection;
   /** Visible if the user holds this permission (admins always pass). */
   permission?: string;
   /** Visible to Admin only. */
@@ -42,119 +63,160 @@ export interface NavItem {
  * what the signed-in user can do (SOW §4 role-based experience).
  */
 export const NAV_ITEMS: NavItem[] = [
+  // ---- Overview ----
   {
     name: "Dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
+    section: "Overview",
     permission: PERMISSIONS.DASHBOARD_VIEW,
   },
+  // ---- Catalogue ----
   {
     name: "Products",
     label: "Products",
     icon: Package,
+    section: "Catalogue",
     permission: PERMISSIONS.PRODUCTS_VIEW,
   },
   {
-    name: "Warehouse",
-    label: "Warehouse",
-    icon: Warehouse,
-    permission: PERMISSIONS.WAREHOUSE_MANAGE,
+    name: "MedGuide",
+    label: "MedGuide",
+    icon: BookOpen,
+    section: "Catalogue",
+    permission: PERMISSIONS.DASHBOARD_VIEW,
   },
+  {
+    name: "Search",
+    label: "Search",
+    icon: Search,
+    section: "Catalogue",
+    permission: PERMISSIONS.PRODUCT_SEARCH,
+  },
+  // ---- Inventory ----
   {
     name: "Inventory",
     label: "Inventory",
     icon: Boxes,
+    section: "Inventory",
     permission: PERMISSIONS.INVENTORY_VIEW,
   },
   {
     name: "ShortBook",
     label: "ShortBook",
     icon: ListChecks,
+    section: "Inventory",
     permission: PERMISSIONS.INVENTORY_VIEW,
   },
   {
-    name: "Receive",
-    label: "Receive Stock",
-    icon: PackagePlus,
-    permission: PERMISSIONS.STOCK_INWARD_MANAGE,
-  },
-  {
-    name: "Orders",
-    label: "Orders",
-    icon: ShoppingBag,
-    permission: PERMISSIONS.PURCHASES_MANAGE,
-  },
-  {
-    name: "Sales",
-    label: "Sales",
-    icon: ShoppingCart,
-    permission: PERMISSIONS.SALES_MANAGE,
+    name: "Warehouse",
+    label: "Warehouse",
+    icon: Warehouse,
+    section: "Inventory",
+    permission: PERMISSIONS.WAREHOUSE_MANAGE,
   },
   {
     name: "Transfers",
     label: "Transfers",
     icon: ArrowLeftRight,
+    section: "Inventory",
     permission: PERMISSIONS.STOCK_TRANSFER_MANAGE,
   },
   {
     name: "Expiry",
     label: "Expiry",
     icon: AlarmClock,
+    section: "Inventory",
     permission: PERMISSIONS.EXPIRY_MANAGE,
   },
   {
     name: "Damaged",
     label: "Damaged",
     icon: ShieldAlert,
+    section: "Inventory",
     permission: PERMISSIONS.DAMAGED_MANAGE,
   },
+  // ---- Purchasing ----
   {
-    name: "Customers",
-    label: "Customers",
-    icon: Contact,
-    permission: PERMISSIONS.CUSTOMERS_MANAGE,
+    name: "Receive",
+    label: "Receive Stock",
+    icon: PackagePlus,
+    section: "Purchasing",
+    permission: PERMISSIONS.STOCK_INWARD_MANAGE,
+  },
+  {
+    name: "Orders",
+    label: "Orders",
+    icon: ShoppingBag,
+    section: "Purchasing",
+    permission: PERMISSIONS.PURCHASES_MANAGE,
   },
   {
     name: "Suppliers",
     label: "Suppliers",
     icon: Truck,
+    section: "Purchasing",
     permission: PERMISSIONS.SUPPLIERS_MANAGE,
   },
   {
     name: "PDC",
     label: "Cheques / PDC",
     icon: CalendarClock,
+    section: "Purchasing",
     permission: PERMISSIONS.SUPPLIERS_MANAGE,
   },
+  // ---- Sales ----
   {
-    name: "Search",
-    label: "Search",
-    icon: Search,
-    permission: PERMISSIONS.PRODUCT_SEARCH,
+    name: "Sales",
+    label: "Sales",
+    icon: ShoppingCart,
+    section: "Sales",
+    permission: PERMISSIONS.SALES_MANAGE,
   },
   {
-    name: "MedGuide",
-    label: "MedGuide",
-    icon: BookOpen,
-    permission: PERMISSIONS.DASHBOARD_VIEW,
+    name: "Customers",
+    label: "Customers",
+    icon: Contact,
+    section: "Sales",
+    permission: PERMISSIONS.CUSTOMERS_MANAGE,
   },
+  // ---- Insights ----
   {
     name: "Reports",
     label: "Reports",
     icon: BarChart3,
+    section: "Insights",
     permission: PERMISSIONS.REPORTS_VIEW,
   },
-  { name: "Team", label: "Team & Access", icon: Users, adminOnly: true },
   {
     name: "AuditLog",
     label: "Audit Logs",
     icon: ScrollText,
+    section: "Insights",
     permission: PERMISSIONS.AUDIT_VIEW,
   },
-  { name: "Settings", label: "Settings", icon: Settings, adminOnly: true },
-  // Personal productivity — available to every signed-in user (no permission).
-  { name: "Reminders", label: "Reminders", icon: BellRing },
-  { name: "Profile", label: "Profile", icon: UserRound },
+  // ---- Workspace ----
+  {
+    name: "Team",
+    label: "Team & Access",
+    icon: Users,
+    section: "Workspace",
+    adminOnly: true,
+  },
+  {
+    name: "Settings",
+    label: "Settings",
+    icon: Settings,
+    section: "Workspace",
+    adminOnly: true,
+  },
+  {
+    name: "Reminders",
+    label: "Reminders",
+    icon: BellRing,
+    section: "Workspace",
+  },
+  { name: "Profile", label: "Profile", icon: UserRound, section: "Workspace" },
 ];
 
 /**

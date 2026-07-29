@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, ScrollView, StyleSheet } from "react-native";
+import { View } from "react-native";
 import { FileSpreadsheet, FileText, BarChart3 } from "lucide-react-native";
 import {
   useReport,
@@ -7,7 +7,7 @@ import {
 } from "@modules/reports/hooks/useReports";
 import { ReportType, ReportColumn } from "@modules/reports/api/reportsApi";
 import { apiErrorMessage } from "@api/apiClient";
-import { palette, radius } from "@shared/designSystem";
+import { palette } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -18,7 +18,11 @@ import {
   TextField,
   ChipsRow,
   EmptyState,
+  DataTable,
+  Column,
 } from "@shared/ui";
+
+type ReportRow = Record<string, unknown>;
 
 const TYPES: { key: ReportType; label: string; timed: boolean }[] = [
   { key: "inventory", label: "Inventory", timed: false },
@@ -168,71 +172,17 @@ export default function ReportsScreen() {
           title="Couldn't load report"
           message={apiErrorMessage(error)}
         />
-      ) : !data || data.rows.length === 0 ? (
-        <EmptyState
-          icon={BarChart3}
-          title={isLoading ? "Loading…" : "No data"}
-          message="No records for this report or date range."
-        />
       ) : (
-        <Card padded={false} style={{ overflow: "hidden" }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator>
-            <View>
-              {/* header */}
-              <View style={[styles.row, styles.headerRow]}>
-                {data.columns.map((c) => (
-                  <View
-                    key={c.key}
-                    style={[styles.cell, { width: colWidth(c) }]}
-                  >
-                    <Text
-                      variant="label-sm"
-                      style={{ color: "#FFFFFF" }}
-                      numberOfLines={1}
-                    >
-                      {c.label}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-              {/* rows */}
-              {data.rows.slice(0, 200).map((row, ri) => (
-                <View
-                  key={ri}
-                  style={[
-                    styles.row,
-                    ri % 2 === 1 && {
-                      backgroundColor: palette.surface.secondary,
-                    },
-                  ]}
-                >
-                  {data.columns.map((c) => (
-                    <View
-                      key={c.key}
-                      style={[styles.cell, { width: colWidth(c) }]}
-                    >
-                      <Text
-                        variant="body-sm"
-                        tone="secondary"
-                        numberOfLines={1}
-                      >
-                        {fmt(row[c.key], c)}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              ))}
-            </View>
-          </ScrollView>
-          {data.rows.length > 200 && (
-            <View style={{ padding: 12 }}>
-              <Text variant="caption" tone="tertiary">
-                Showing first 200 of {data.rows.length} rows — export for the
-                full report.
-              </Text>
-            </View>
-          )}
-        </Card>
+        <DataTable<ReportRow>
+          columns={(data?.columns ?? []).map(toColumn)}
+          rows={(data?.rows as ReportRow[]) ?? []}
+          keyExtractor={(_, i) => String(i)}
+          pageSize={50}
+          dense
+          emptyIcon={BarChart3}
+          emptyTitle={isLoading ? "Loading…" : "No data"}
+          emptyMessage="No records for this report or date range."
+        />
       )}
     </Screen>
   );
@@ -245,19 +195,21 @@ function colWidth(c: ReportColumn) {
   return 170;
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: palette.border.subtle,
-  },
-  headerRow: {
-    backgroundColor: palette.teal[600],
-    borderBottomColor: palette.teal[600],
-  },
-  cell: {
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    justifyContent: "center",
-  },
-});
+/** Map a server report column to a sortable DataTable column. */
+function toColumn(c: ReportColumn): Column<ReportRow> {
+  const numeric = c.type === "money" || c.type === "number";
+  return {
+    key: c.key,
+    header: c.label,
+    width: colWidth(c),
+    align: numeric ? "right" : "left",
+    sortable: true,
+    sortValue: (r) =>
+      numeric ? Number(r[c.key]) || 0 : String(r[c.key] ?? ""),
+    render: (r) => (
+      <Text variant="body-sm" tone="secondary" numberOfLines={1}>
+        {fmt(r[c.key], c)}
+      </Text>
+    ),
+  };
+}

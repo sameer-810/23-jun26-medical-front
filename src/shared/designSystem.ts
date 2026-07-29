@@ -345,6 +345,19 @@ export const glass = {
   },
 } as const;
 
+/**
+ * Responsive breakpoints (min-width, px). One source of truth so "narrow vs
+ * wide" behaves the same everywhere instead of each screen hardcoding 640/700/
+ * 760/900/1100. Consume via the `useBreakpoint` hook.
+ */
+export const breakpoints = {
+  sm: 640,
+  md: 760,
+  lg: 900,
+  xl: 1100,
+  xxl: 1200,
+} as const;
+
 export const layout = {
   screenPadding: 20,
   cardPadding: 20,

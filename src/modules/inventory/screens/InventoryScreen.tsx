@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { View, TextInput, StyleSheet, useWindowDimensions } from "react-native";
+import { View, StyleSheet, useWindowDimensions } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
-  Search,
   Boxes,
   IndianRupee,
   PackageX,
@@ -10,7 +9,7 @@ import {
 } from "lucide-react-native";
 import { useStock, useStockValue } from "@modules/inventory/hooks/useInventory";
 import { StockSummaryItem } from "@modules/inventory/types";
-import { palette, radius, outline } from "@shared/designSystem";
+import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -20,8 +19,10 @@ import {
   StatTile,
   StatusChip,
   ChipsRow,
-  EmptyState,
   Pagination,
+  SearchInput,
+  DataTable,
+  Column,
 } from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -29,7 +30,7 @@ const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 export default function InventoryScreen() {
   const navigation = useNavigation<any>();
   const { width } = useWindowDimensions();
-  const cols = width >= 1000 ? 3 : width >= 640 ? 3 : 1;
+  const cols = width >= 640 ? 3 : 1;
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -67,6 +68,94 @@ export default function InventoryScreen() {
   if (!isLoading && totalPages > 0 && page > totalPages) setPage(totalPages);
 
   const tileW = cols === 1 ? "100%" : "33.33%";
+  const open = (s: StockSummaryItem) =>
+    navigation.navigate("ProductInventory", { id: s.productId });
+
+  const columns: Column<StockSummaryItem>[] = [
+    {
+      key: "name",
+      header: "Product",
+      width: 260,
+      sortable: true,
+      sortValue: (s) => s.name.toLowerCase(),
+      render: (s) => (
+        <VStack gap={2}>
+          <Text variant="label" tone="primary" numberOfLines={1}>
+            {s.name}
+          </Text>
+          <Text variant="caption" tone="tertiary" numberOfLines={1}>
+            {s.sku}
+          </Text>
+        </VStack>
+      ),
+    },
+    {
+      key: "available",
+      header: "In stock",
+      width: 150,
+      sortable: true,
+      sortValue: (s) => s.available,
+      render: (s) => (
+        <StatusChip
+          label={`${s.available}/${s.onHand} ${s.baseUnit}`}
+          tone={s.isLow ? "warning" : "info"}
+        />
+      ),
+    },
+    {
+      key: "batches",
+      header: "Batches",
+      width: 90,
+      align: "center",
+      sortable: true,
+      sortValue: (s) => s.batches,
+      render: (s) => (
+        <Text variant="body-sm" tone="secondary">
+          {s.batches}
+        </Text>
+      ),
+    },
+    {
+      key: "locations",
+      header: "Locations",
+      width: 100,
+      align: "center",
+      render: (s) => (
+        <Text variant="body-sm" tone="secondary">
+          {s.locations}
+        </Text>
+      ),
+    },
+    {
+      key: "costValue",
+      header: "Cost value",
+      width: 130,
+      align: "right",
+      sortable: true,
+      sortValue: (s) => s.costValue,
+      render: (s) => (
+        <Text variant="label" tone="primary">
+          {money(s.costValue)}
+        </Text>
+      ),
+    },
+    {
+      key: "status",
+      header: "",
+      width: 130,
+      align: "right",
+      render: (s) =>
+        s.isLow ? (
+          <StatusChip label="Low stock" tone="warning" />
+        ) : (
+          <ChevronRight
+            size={18}
+            color={palette.text.tertiary}
+            strokeWidth={2}
+          />
+        ),
+    },
+  ];
 
   return (
     <Screen
@@ -105,15 +194,11 @@ export default function InventoryScreen() {
         </View>
       </View>
 
-      <View style={[styles.searchWrap, { marginTop: 14 }]}>
-        <Search size={18} color={palette.text.tertiary} strokeWidth={1.8} />
-        <TextInput
-          placeholder="Search products in stock"
-          placeholderTextColor={palette.text.tertiary}
+      <View style={{ marginTop: 14 }}>
+        <SearchInput
           value={search}
           onChangeText={setSearch}
-          style={styles.searchInput}
-          autoCapitalize="none"
+          placeholder="Search products in stock"
         />
       </View>
       <View style={{ marginHorizontal: -24, marginTop: 12 }}>
@@ -127,44 +212,41 @@ export default function InventoryScreen() {
         />
       </View>
 
-      {list.length === 0 ? (
-        <EmptyState
-          icon={filter === "low" ? PackageX : Boxes}
-          title={
+      <View style={{ marginTop: 16 }}>
+        <DataTable<StockSummaryItem>
+          columns={columns}
+          rows={list}
+          keyExtractor={(s) => s.productId}
+          onRowPress={open}
+          mobileCard={(s) => <StockRow item={s} onPress={() => open(s)} />}
+          emptyIcon={filter === "low" ? PackageX : Boxes}
+          emptyTitle={
             isLoading
               ? "Loading…"
               : filter === "low"
                 ? "No low-stock items"
                 : "No stock yet"
           }
-          message={
+          emptyMessage={
             filter === "low"
               ? "Everything is above its reorder level."
               : "Receive stock to see it here."
           }
         />
-      ) : (
-        <VStack gap={12} style={{ marginTop: 16 }}>
-          {list.map((s) => (
-            <StockRow
-              key={s.productId}
-              item={s}
-              onPress={() =>
-                navigation.navigate("ProductInventory", { id: s.productId })
-              }
+        {list.length > 0 ? (
+          <View style={{ marginTop: 16 }}>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              limit={limit}
+              onPageChange={setPage}
+              onLimitChange={setLimit}
+              label="products"
             />
-          ))}
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            total={total}
-            limit={limit}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
-            label="products"
-          />
-        </VStack>
-      )}
+          </View>
+        ) : null}
+      </View>
     </Screen>
   );
 }
@@ -218,23 +300,6 @@ function StockRow({
 }
 
 const styles = StyleSheet.create({
-  searchWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    height: 48,
-    borderRadius: radius.md,
-    borderWidth: outline.width,
-    borderColor: outline.color,
-    backgroundColor: palette.surface.primary,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: palette.text.primary,
-    paddingVertical: 0,
-  },
   icon: {
     width: 46,
     height: 46,

@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { View, Platform, Alert } from "react-native";
 import { Plus, Warehouse as WarehouseIcon } from "lucide-react-native";
 import {
   useWarehouseTree,
@@ -9,8 +8,16 @@ import { LocationTreeNode } from "@modules/warehouse/types";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { apiErrorMessage } from "@api/apiClient";
-import { palette } from "@shared/designSystem";
-import { Screen, Text, VStack, Card, Button, EmptyState } from "@shared/ui";
+import {
+  Screen,
+  Text,
+  VStack,
+  Card,
+  Button,
+  EmptyState,
+  Banner,
+  ConfirmDialog,
+} from "@shared/ui";
 import { LocationNode } from "@modules/warehouse/components/LocationNode";
 import { LocationModal } from "@modules/warehouse/components/LocationModal";
 
@@ -20,39 +27,18 @@ type ModalState =
   | { mode: "rename"; node: LocationTreeNode }
   | null;
 
-function confirm(message: string, onYes: () => void) {
-  if (Platform.OS === "web") {
-    // eslint-disable-next-line no-alert
-    if (window.confirm(message)) onYes();
-  } else {
-    Alert.alert("Please confirm", message, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: onYes },
-    ]);
-  }
-}
-
 export default function WarehouseScreen() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canManage = hasPermission(PERMISSIONS.WAREHOUSE_MANAGE);
   const { data: roots, isLoading, refetch, isRefetching } = useWarehouseTree();
   const removeMut = useRemoveLocation();
   const [modal, setModal] = useState<ModalState>(null);
+  const [pendingNode, setPendingNode] = useState<LocationTreeNode | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const warehouses = roots ?? [];
 
-  const onRemove = (node: LocationTreeNode) =>
-    confirm(
-      node.children.length
-        ? `"${node.name}" has sub-locations and can't be removed until they are deleted.`
-        : `Remove ${node.type} "${node.name}" (${node.code})?`,
-      () =>
-        removeMut.mutate(node.id, {
-          onError: (e) => {
-            if (Platform.OS === "web") window.alert(apiErrorMessage(e));
-          },
-        }),
-    );
+  const onRemove = (node: LocationTreeNode) => setPendingNode(node);
 
   return (
     <Screen
@@ -72,6 +58,10 @@ export default function WarehouseScreen() {
         ) : undefined
       }
     >
+      {errorMsg ? (
+        <Banner tone="danger" message={errorMsg} style={{ marginBottom: 16 }} />
+      ) : null}
+
       {warehouses.length === 0 ? (
         <EmptyState
           icon={WarehouseIcon}
@@ -123,6 +113,29 @@ export default function WarehouseScreen() {
         parent={modal && modal.mode === "createChild" ? modal.parent : null}
         node={modal && modal.mode === "rename" ? modal.node : null}
         onClose={() => setModal(null)}
+      />
+
+      <ConfirmDialog
+        visible={pendingNode !== null}
+        title={
+          pendingNode
+            ? pendingNode.children.length
+              ? `"${pendingNode.name}" has sub-locations and can't be removed until they are deleted.`
+              : `Remove ${pendingNode.type} "${pendingNode.name}" (${pendingNode.code})?`
+            : ""
+        }
+        confirmLabel="Remove"
+        destructive
+        loading={removeMut.isPending}
+        onConfirm={() => {
+          if (!pendingNode) return;
+          setErrorMsg(null);
+          removeMut.mutate(pendingNode.id, {
+            onError: (e) => setErrorMsg(apiErrorMessage(e)),
+            onSettled: () => setPendingNode(null),
+          });
+        }}
+        onCancel={() => setPendingNode(null)}
       />
     </Screen>
   );
