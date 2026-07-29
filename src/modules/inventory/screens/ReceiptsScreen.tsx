@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Pressable } from "react-native";
+import { View, Pressable } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
   ArrowLeft,
@@ -17,8 +17,10 @@ import {
   HStack,
   Card,
   StatusChip,
-  EmptyState,
   Pagination,
+  DataTable,
+  Column,
+  Skeleton,
 } from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -37,6 +39,87 @@ export default function ReceiptsScreen() {
 
   // Snap back if the result set shrank below the current page.
   if (!isLoading && totalPages > 0 && page > totalPages) setPage(totalPages);
+
+  const open = (r: ReceiptListItem) =>
+    navigation.navigate("ReceiptDetail", { id: r.id });
+
+  const columns: Column<ReceiptListItem>[] = [
+    {
+      key: "receiptNo",
+      header: "Receipt",
+      width: 150,
+      sortable: true,
+      sortValue: (r) => r.receiptNo,
+      render: (r) => (
+        <Text variant="label" tone="primary">
+          {r.receiptNo}
+        </Text>
+      ),
+    },
+    {
+      key: "supplierName",
+      header: "Supplier",
+      width: 190,
+      sortable: true,
+      sortValue: (r) => (r.supplierName || "").toLowerCase(),
+      render: (r) => (
+        <Text variant="body-sm" tone="secondary" numberOfLines={1}>
+          {r.supplierName || "No supplier"}
+        </Text>
+      ),
+    },
+    {
+      key: "receivedAt",
+      header: "Date",
+      width: 120,
+      sortable: true,
+      sortValue: (r) => r.receivedAt,
+      render: (r) => (
+        <Text variant="body-sm" tone="tertiary">
+          {new Date(r.receivedAt).toLocaleDateString("en-IN")}
+        </Text>
+      ),
+    },
+    {
+      key: "lineCount",
+      header: "Lines",
+      width: 80,
+      align: "center",
+      sortable: true,
+      sortValue: (r) => r.lineCount,
+      render: (r) => (
+        <Text variant="body-sm" tone="secondary">
+          {r.lineCount}
+        </Text>
+      ),
+    },
+    {
+      key: "totalQuantity",
+      header: "Qty",
+      width: 90,
+      align: "center",
+      sortable: true,
+      sortValue: (r) => r.totalQuantity,
+      render: (r) => (
+        <Text variant="body-sm" tone="secondary">
+          {r.totalQuantity}
+        </Text>
+      ),
+    },
+    {
+      key: "totalValue",
+      header: "Value",
+      width: 120,
+      align: "right",
+      sortable: true,
+      sortValue: (r) => r.totalValue,
+      render: (r) => (
+        <Text variant="label" tone="primary">
+          {money(r.totalValue)}
+        </Text>
+      ),
+    },
+  ];
 
   return (
     <Screen
@@ -59,33 +142,57 @@ export default function ReceiptsScreen() {
         </HStack>
       </Pressable>
 
-      {receipts.length === 0 ? (
-        <EmptyState
-          icon={ScrollText}
-          title={isLoading ? "Loading…" : "No receipts yet"}
-          message="Received stock will be listed here as GRNs."
-        />
+      {isLoading && receipts.length === 0 ? (
+        <ListSkeleton />
       ) : (
-        <VStack gap={12}>
-          {receipts.map((r) => (
-            <ReceiptRow
-              key={r.id}
-              receipt={r}
-              onPress={() => navigation.navigate("ReceiptDetail", { id: r.id })}
-            />
-          ))}
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            total={total}
-            limit={limit}
-            onPageChange={setPage}
-            onLimitChange={setLimit}
-            label="receipts"
+        <>
+          <DataTable<ReceiptListItem>
+            columns={columns}
+            rows={receipts}
+            keyExtractor={(r) => r.id}
+            onRowPress={open}
+            mobileCard={(r) => (
+              <ReceiptRow receipt={r} onPress={() => open(r)} />
+            )}
+            emptyIcon={ScrollText}
+            emptyTitle="No receipts yet"
+            emptyMessage="Received stock will be listed here as GRNs."
           />
-        </VStack>
+          {receipts.length > 0 ? (
+            <View style={{ marginTop: 16 }}>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                limit={limit}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
+                label="receipts"
+              />
+            </View>
+          ) : null}
+        </>
       )}
     </Screen>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <VStack gap={12}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <Card key={i} elevation="base">
+          <HStack gap={14} align="center">
+            <Skeleton width={22} height={22} rounded="sm" />
+            <VStack gap={6} flex={1}>
+              <Skeleton width="40%" height={16} />
+              <Skeleton width="70%" height={12} />
+            </VStack>
+            <Skeleton width={70} height={16} />
+          </HStack>
+        </Card>
+      ))}
+    </VStack>
   );
 }
 

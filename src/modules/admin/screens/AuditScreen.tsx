@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { ScrollText } from "lucide-react-native";
 import { useAudit } from "@modules/admin/hooks/useAdmin";
 import { AdminNav } from "@modules/admin/components/AdminNav";
+import type { AuditEntry } from "@modules/admin/types";
 import {
   Screen,
   Text,
@@ -11,7 +12,9 @@ import {
   Card,
   StatusChip,
   Pagination,
-  EmptyState,
+  DataTable,
+  Column,
+  Skeleton,
 } from "@shared/ui";
 
 export default function AuditScreen() {
@@ -21,57 +24,126 @@ export default function AuditScreen() {
   const items = data?.data ?? [];
   const meta = data?.meta;
 
+  const columns: Column<AuditEntry>[] = [
+    {
+      key: "createdAt",
+      header: "When",
+      width: 180,
+      sortable: true,
+      sortValue: (a) => a.createdAt,
+      render: (a) => (
+        <Text variant="caption" tone="tertiary">
+          {new Date(a.createdAt).toLocaleString("en-IN")}
+        </Text>
+      ),
+    },
+    {
+      key: "adminEmail",
+      header: "Actor",
+      width: 220,
+      sortable: true,
+      sortValue: (a) => (a.adminEmail || "").toLowerCase(),
+      render: (a) => (
+        <Text variant="body-sm" tone="secondary" numberOfLines={1}>
+          {a.adminEmail} · {a.entityType}
+          {a.ip ? ` · ${a.ip}` : ""}
+        </Text>
+      ),
+    },
+    {
+      key: "action",
+      header: "Action",
+      width: 160,
+      render: (a) => <StatusChip label={a.action} tone="info" />,
+    },
+    {
+      key: "description",
+      header: "Description",
+      width: 320,
+      render: (a) => (
+        <Text variant="body-sm" tone="primary" numberOfLines={2}>
+          {a.description || "—"}
+        </Text>
+      ),
+    },
+  ];
+
   return (
     <Screen overline="Platform" title="Audit log">
       <AdminNav active="audit" />
 
-      {items.length === 0 ? (
-        <EmptyState
-          icon={ScrollText}
-          title={isLoading ? "Loading…" : "No activity yet"}
-        />
+      {isLoading && items.length === 0 ? (
+        <ListSkeleton />
       ) : (
-        <VStack gap={8}>
-          {items.map((a) => (
-            <Card key={a._id}>
-              <VStack gap={6}>
-                <HStack gap={10} align="center" justify="space-between">
-                  <StatusChip label={a.action} tone="info" />
-                  <Text variant="caption" tone="tertiary">
-                    {new Date(a.createdAt).toLocaleString("en-IN")}
-                  </Text>
-                </HStack>
-                {a.description ? (
-                  <Text variant="body-sm" tone="primary">
-                    {a.description}
-                  </Text>
-                ) : null}
-                <Text variant="caption" tone="tertiary" numberOfLines={1}>
-                  {a.adminEmail} · {a.entityType}
-                  {a.ip ? ` · ${a.ip}` : ""}
-                </Text>
-              </VStack>
-            </Card>
-          ))}
-        </VStack>
-      )}
-
-      {meta && meta.total > 0 ? (
-        <View style={{ marginTop: 16 }}>
-          <Pagination
-            page={meta.page}
-            totalPages={meta.totalPages}
-            total={meta.total}
-            limit={meta.limit}
-            onPageChange={setPage}
-            onLimitChange={(l) => {
-              setLimit(l);
-              setPage(1);
-            }}
-            label="events"
+        <View>
+          <DataTable<AuditEntry>
+            columns={columns}
+            rows={items}
+            keyExtractor={(a) => a._id}
+            mobileCard={(a) => <AuditRow entry={a} />}
+            emptyIcon={ScrollText}
+            emptyTitle="No activity yet"
           />
+          {meta && meta.total > 0 ? (
+            <View style={{ marginTop: 16 }}>
+              <Pagination
+                page={meta.page}
+                totalPages={meta.totalPages}
+                total={meta.total}
+                limit={meta.limit}
+                onPageChange={setPage}
+                onLimitChange={(l) => {
+                  setLimit(l);
+                  setPage(1);
+                }}
+                label="events"
+              />
+            </View>
+          ) : null}
         </View>
-      ) : null}
+      )}
     </Screen>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <VStack gap={8}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <Card key={i}>
+          <VStack gap={6}>
+            <HStack gap={10} align="center" justify="space-between">
+              <Skeleton width={90} height={16} />
+              <Skeleton width={120} height={12} />
+            </HStack>
+            <Skeleton width="70%" height={12} />
+          </VStack>
+        </Card>
+      ))}
+    </VStack>
+  );
+}
+
+function AuditRow({ entry }: { entry: AuditEntry }) {
+  return (
+    <Card>
+      <VStack gap={6}>
+        <HStack gap={10} align="center" justify="space-between">
+          <StatusChip label={entry.action} tone="info" />
+          <Text variant="caption" tone="tertiary">
+            {new Date(entry.createdAt).toLocaleString("en-IN")}
+          </Text>
+        </HStack>
+        {entry.description ? (
+          <Text variant="body-sm" tone="primary">
+            {entry.description}
+          </Text>
+        ) : null}
+        <Text variant="caption" tone="tertiary" numberOfLines={1}>
+          {entry.adminEmail} · {entry.entityType}
+          {entry.ip ? ` · ${entry.ip}` : ""}
+        </Text>
+      </VStack>
+    </Card>
   );
 }

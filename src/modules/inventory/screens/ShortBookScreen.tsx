@@ -4,6 +4,7 @@ import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { ListChecks, Search, ShoppingBag } from "lucide-react-native";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
+import { ShortbookItem } from "@modules/inventory/types";
 import { palette } from "@shared/designSystem";
 import {
   Screen,
@@ -15,7 +16,9 @@ import {
   StatusChip,
   TextField,
   Pagination,
-  EmptyState,
+  DataTable,
+  Column,
+  Skeleton,
 } from "@shared/ui";
 
 export default function ShortBookScreen() {
@@ -44,6 +47,63 @@ export default function ShortBookScreen() {
         })),
       },
     });
+
+  const columns: Column<ShortbookItem>[] = [
+    {
+      key: "name",
+      header: "Product",
+      width: 240,
+      sortable: true,
+      sortValue: (it) => it.name.toLowerCase(),
+      render: (it) => (
+        <VStack gap={2}>
+          <Text variant="label" tone="primary" numberOfLines={1}>
+            {it.name}
+          </Text>
+          <Text variant="caption" tone="tertiary" numberOfLines={1}>
+            {it.brandName || "—"} · {it.sku}
+          </Text>
+        </VStack>
+      ),
+    },
+    {
+      key: "onHand",
+      header: "Stock / Min",
+      width: 130,
+      align: "center",
+      sortable: true,
+      sortValue: (it) => it.onHand,
+      render: (it) => (
+        <Text variant="body-sm" tone="secondary">
+          {it.onHand} / {it.reorderLevel}
+        </Text>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      width: 100,
+      render: (it) => (
+        <StatusChip
+          label={it.onHand === 0 ? "Out" : "Low"}
+          tone={it.onHand === 0 ? "danger" : "warning"}
+        />
+      ),
+    },
+    {
+      key: "need",
+      header: "Order",
+      width: 90,
+      align: "right",
+      sortable: true,
+      sortValue: (it) => it.need,
+      render: (it) => (
+        <Text variant="label-lg" weight="700" tone="primary">
+          {it.need}
+        </Text>
+      ),
+    },
+  ];
 
   return (
     <Screen
@@ -76,69 +136,94 @@ export default function ShortBookScreen() {
         />
       </View>
 
-      {items.length === 0 ? (
-        <EmptyState
-          icon={ListChecks}
-          title={isLoading ? "Loading…" : "Nothing to reorder"}
-        />
+      {isLoading && items.length === 0 ? (
+        <ListSkeleton />
       ) : (
-        <VStack gap={8}>
-          {items.map((it) => (
-            <Card key={it.productId}>
-              <HStack gap={10} align="center" justify="space-between">
-                <VStack gap={2} flex={1}>
-                  <Text variant="label-lg" tone="primary" numberOfLines={1}>
-                    {it.name}
-                  </Text>
-                  <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
-                    {it.brandName || "—"} · {it.sku}
-                  </Text>
-                </VStack>
-                <HStack gap={14} align="center">
-                  <VStack gap={1} align="flex-end">
-                    <Text variant="caption" tone="tertiary">
-                      Stock / Min
-                    </Text>
-                    <Text variant="body-sm" tone="secondary">
-                      {it.onHand} / {it.reorderLevel}
-                    </Text>
-                  </VStack>
-                  <StatusChip
-                    label={it.onHand === 0 ? "Out" : "Low"}
-                    tone={it.onHand === 0 ? "danger" : "warning"}
-                  />
-                  <VStack gap={1} align="flex-end" style={styles.orderCell}>
-                    <Text variant="caption" tone="tertiary">
-                      Order
-                    </Text>
-                    <Text variant="label-lg" weight="700" tone="primary">
-                      {it.need}
-                    </Text>
-                  </VStack>
-                </HStack>
-              </HStack>
-            </Card>
-          ))}
-        </VStack>
-      )}
-
-      {meta && meta.total > 0 ? (
-        <View style={{ marginTop: 16 }}>
-          <Pagination
-            page={meta.page}
-            totalPages={meta.pages}
-            total={meta.total}
-            limit={limit}
-            onPageChange={setPage}
-            onLimitChange={(l) => {
-              setLimit(l);
-              setPage(1);
-            }}
-            label="items"
+        <>
+          <DataTable<ShortbookItem>
+            columns={columns}
+            rows={items}
+            keyExtractor={(it) => it.productId}
+            mobileCard={(it) => <ShortBookRow item={it} />}
+            emptyIcon={ListChecks}
+            emptyTitle="Nothing to reorder"
           />
-        </View>
-      ) : null}
+          {items.length > 0 && meta ? (
+            <View style={{ marginTop: 16 }}>
+              <Pagination
+                page={meta.page}
+                totalPages={meta.pages}
+                total={meta.total}
+                limit={limit}
+                onPageChange={setPage}
+                onLimitChange={(l) => {
+                  setLimit(l);
+                  setPage(1);
+                }}
+                label="items"
+              />
+            </View>
+          ) : null}
+        </>
+      )}
     </Screen>
+  );
+}
+
+function ShortBookRow({ item }: { item: ShortbookItem }) {
+  return (
+    <Card>
+      <HStack gap={10} align="center" justify="space-between">
+        <VStack gap={2} flex={1}>
+          <Text variant="label-lg" tone="primary" numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
+            {item.brandName || "—"} · {item.sku}
+          </Text>
+        </VStack>
+        <HStack gap={14} align="center">
+          <VStack gap={1} align="flex-end">
+            <Text variant="caption" tone="tertiary">
+              Stock / Min
+            </Text>
+            <Text variant="body-sm" tone="secondary">
+              {item.onHand} / {item.reorderLevel}
+            </Text>
+          </VStack>
+          <StatusChip
+            label={item.onHand === 0 ? "Out" : "Low"}
+            tone={item.onHand === 0 ? "danger" : "warning"}
+          />
+          <VStack gap={1} align="flex-end" style={styles.orderCell}>
+            <Text variant="caption" tone="tertiary">
+              Order
+            </Text>
+            <Text variant="label-lg" weight="700" tone="primary">
+              {item.need}
+            </Text>
+          </VStack>
+        </HStack>
+      </HStack>
+    </Card>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <VStack gap={8}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <Card key={i}>
+          <HStack gap={14} align="center">
+            <VStack gap={6} flex={1}>
+              <Skeleton width="40%" height={16} />
+              <Skeleton width="70%" height={12} />
+            </VStack>
+            <Skeleton width={70} height={16} />
+          </HStack>
+        </Card>
+      ))}
+    </VStack>
   );
 }
 

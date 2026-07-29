@@ -18,6 +18,7 @@ export type { Column } from "./DataTable";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { PromptDialog } from "./PromptDialog";
 export { Skeleton } from "./Skeleton";
+export { BackLink } from "./BackLink";
 export { Fab } from "./Fab";
 export { Avatar } from "./Avatar";
 export { Screen } from "./Screen";

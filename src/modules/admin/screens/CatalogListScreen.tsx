@@ -4,6 +4,7 @@ import { useNavigation } from "@react-navigation/native";
 import { Pill, Plus, Search } from "lucide-react-native";
 import { useCatalog, useCatalogStats } from "@modules/admin/hooks/useAdmin";
 import { AdminNav } from "@modules/admin/components/AdminNav";
+import type { CatalogProduct } from "@modules/admin/types";
 import { palette } from "@shared/designSystem";
 import {
   Screen,
@@ -16,7 +17,9 @@ import {
   StatusChip,
   TextField,
   Pagination,
-  EmptyState,
+  DataTable,
+  Column,
+  Skeleton,
 } from "@shared/ui";
 
 export default function CatalogListScreen() {
@@ -29,6 +32,76 @@ export default function CatalogListScreen() {
   const { data, isLoading } = useCatalog({ page, limit, search });
   const items = data?.data ?? [];
   const meta = data?.meta;
+
+  const open = (p: CatalogProduct) =>
+    navigation.navigate("AdminCatalogForm", { id: p._id });
+
+  const columns: Column<CatalogProduct>[] = [
+    {
+      key: "name",
+      header: "Product",
+      width: 220,
+      sortable: true,
+      sortValue: (p) => (p.name || "").toLowerCase(),
+      render: (p) => (
+        <Text variant="label" tone="primary" numberOfLines={1}>
+          {p.name}
+        </Text>
+      ),
+    },
+    {
+      key: "saltComposition",
+      header: "Salt / Manufacturer",
+      width: 260,
+      sortable: true,
+      sortValue: (p) => (p.saltComposition || "").toLowerCase(),
+      render: (p) => (
+        <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
+          {p.saltComposition || "—"} · {p.manufacturerName || "—"}
+        </Text>
+      ),
+    },
+    {
+      key: "sku",
+      header: "SKU",
+      width: 150,
+      sortable: true,
+      sortValue: (p) => (p.sku || "").toLowerCase(),
+      render: (p) => (
+        <Text variant="body-sm" tone="secondary" numberOfLines={1}>
+          {p.sku || "—"}
+        </Text>
+      ),
+    },
+    {
+      key: "mrp",
+      header: "MRP",
+      width: 100,
+      align: "right",
+      sortable: true,
+      sortValue: (p) => p.mrp,
+      render: (p) => (
+        <Text variant="label" weight="600" tone="secondary">
+          ₹{p.mrp}
+        </Text>
+      ),
+    },
+    {
+      key: "packLabel",
+      header: "Pack",
+      width: 150,
+      render: (p) => (
+        <HStack gap={6} align="center" wrap>
+          <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
+            {p.packLabel || "—"}
+          </Text>
+          {p.prescriptionRequired ? (
+            <StatusChip label="Rx" tone="warning" />
+          ) : null}
+        </HStack>
+      ),
+    },
+  ];
 
   return (
     <Screen
@@ -86,61 +159,89 @@ export default function CatalogListScreen() {
         />
       </View>
 
-      {items.length === 0 ? (
-        <EmptyState
-          icon={Pill}
-          title={isLoading ? "Loading…" : "No products found"}
-        />
+      {isLoading && items.length === 0 ? (
+        <ListSkeleton />
       ) : (
-        <VStack gap={8}>
-          {items.map((p) => (
-            <Card
-              key={p._id}
-              elevation="base"
-              onPress={() =>
-                navigation.navigate("AdminCatalogForm", { id: p._id })
-              }
-            >
-              <HStack gap={10} align="center" justify="space-between">
-                <VStack gap={2} flex={1}>
-                  <Text variant="label-lg" tone="primary" numberOfLines={1}>
-                    {p.name}
-                  </Text>
-                  <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
-                    {p.saltComposition || "—"} · {p.manufacturerName || "—"}
-                  </Text>
-                </VStack>
-                <VStack gap={4} align="flex-end">
-                  <Text variant="label" weight="600" tone="secondary">
-                    ₹{p.mrp}
-                  </Text>
-                  {p.prescriptionRequired ? (
-                    <StatusChip label="Rx" tone="warning" />
-                  ) : null}
-                </VStack>
-              </HStack>
-            </Card>
-          ))}
-        </VStack>
-      )}
-
-      {meta && meta.total > 0 ? (
-        <View style={{ marginTop: 16 }}>
-          <Pagination
-            page={meta.page}
-            totalPages={meta.totalPages}
-            total={meta.total}
-            limit={meta.limit}
-            onPageChange={setPage}
-            onLimitChange={(l) => {
-              setLimit(l);
-              setPage(1);
-            }}
-            label="products"
+        <View>
+          <DataTable<CatalogProduct>
+            columns={columns}
+            rows={items}
+            keyExtractor={(p) => p._id}
+            onRowPress={open}
+            mobileCard={(p) => (
+              <CatalogRow product={p} onPress={() => open(p)} />
+            )}
+            emptyIcon={Pill}
+            emptyTitle="No products found"
           />
+          {meta && meta.total > 0 ? (
+            <View style={{ marginTop: 16 }}>
+              <Pagination
+                page={meta.page}
+                totalPages={meta.totalPages}
+                total={meta.total}
+                limit={meta.limit}
+                onPageChange={setPage}
+                onLimitChange={(l) => {
+                  setLimit(l);
+                  setPage(1);
+                }}
+                label="products"
+              />
+            </View>
+          ) : null}
         </View>
-      ) : null}
+      )}
     </Screen>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <VStack gap={12}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <Card key={i} elevation="base">
+          <HStack gap={14} align="center">
+            <VStack gap={6} flex={1}>
+              <Skeleton width="40%" height={16} />
+              <Skeleton width="70%" height={12} />
+            </VStack>
+            <Skeleton width={70} height={16} />
+          </HStack>
+        </Card>
+      ))}
+    </VStack>
+  );
+}
+
+function CatalogRow({
+  product,
+  onPress,
+}: {
+  product: CatalogProduct;
+  onPress: () => void;
+}) {
+  return (
+    <Card elevation="base" onPress={onPress}>
+      <HStack gap={10} align="center" justify="space-between">
+        <VStack gap={2} flex={1}>
+          <Text variant="label-lg" tone="primary" numberOfLines={1}>
+            {product.name}
+          </Text>
+          <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
+            {product.saltComposition || "—"} · {product.manufacturerName || "—"}
+          </Text>
+        </VStack>
+        <VStack gap={4} align="flex-end">
+          <Text variant="label" weight="600" tone="secondary">
+            ₹{product.mrp}
+          </Text>
+          {product.prescriptionRequired ? (
+            <StatusChip label="Rx" tone="warning" />
+          ) : null}
+        </VStack>
+      </HStack>
+    </Card>
   );
 }
 

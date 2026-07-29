@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Plus, ChevronRight, ShieldCheck, Users } from "lucide-react-native";
 import { useTeamUsers } from "@modules/team/hooks/useTeam";
@@ -14,7 +15,9 @@ import {
   StatusChip,
   Button,
   SearchInput,
-  EmptyState,
+  DataTable,
+  Column,
+  Skeleton,
 } from "@shared/ui";
 
 export default function TeamScreen() {
@@ -24,6 +27,71 @@ export default function TeamScreen() {
     search.trim() ? { search: search.trim() } : undefined,
   );
   const users = data?.data ?? [];
+
+  const open = (u: TeamUser) => navigation.navigate("UserDetail", { id: u.id });
+
+  const columns: Column<TeamUser>[] = [
+    {
+      key: "fullName",
+      header: "Name",
+      width: 220,
+      sortable: true,
+      sortValue: (u) => u.fullName.toLowerCase(),
+      render: (u) => (
+        <HStack gap={8} align="center">
+          <Avatar
+            name={u.fullName}
+            size={30}
+            tone={u.role === "admin" ? "cobalt" : "teal"}
+          />
+          <Text variant="label" tone="primary" numberOfLines={1}>
+            {u.fullName}
+          </Text>
+          {u.role === "admin" && (
+            <ShieldCheck
+              size={15}
+              color={palette.cobalt[600]}
+              strokeWidth={2}
+            />
+          )}
+        </HStack>
+      ),
+    },
+    {
+      key: "email",
+      header: "Email",
+      width: 240,
+      sortable: true,
+      sortValue: (u) => u.email.toLowerCase(),
+      render: (u) => (
+        <Text variant="body-sm" tone="secondary" numberOfLines={1}>
+          {u.email}
+        </Text>
+      ),
+    },
+    {
+      key: "role",
+      header: "Role",
+      width: 150,
+      render: (u) => (
+        <StatusChip
+          label={u.role === "admin" ? "Admin" : u.roleLabel || "Staff"}
+          tone={u.role === "admin" ? "info" : "neutral"}
+        />
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      width: 120,
+      render: (u) => (
+        <StatusChip
+          label={u.isActive ? "Active" : "Disabled"}
+          tone={u.isActive ? "success" : "danger"}
+        />
+      ),
+    },
+  ];
 
   return (
     <Screen
@@ -47,24 +115,42 @@ export default function TeamScreen() {
         placeholder="Search name, email or role"
       />
 
-      {users.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title={isLoading ? "Loading team…" : "No members yet"}
-          message="Add staff and assign exactly the permissions they need."
-        />
+      {isLoading && users.length === 0 ? (
+        <ListSkeleton />
       ) : (
-        <VStack gap={12} style={{ marginTop: 16 }}>
-          {users.map((u) => (
-            <UserRow
-              key={u.id}
-              user={u}
-              onPress={() => navigation.navigate("UserDetail", { id: u.id })}
-            />
-          ))}
-        </VStack>
+        <View style={{ marginTop: 16 }}>
+          <DataTable<TeamUser>
+            columns={columns}
+            rows={users}
+            keyExtractor={(u) => u.id}
+            onRowPress={open}
+            mobileCard={(u) => <UserRow user={u} onPress={() => open(u)} />}
+            emptyIcon={Users}
+            emptyTitle="No members yet"
+            emptyMessage="Add staff and assign exactly the permissions they need."
+          />
+        </View>
       )}
     </Screen>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <VStack gap={12} style={{ marginTop: 16 }}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <Card key={i} elevation="base">
+          <HStack gap={14} align="center">
+            <Skeleton width={46} height={46} rounded="full" />
+            <VStack gap={6} flex={1}>
+              <Skeleton width="40%" height={16} />
+              <Skeleton width="70%" height={12} />
+            </VStack>
+            <Skeleton width={70} height={16} />
+          </HStack>
+        </Card>
+      ))}
+    </VStack>
   );
 }
 
