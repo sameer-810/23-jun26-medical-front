@@ -12,7 +12,7 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import type { LucideIcon } from "lucide-react-native";
-import { palette, radius, shadows, motion, outline } from "../designSystem";
+import { palette, radius, motion, outline } from "../designSystem";
 import { Text } from "./Text";
 
 type Tone = "light" | "teal" | "cobalt" | "slate";
@@ -116,7 +116,6 @@ export function StatTile({
         accent && !dark
           ? { borderTopColor: accent.color, borderTopWidth: 3 }
           : null,
-        shadows.sm,
         style,
       ]}
     >

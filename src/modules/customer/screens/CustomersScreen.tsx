@@ -84,14 +84,15 @@ export default function CustomersScreen() {
       key: "gstin",
       header: "GSTIN",
       width: 220,
-      render: (c) =>
-        c.gstin ? (
-          <StatusChip label={c.gstin} tone="neutral" />
-        ) : (
-          <Text variant="body-sm" tone="tertiary">
-            —
-          </Text>
-        ),
+      render: (c) => (
+        <Text
+          variant="body-sm"
+          tone={c.gstin ? "secondary" : "tertiary"}
+          numberOfLines={1}
+        >
+          {c.gstin || "—"}
+        </Text>
+      ),
     },
   ];
 

@@ -8,7 +8,8 @@ import {
 } from "lucide-react-native";
 import { useExpiryReport } from "@modules/expiry/hooks/useExpiry";
 import { ExpiryBatch } from "@modules/expiry/api/expiryApi";
-import { palette } from "@shared/designSystem";
+import { palette, accents } from "@shared/designSystem";
+import { fmtInt, fmtMoney } from "@shared/format";
 import {
   Screen,
   Text,
@@ -23,7 +24,7 @@ import {
   Skeleton,
 } from "@shared/ui";
 
-const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+const money = fmtMoney;
 
 const batchTone = (b: ExpiryBatch) =>
   b.expired || b.daysToExpiry <= 30
@@ -59,17 +60,17 @@ export default function ExpiryScreen() {
         <View style={{ width: tileW, padding: 6 }}>
           <StatTile
             label="Expired"
-            value={String(data?.summary.expired ?? 0)}
+            value={fmtInt(data?.summary.expired)}
             icon={CalendarX2}
-            tone={data?.summary.expired ? "cobalt" : "light"}
+            accent={accents.red}
           />
         </View>
         <View style={{ width: tileW, padding: 6 }}>
           <StatTile
             label="Expiring soon"
-            value={String(data?.summary.expiringSoon ?? 0)}
+            value={fmtInt(data?.summary.expiringSoon)}
             icon={AlarmClock}
-            tone="light"
+            accent={accents.amber}
           />
         </View>
         <View style={{ width: tileW, padding: 6 }}>

@@ -24,8 +24,9 @@ import {
   DataTable,
   Column,
 } from "@shared/ui";
+import { fmtMoney, fmtQty } from "@shared/format";
 
-const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+const money = fmtMoney;
 
 export default function InventoryScreen() {
   const navigation = useNavigation<any>();
@@ -187,7 +188,7 @@ export default function InventoryScreen() {
         <View style={{ width: tileW, padding: 6 }}>
           <StatTile
             label="Units in stock"
-            value={String(value?.totalUnits ?? 0)}
+            value={fmtQty(value?.totalUnits)}
             icon={Boxes}
             tone="light"
           />

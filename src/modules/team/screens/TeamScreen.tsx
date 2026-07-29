@@ -72,12 +72,11 @@ export default function TeamScreen() {
     {
       key: "role",
       header: "Role",
-      width: 150,
+      width: 160,
       render: (u) => (
-        <StatusChip
-          label={u.role === "admin" ? "Admin" : u.roleLabel || "Staff"}
-          tone={u.role === "admin" ? "info" : "neutral"}
-        />
+        <Text variant="body-sm" tone="secondary" numberOfLines={1}>
+          {u.role === "admin" ? "Admin" : u.roleLabel || "Staff"}
+        </Text>
       ),
     },
     {

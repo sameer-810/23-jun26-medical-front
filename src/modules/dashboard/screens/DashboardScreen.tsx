@@ -26,6 +26,7 @@ import { PERMISSIONS } from "@shared/permissions";
 import { useDashboardSummary } from "@modules/dashboard/hooks/useDashboard";
 import { dashboardApi } from "@modules/dashboard/api/dashboardApi";
 import { useSectionNav } from "@navigation/AppNavigator";
+import { fmtInt, fmtMoney } from "@shared/format";
 import { palette, accents, radius } from "@shared/designSystem";
 import {
   Screen,
@@ -38,7 +39,7 @@ import {
   Button,
 } from "@shared/ui";
 
-const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+const money = fmtMoney;
 
 type AttnTone = "danger" | "warning";
 interface Attn {
@@ -69,21 +70,21 @@ export default function DashboardScreen() {
   const kpis = [
     {
       label: "Products",
-      value: String(data?.products.total ?? 0),
+      value: fmtInt(data?.products.total),
       icon: Package,
       accent: accents.teal,
       nav: "Products",
     },
     {
       label: "Low stock",
-      value: String(data?.inventory.lowStock ?? 0),
+      value: fmtInt(data?.inventory.lowStock),
       icon: Boxes,
       accent: accents.amber,
       nav: "Inventory",
     },
     {
       label: "Expiring soon",
-      value: String(data?.expiry.expiringSoon ?? 0),
+      value: fmtInt(data?.expiry.expiringSoon),
       icon: AlarmClock,
       accent: accents.red,
       nav: "Expiry",

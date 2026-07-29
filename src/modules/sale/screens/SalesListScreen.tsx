@@ -115,15 +115,17 @@ export default function SalesListScreen() {
     {
       key: "status",
       header: "Status",
-      width: 150,
+      width: 170,
       render: (s) => (
-        <HStack gap={6} wrap>
+        <HStack gap={8} align="center">
           <StatusChip
             label={s.status.replace("_", " ")}
             tone={STATUS_TONE[s.status]}
           />
           {s.paymentMode ? (
-            <StatusChip label={s.paymentMode} tone="neutral" />
+            <Text variant="caption" tone="tertiary">
+              {s.paymentMode}
+            </Text>
           ) : null}
         </HStack>
       ),

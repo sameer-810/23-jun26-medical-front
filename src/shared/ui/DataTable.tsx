@@ -1,6 +1,7 @@
 /**
- * DataTable — the shared data grid. Frozen teal header, click-to-sort columns,
- * zebra rows, horizontal scroll for wide tables, optional client-side
+ * DataTable — the shared data grid. Quiet neutral header (small uppercase muted
+ * labels + a hairline bottom border), click-to-sort columns, hairline rows with
+ * a subtle hover, horizontal scroll for wide tables, optional client-side
  * pagination, and a mobile fallback that renders each row as a card. Replaces
  * the one hand-rolled Reports table and the copy-pasted card-row lists.
  */
@@ -131,14 +132,18 @@ export function DataTable<T>({
       </View>
     );
 
-  const pv = dense ? 8 : 11;
+  const pv = dense ? 7 : 9;
 
   // ---- Desktop / wide: table ----
   return (
     <View>
       <Card padded={false} style={{ overflow: "hidden" }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator>
-          <View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ minWidth: "100%" }}
+        >
+          <View style={{ minWidth: "100%" }}>
             {/* header */}
             <View style={[styles.row, styles.headerRow]}>
               {columns.map((c) => {
@@ -161,8 +166,12 @@ export function DataTable<T>({
                       ]}
                     >
                       <Text
-                        variant="label-sm"
-                        style={{ color: "#FFFFFF" }}
+                        variant="overline"
+                        style={{
+                          color: active
+                            ? palette.text.secondary
+                            : palette.text.tertiary,
+                        }}
                         numberOfLines={1}
                       >
                         {c.header}
@@ -170,14 +179,14 @@ export function DataTable<T>({
                       {active ? (
                         sort!.dir === "asc" ? (
                           <ChevronUp
-                            size={13}
-                            color="#FFFFFF"
+                            size={12}
+                            color={palette.text.secondary}
                             strokeWidth={2.4}
                           />
                         ) : (
                           <ChevronDown
-                            size={13}
-                            color="#FFFFFF"
+                            size={12}
+                            color={palette.text.secondary}
                             strokeWidth={2.4}
                           />
                         )
@@ -190,14 +199,7 @@ export function DataTable<T>({
             {/* rows */}
             {paged.map((r, i) => {
               const inner = (
-                <View
-                  style={[
-                    styles.row,
-                    i % 2 === 1 && {
-                      backgroundColor: palette.surface.secondary,
-                    },
-                  ]}
-                >
+                <View style={styles.row}>
                   {columns.map((c) => (
                     <View
                       key={c.key}
@@ -227,7 +229,13 @@ export function DataTable<T>({
                 <Pressable
                   key={keyExtractor(r, i)}
                   onPress={() => onRowPress(r)}
-                  style={({ pressed }) => (pressed ? { opacity: 0.7 } : null)}
+                  // RN-Web passes `hovered`; RN's types don't include it.
+                  style={(state: { pressed: boolean; hovered?: boolean }) => [
+                    state.hovered ? { backgroundColor: palette.ink[50] } : null,
+                    state.pressed
+                      ? { backgroundColor: palette.ink[100] }
+                      : null,
+                  ]}
                 >
                   {inner}
                 </Pressable>
@@ -261,8 +269,9 @@ const styles = StyleSheet.create({
     borderBottomColor: palette.border.subtle,
   },
   headerRow: {
-    backgroundColor: palette.teal[600],
-    borderBottomColor: palette.teal[600],
+    backgroundColor: palette.neutral[50],
+    borderBottomWidth: 1.5,
+    borderBottomColor: palette.border.strong,
   },
   headCell: {
     flexDirection: "row",

@@ -59,7 +59,7 @@ export function Screen({
     >
       <VStack gap={3} flex={stackHeader ? undefined : 1}>
         {overline ? (
-          <Text variant="overline" tone="accent">
+          <Text variant="overline" tone="tertiary">
             {overline}
           </Text>
         ) : null}

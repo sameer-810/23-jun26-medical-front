@@ -10,9 +10,11 @@ import { palette, radius, shadows, outline, motion } from "../designSystem";
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type Elevation = "base" | "raised" | "floating" | "overlay";
+// Resting cards are flat (hairline border only) — the modern/clinical look.
+// Real shadow is reserved for genuinely floating surfaces (menus, dialogs).
 const ELEV: Record<Elevation, object> = {
-  base: shadows.xs,
-  raised: shadows.sm,
+  base: shadows.none,
+  raised: shadows.xs,
   floating: shadows.md,
   overlay: shadows.lg,
 };
