@@ -2,8 +2,17 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Send, CheckCircle2, Ban } from "lucide-react-native";
+import {
+  ArrowLeft,
+  Send,
+  CheckCircle2,
+  Ban,
+  MessageCircle,
+} from "lucide-react-native";
 import { purchaseOrderApi } from "@modules/purchaseOrder/api/purchaseOrderApi";
+import { useSupplier } from "@modules/supplier/hooks/useSuppliers";
+import { useAuthStore } from "@shared/store/useAuthStore";
+import { sendWhatsApp } from "@shared/whatsapp";
 import { apiErrorMessage } from "@api/apiClient";
 import { palette, radius } from "@shared/designSystem";
 import {
@@ -41,6 +50,18 @@ export default function OrderDetailScreen() {
   });
 
   const status = order?.status;
+  const shopName = useAuthStore((s) => s.organization?.name) || "our pharmacy";
+  const { data: supplier } = useSupplier(order?.supplierId || "");
+
+  const waPO = () => {
+    if (!order) return "";
+    const items = order.lines
+      .map((l) => `• ${l.productName} × ${l.quantity}`)
+      .join("\n");
+    return `*${shopName}*\nPurchase Order ${order.orderNo}\n\n${items}\n\nEstimated value: ${money(
+      order.estimatedValue,
+    )}\nPlease confirm availability & dispatch. Thank you.`;
+  };
 
   return (
     <Screen
@@ -148,6 +169,22 @@ export default function OrderDetailScreen() {
                 {apiErrorMessage(statusMut.error)}
               </Text>
             </View>
+          ) : null}
+
+          {/* Send the PO to the supplier over WhatsApp */}
+          {supplier?.mobile && status !== "cancelled" ? (
+            <Button
+              label="Send to supplier on WhatsApp"
+              variant="secondary"
+              icon={
+                <MessageCircle
+                  size={16}
+                  color={palette.success.text}
+                  strokeWidth={2}
+                />
+              }
+              onPress={() => sendWhatsApp(supplier.mobile, waPO())}
+            />
           ) : null}
 
           {/* Status actions */}

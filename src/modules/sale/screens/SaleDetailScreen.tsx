@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { Printer, Undo2, MapPin } from "lucide-react-native";
+import { Printer, Undo2, MapPin, MessageCircle } from "lucide-react-native";
 import { useSale, useInvoiceProfile } from "@modules/sale/hooks/useSales";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { printInvoice } from "@modules/sale/invoice";
+import { sendWhatsApp } from "@shared/whatsapp";
 import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
@@ -36,6 +37,7 @@ export default function SaleDetailScreen() {
   const { data: profile } = useInvoiceProfile();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canReturn = hasPermission(PERMISSIONS.SALES_MANAGE);
+  const shopName = useAuthStore((s) => s.organization?.name) || "Pharmacy";
   const [returnOpen, setReturnOpen] = useState(false);
 
   if (isLoading || !sale) {
@@ -71,6 +73,20 @@ export default function SaleDetailScreen() {
   const intra = sale.taxType === "intra";
   const fullyReturned = sale.status === "returned";
 
+  const waInvoice = () => {
+    const items = sale.lines
+      .map(
+        (l) =>
+          `• ${l.productName} × ${l.quantity} ${l.unit} = ${money(l.lineTotal)}`,
+      )
+      .join("\n");
+    return `*${shopName}*\nInvoice ${sale.invoiceNo}\n${new Date(
+      sale.saleDate,
+    ).toLocaleDateString("en-IN")}\n\n${items}\n\n*Total: ${money(
+      sale.grandTotal,
+    )}*\nThank you for your visit!`;
+  };
+
   return (
     <Screen
       overline={`Invoice · ${sale.status.replace("_", " ")}`}
@@ -85,6 +101,21 @@ export default function SaleDetailScreen() {
       >
         <BackLink label="Back" onPress={() => navigation.goBack()} />
         <HStack gap={10}>
+          {sale.customerMobile ? (
+            <Button
+              label="WhatsApp"
+              variant="secondary"
+              fullWidth={false}
+              icon={
+                <MessageCircle
+                  size={16}
+                  color={palette.success.text}
+                  strokeWidth={2}
+                />
+              }
+              onPress={() => sendWhatsApp(sale.customerMobile, waInvoice())}
+            />
+          ) : null}
           <Button
             label="Print"
             variant="secondary"

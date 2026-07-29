@@ -10,6 +10,7 @@ import {
   Receipt,
   Trash2,
   Wallet,
+  MessageCircle,
 } from "lucide-react-native";
 import {
   useCustomer,
@@ -19,6 +20,7 @@ import { customerApi } from "@modules/customer/api/customerApi";
 import { useSales } from "@modules/sale/hooks/useSales";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
+import { sendWhatsApp } from "@shared/whatsapp";
 import { palette } from "@shared/designSystem";
 import {
   Screen,
@@ -53,6 +55,7 @@ export default function CustomerDetailScreen() {
   const removeMut = useRemoveCustomer();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canManage = hasPermission(PERMISSIONS.CUSTOMERS_MANAGE);
+  const shopName = useAuthStore((s) => s.organization?.name) || "our pharmacy";
 
   const queryClient = useQueryClient();
   const { data: statement } = useQuery({
@@ -213,24 +216,49 @@ export default function CustomerDetailScreen() {
       </HStack>
 
       {canManage ? (
-        <Button
-          label={
-            outstanding > 0
-              ? `Collect payment (₹${Math.round(outstanding)} due)`
-              : "Collect payment"
-          }
-          variant={outstanding > 0 ? "primary" : "secondary"}
-          icon={
-            <Wallet
-              size={16}
-              color={outstanding > 0 ? "#FFFFFF" : palette.text.secondary}
-              strokeWidth={2}
+        <HStack gap={10} style={{ marginBottom: 24 }}>
+          <View style={{ flex: 1 }}>
+            <Button
+              label={
+                outstanding > 0
+                  ? `Collect payment (₹${Math.round(outstanding)} due)`
+                  : "Collect payment"
+              }
+              variant={outstanding > 0 ? "primary" : "secondary"}
+              icon={
+                <Wallet
+                  size={16}
+                  color={outstanding > 0 ? "#FFFFFF" : palette.text.secondary}
+                  strokeWidth={2}
+                />
+              }
+              loading={payMut.isPending}
+              onPress={() => setCollectOpen(true)}
             />
-          }
-          style={{ marginBottom: 24 }}
-          loading={payMut.isPending}
-          onPress={() => setCollectOpen(true)}
-        />
+          </View>
+          {outstanding > 0 && customer?.mobile ? (
+            <Button
+              label="Remind"
+              variant="secondary"
+              fullWidth={false}
+              icon={
+                <MessageCircle
+                  size={16}
+                  color={palette.success.text}
+                  strokeWidth={2}
+                />
+              }
+              onPress={() =>
+                sendWhatsApp(
+                  customer.mobile,
+                  `Dear ${customer?.name || "Customer"}, a friendly reminder from *${shopName}*: your outstanding balance is *₹${Math.round(
+                    outstanding,
+                  )}*. Kindly clear it at your convenience. Thank you!`,
+                )
+              }
+            />
+          ) : null}
+        </HStack>
       ) : null}
 
       <Text variant="h3" tone="primary" style={{ marginBottom: 12 }}>
