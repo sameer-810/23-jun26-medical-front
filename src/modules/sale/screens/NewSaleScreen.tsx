@@ -763,9 +763,9 @@ export default function NewSaleScreen() {
                           onChangeText={(v) => setLine(i, { unitPrice: v })}
                         />
                       </Field>
-                      <Field label="Disc" w={104}>
+                      <Field label="Disc" w={120}>
                         <DiscCell
-                          w={104}
+                          w={120}
                           line={line}
                           onValue={(v) => setLine(i, { discount: v })}
                           onMode={(m) => setLine(i, { discountMode: m })}
@@ -1092,7 +1092,7 @@ const COL = {
   qty: 60,
   unit: 96,
   price: 82,
-  disc: 108,
+  disc: 124,
   gst: 52,
   amount: 88,
   rm: 30,
@@ -1310,6 +1310,9 @@ const styles = StyleSheet.create({
   },
   discInput: {
     flex: 1,
+    // Without this, react-native-web won't shrink the input below its intrinsic
+    // width, pushing the ₹/% toggle past the cell where overflow:hidden clips it.
+    minWidth: 0,
     height: 38,
     paddingHorizontal: 8,
     fontSize: 14,
@@ -1321,7 +1324,7 @@ const styles = StyleSheet.create({
     borderLeftColor: palette.border.default,
   },
   discToggleBtn: {
-    width: 22,
+    width: 26,
     height: 38,
     alignItems: "center",
     justifyContent: "center",
