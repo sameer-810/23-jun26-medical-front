@@ -15,6 +15,8 @@ import {
   Printer,
   Search,
   Trash2,
+  AlertTriangle,
+  Check,
 } from "lucide-react-native";
 import {
   useProducts,
@@ -66,9 +68,35 @@ import {
 } from "@shared/ui";
 import { useAuthStore } from "@shared/store/useAuthStore";
 
+/** Stock expiring within this many days is flagged short at receiving. */
+const SHORT_EXPIRY_DAYS = 90;
+
+/** Parse a "YYYY-MM" or "YYYY-MM-DD" entry to the last date the lot is valid. */
+function parseExpiry(s: string): Date | null {
+  const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec((s || "").trim());
+  if (!m) return null;
+  const y = +m[1];
+  const mo = +m[2];
+  if (mo < 1 || mo > 12) return null;
+  // No day given → last day of that month (day 0 of the next month).
+  return m[3] ? new Date(y, mo - 1, +m[3]) : new Date(y, mo, 0);
+}
+
+type ExpiryState = "ok" | "soon" | "expired";
+/** How close to expiry a typed date is, and days remaining (negative = past). */
+function expiryInfo(s: string): { state: ExpiryState; days: number } {
+  const d = parseExpiry(s);
+  if (!d) return { state: "ok", days: Infinity };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((d.getTime() - today.getTime()) / 86400000);
+  if (days < 0) return { state: "expired", days };
+  return { state: days <= SHORT_EXPIRY_DAYS ? "soon" : "ok", days };
+}
+
 /**
  * Receive Stock — goods-received note, entered as a dense spreadsheet-style grid
- * (one row per medicine: Batch · Expiry · Qty · Unit · Rate · MRP · Location),
+ * (one row per medicine: Batch · Expiry · Qty · Free · Unit · Rate · MRP · Loc),
  * the way Marg / eVitalRx / GoFrugal do it. Draft rules live in `receiveDraft.ts`.
  */
 export default function ReceiveStockScreen() {
@@ -234,6 +262,26 @@ export default function ReceiveStockScreen() {
     (s, l) => s + (Number(l.quantity) || 0) * (Number(l.purchasePrice) || 0),
     0,
   );
+  const freeUnits = lines.reduce(
+    (s, l) => s + (Number(l.freeQuantity) || 0),
+    0,
+  );
+
+  // Short-expiry gate: warn on lots nearing expiry, block already-expired ones.
+  const [confirmShort, setConfirmShort] = useState(false);
+  const expFlags = lines.map((l) => expiryInfo(l.expiryDate));
+  const expiredCount = lines.filter(
+    (l, i) =>
+      l.productId && l.expiryDate.trim() && expFlags[i].state === "expired",
+  ).length;
+  const soonLines = lines
+    .map((l, i) => ({ l, i, ...expFlags[i] }))
+    .filter(
+      (x) => x.l.productId && x.l.expiryDate.trim() && x.state === "soon",
+    );
+  const soonest = soonLines.reduce((min, x) => Math.min(min, x.days), Infinity);
+  const blockedByExpired = expiredCount > 0;
+  const needsShortConfirm = soonLines.length > 0 && !confirmShort;
 
   /**
    * Print a shelf label for every unit just received. One label per unit is the
@@ -349,6 +397,61 @@ export default function ReceiveStockScreen() {
         />
       ) : null}
 
+      {/* Short-expiry gate: block expired outright, confirm near-expiry. */}
+      {blockedByExpired ? (
+        <Banner
+          tone="danger"
+          style={{ marginBottom: 16 }}
+          message={`${expiredCount} line${
+            expiredCount > 1 ? "s are" : " is"
+          } already expired — expired stock can't be received. Fix the red expiry date${
+            expiredCount > 1 ? "s" : ""
+          } to continue.`}
+        />
+      ) : soonLines.length > 0 ? (
+        <Banner tone="warning" style={{ marginBottom: 16 }}>
+          <HStack gap={10} align="center" justify="space-between" wrap>
+            <HStack gap={8} align="center" flex={1}>
+              <AlertTriangle
+                size={16}
+                color={palette.warning.text}
+                strokeWidth={2}
+              />
+              <Text variant="body-sm" tone="warning">
+                {soonLines.length} line{soonLines.length > 1 ? "s" : ""}{" "}
+                {soonLines.length > 1 ? "expire" : "expires"} within{" "}
+                {SHORT_EXPIRY_DAYS} days
+                {Number.isFinite(soonest) ? ` (soonest in ${soonest}d)` : ""} —
+                check before you accept the stock.
+              </Text>
+            </HStack>
+            <Pressable
+              onPress={() => setConfirmShort((v) => !v)}
+              style={styles.confirmToggle}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: confirmShort }}
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  confirmShort && {
+                    backgroundColor: palette.warning.text,
+                    borderColor: palette.warning.text,
+                  },
+                ]}
+              >
+                {confirmShort ? (
+                  <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                ) : null}
+              </View>
+              <Text variant="label-sm" tone="warning">
+                Receive anyway
+              </Text>
+            </Pressable>
+          </HStack>
+        </Banner>
+      ) : null}
+
       <Card style={{ marginBottom: 16 }}>
         <VStack gap={16}>
           <Select
@@ -411,6 +514,7 @@ export default function ReceiveStockScreen() {
               <GrnHead w={COL.mfg} label="MFG" />
               <GrnHead w={COL.expiry} label="EXPIRY" />
               <GrnHead w={COL.qty} label="QTY" />
+              <GrnHead w={COL.free} label="FREE" />
               <GrnHead w={COL.unit} label="UNIT" />
               <GrnHead w={COL.rate} label="RATE" right />
               <GrnHead w={COL.mrp} label="MRP" right />
@@ -488,6 +592,8 @@ export default function ReceiveStockScreen() {
                     value={line.expiryDate}
                     onChangeText={(v) => setLine(i, { expiryDate: v })}
                     placeholder="YYYY-MM"
+                    error={started && expFlags[i].state === "expired"}
+                    warn={started && expFlags[i].state === "soon"}
                   />
                   <GrnCell
                     w={COL.qty}
@@ -496,6 +602,14 @@ export default function ReceiveStockScreen() {
                     numeric
                     align="center"
                     error={started && !(qtyN > 0)}
+                  />
+                  <GrnCell
+                    w={COL.free}
+                    value={line.freeQuantity}
+                    onChangeText={(v) => setLine(i, { freeQuantity: v })}
+                    numeric
+                    align="center"
+                    placeholder="0"
                   />
                   <View style={{ width: COL.unit }}>
                     <Select
@@ -566,6 +680,7 @@ export default function ReceiveStockScreen() {
             </Text>
             <Text variant="caption" tone="tertiary">
               {totalBase} base units
+              {freeUnits > 0 ? ` · ${freeUnits} free (scheme)` : ""}
             </Text>
           </VStack>
           <VStack gap={2} align="flex-end">
@@ -583,7 +698,7 @@ export default function ReceiveStockScreen() {
         label="Receive stock"
         size="lg"
         loading={mut.isPending}
-        disabled={!validLines.length}
+        disabled={!validLines.length || blockedByExpired || needsShortConfirm}
         onPress={submit}
       />
 
@@ -617,21 +732,37 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     justifyContent: "center",
   },
+  confirmToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: palette.warning.text,
+    backgroundColor: palette.surface.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });
 
 // ---- GRN spreadsheet grid ----
 const COL = {
   idx: 26,
-  product: 190,
+  product: 180,
   batch: 88,
-  mfg: 82,
-  expiry: 82,
-  qty: 52,
-  unit: 90,
-  rate: 76,
-  mrp: 76,
-  loc: 132,
-  amount: 82,
+  mfg: 80,
+  expiry: 80,
+  qty: 50,
+  free: 46,
+  unit: 88,
+  rate: 74,
+  mrp: 74,
+  loc: 126,
+  amount: 80,
   rm: 30,
 };
 
@@ -669,6 +800,7 @@ function GrnCell({
   align = "left",
   placeholder,
   error,
+  warn,
 }: {
   w: number;
   value: string;
@@ -677,6 +809,7 @@ function GrnCell({
   align?: "left" | "center" | "right";
   placeholder?: string;
   error?: boolean;
+  warn?: boolean;
 }) {
   return (
     <TextInput
@@ -694,7 +827,12 @@ function GrnCell({
               borderColor: palette.danger.text,
               backgroundColor: palette.danger.bg,
             }
-          : null,
+          : warn
+            ? {
+                borderColor: palette.warning.text,
+                backgroundColor: palette.warning.bg,
+              }
+            : null,
         // @ts-expect-error web-only outline reset
         { outlineStyle: "none" },
       ]}

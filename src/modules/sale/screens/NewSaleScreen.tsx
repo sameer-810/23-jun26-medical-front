@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { useQuery } from "@tanstack/react-query";
 import {
   History,
   ShoppingCart,
@@ -15,9 +16,13 @@ import {
   Search,
   Trash2,
   PackageX,
+  Repeat,
+  X,
+  CheckCircle2,
 } from "lucide-react-native";
 import { useProducts } from "@modules/product/hooks/useProducts";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
+import { AlternativeItem } from "@modules/inventory/types";
 import { useScanGun } from "@shared/useScanGun";
 import {
   useCustomers,
@@ -148,6 +153,56 @@ export default function NewSaleScreen() {
     );
   const removeLine = (i: number) =>
     setLines((cur) => cur.filter((_, idx) => idx !== i));
+
+  // ---- Salt-based substitution (eVitalRx-style) --------------------------
+  // When a line can't be filled, offer in-stock medicines of the SAME salt and
+  // let the cashier swap in one tap.
+  const [subFor, setSubFor] = useState<number | null>(null);
+  const subProductId = subFor != null ? lines[subFor]?.productId : undefined;
+  const { data: subData, isFetching: subsLoading } = useQuery({
+    queryKey: ["pos-alternatives", subProductId],
+    queryFn: () => inventoryApi.alternatives(subProductId!),
+    enabled: !!subProductId,
+  });
+
+  const swapLine = (i: number, alt: AlternativeItem) => {
+    // Seed a minimal product so the client preview has a base unit; the backend
+    // still prices from the real product (we clear the per-line GST override).
+    setKnownProducts((cur) => ({
+      ...cur,
+      [alt.productId]: {
+        id: alt.productId,
+        name: alt.name,
+        sku: alt.sku,
+        saltComposition: alt.saltComposition,
+        baseUnit: alt.baseUnit,
+        sellingPrice: alt.sellingPrice,
+        taxRatePct: 0,
+        packs: [],
+      } as unknown as ProductRow,
+    }));
+    setLines((cur) =>
+      cur.map((l, idx) =>
+        idx === i
+          ? {
+              ...l,
+              productId: alt.productId,
+              productName: alt.name,
+              salt: alt.saltComposition,
+              baseUnit: alt.baseUnit,
+              batchId: null,
+              batchNumber: null,
+              expiry: null,
+              available: alt.available,
+              unit: alt.baseUnit,
+              unitPrice: String(alt.sellingPrice),
+              taxRate: "", // let the server use the substitute's own GST rate
+            }
+          : l,
+      ),
+    );
+    setSubFor(null);
+  };
 
   /** How many BASE units of a hand-picked product can actually be sold. */
   const loadAvailabilityForProduct = async (productId: string) => {
@@ -440,26 +495,167 @@ export default function NewSaleScreen() {
           {lines.map((line, i) => {
             const c = calc(line);
             const issue = stockIssue(line);
-            return wide ? (
-              <View
-                key={i}
-                style={[styles.gridRow, i % 2 === 1 && styles.gridRowAlt]}
-              >
-                <HStack gap={8} align="center">
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text variant="label" tone="primary" numberOfLines={1}>
-                      {line.productName}
-                    </Text>
-                    <HStack gap={6} align="center" style={{ marginTop: 2 }}>
-                      {line.salt ? (
-                        <Text
-                          variant="caption"
-                          tone="tertiary"
-                          numberOfLines={1}
-                        >
-                          {line.salt}
+            return (
+              <React.Fragment key={i}>
+                {wide ? (
+                  <View
+                    style={[styles.gridRow, i % 2 === 1 && styles.gridRowAlt]}
+                  >
+                    <HStack gap={8} align="center">
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text variant="label" tone="primary" numberOfLines={1}>
+                          {line.productName}
                         </Text>
-                      ) : null}
+                        <HStack gap={6} align="center" style={{ marginTop: 2 }}>
+                          {line.salt ? (
+                            <Text
+                              variant="caption"
+                              tone="tertiary"
+                              numberOfLines={1}
+                            >
+                              {line.salt}
+                            </Text>
+                          ) : null}
+                          {line.batchId ? (
+                            <View style={styles.lotBadge}>
+                              <Text
+                                variant="label-sm"
+                                style={{ color: palette.teal[700] }}
+                              >
+                                {line.batchNumber}
+                                {line.expiry
+                                  ? ` · ${prettyExp(line.expiry)}`
+                                  : ""}
+                              </Text>
+                            </View>
+                          ) : (
+                            <View style={styles.fefoBadge}>
+                              <Text
+                                variant="label-sm"
+                                style={{ color: palette.text.tertiary }}
+                              >
+                                FEFO
+                              </Text>
+                            </View>
+                          )}
+                          {issue ? (
+                            <Text variant="caption" tone="danger">
+                              {issue.message}
+                            </Text>
+                          ) : line.available != null ? (
+                            <Text variant="caption" tone="success">
+                              {line.available} in stock
+                            </Text>
+                          ) : null}
+                          {!line.batchId && line.salt ? (
+                            <Pressable
+                              onPress={() => setSubFor(subFor === i ? null : i)}
+                              hitSlop={6}
+                              accessibilityRole="button"
+                              accessibilityLabel="Find a same-salt substitute"
+                            >
+                              <HStack gap={3} align="center">
+                                <Repeat
+                                  size={12}
+                                  color={palette.teal[600]}
+                                  strokeWidth={2}
+                                />
+                                <Text
+                                  variant="caption"
+                                  style={{ color: palette.teal[600] }}
+                                >
+                                  {issue ? "Substitute" : "Alt"}
+                                </Text>
+                              </HStack>
+                            </Pressable>
+                          ) : null}
+                        </HStack>
+                      </View>
+                      <Cell
+                        w={COL.qty}
+                        value={line.quantity}
+                        onChangeText={(v) => setLine(i, { quantity: v })}
+                        error={!!issue}
+                        align="center"
+                      />
+                      <View style={{ width: COL.unit }}>
+                        <Select
+                          value={line.unit}
+                          options={unitOptions(line)}
+                          onChange={(v) => setLine(i, { unit: v })}
+                        />
+                      </View>
+                      <Cell
+                        w={COL.price}
+                        value={line.unitPrice}
+                        onChangeText={(v) => setLine(i, { unitPrice: v })}
+                      />
+                      <DiscCell
+                        w={COL.disc}
+                        line={line}
+                        onValue={(v) => setLine(i, { discount: v })}
+                        onMode={(m) => setLine(i, { discountMode: m })}
+                      />
+                      <Cell
+                        w={COL.gst}
+                        value={line.taxRate}
+                        onChangeText={(v) => setLine(i, { taxRate: v })}
+                        align="center"
+                      />
+                      <Text
+                        variant="label"
+                        tone="primary"
+                        style={{ width: COL.amount, textAlign: "right" }}
+                      >
+                        {money(c.total)}
+                      </Text>
+                      <Pressable
+                        onPress={() => removeLine(i)}
+                        hitSlop={8}
+                        style={{ width: COL.rm, alignItems: "center" }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove ${line.productName}`}
+                      >
+                        <Trash2
+                          size={16}
+                          color={palette.text.tertiary}
+                          strokeWidth={2}
+                        />
+                      </Pressable>
+                    </HStack>
+                  </View>
+                ) : (
+                  // ---- Narrow: compact line card ----
+                  <Card elevation="base">
+                    <HStack align="center" justify="space-between">
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text variant="label" tone="primary" numberOfLines={1}>
+                          {line.productName}
+                        </Text>
+                        {line.salt ? (
+                          <Text
+                            variant="caption"
+                            tone="tertiary"
+                            numberOfLines={1}
+                          >
+                            {line.salt}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Pressable
+                        onPress={() => removeLine(i)}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove ${line.productName}`}
+                      >
+                        <Trash2
+                          size={16}
+                          color={palette.danger.text}
+                          strokeWidth={2}
+                        />
+                      </Pressable>
+                    </HStack>
+                    <HStack gap={6} align="center" style={{ marginTop: 6 }}>
                       {line.batchId ? (
                         <View style={styles.lotBadge}>
                           <Text
@@ -476,7 +672,7 @@ export default function NewSaleScreen() {
                             variant="label-sm"
                             style={{ color: palette.text.tertiary }}
                           >
-                            FEFO
+                            FEFO batch
                           </Text>
                         </View>
                       )}
@@ -489,169 +685,95 @@ export default function NewSaleScreen() {
                           {line.available} in stock
                         </Text>
                       ) : null}
+                      {!line.batchId && line.salt ? (
+                        <Pressable
+                          onPress={() => setSubFor(subFor === i ? null : i)}
+                          hitSlop={6}
+                          accessibilityRole="button"
+                          accessibilityLabel="Find a same-salt substitute"
+                        >
+                          <HStack gap={3} align="center">
+                            <Repeat
+                              size={12}
+                              color={palette.teal[600]}
+                              strokeWidth={2}
+                            />
+                            <Text
+                              variant="caption"
+                              style={{ color: palette.teal[600] }}
+                            >
+                              {issue ? "Substitute" : "Alt"}
+                            </Text>
+                          </HStack>
+                        </Pressable>
+                      ) : null}
                     </HStack>
-                  </View>
-                  <Cell
-                    w={COL.qty}
-                    value={line.quantity}
-                    onChangeText={(v) => setLine(i, { quantity: v })}
-                    error={!!issue}
-                    align="center"
+                    <HStack
+                      gap={8}
+                      align="flex-end"
+                      wrap
+                      style={{ marginTop: 10 }}
+                    >
+                      <Field label="Qty" w={64}>
+                        <Cell
+                          w={64}
+                          value={line.quantity}
+                          onChangeText={(v) => setLine(i, { quantity: v })}
+                          error={!!issue}
+                          align="center"
+                        />
+                      </Field>
+                      <Field label="Unit" w={104}>
+                        <Select
+                          value={line.unit}
+                          options={unitOptions(line)}
+                          onChange={(v) => setLine(i, { unit: v })}
+                        />
+                      </Field>
+                      <Field label="Price" w={84}>
+                        <Cell
+                          w={84}
+                          value={line.unitPrice}
+                          onChangeText={(v) => setLine(i, { unitPrice: v })}
+                        />
+                      </Field>
+                      <Field label="Disc" w={104}>
+                        <DiscCell
+                          w={104}
+                          line={line}
+                          onValue={(v) => setLine(i, { discount: v })}
+                          onMode={(m) => setLine(i, { discountMode: m })}
+                        />
+                      </Field>
+                      <Field label="GST%" w={56}>
+                        <Cell
+                          w={56}
+                          value={line.taxRate}
+                          onChangeText={(v) => setLine(i, { taxRate: v })}
+                          align="center"
+                        />
+                      </Field>
+                      <View style={{ flex: 1, alignItems: "flex-end" }}>
+                        <Text variant="caption" tone="tertiary">
+                          Amount
+                        </Text>
+                        <Text variant="label-lg" tone="primary">
+                          {money(c.total)}
+                        </Text>
+                      </View>
+                    </HStack>
+                  </Card>
+                )}
+                {subFor === i ? (
+                  <SubstitutePanel
+                    molecule={subData?.molecule}
+                    items={subData?.items || []}
+                    loading={subsLoading}
+                    onSwap={(alt) => swapLine(i, alt)}
+                    onClose={() => setSubFor(null)}
                   />
-                  <View style={{ width: COL.unit }}>
-                    <Select
-                      value={line.unit}
-                      options={unitOptions(line)}
-                      onChange={(v) => setLine(i, { unit: v })}
-                    />
-                  </View>
-                  <Cell
-                    w={COL.price}
-                    value={line.unitPrice}
-                    onChangeText={(v) => setLine(i, { unitPrice: v })}
-                  />
-                  <DiscCell
-                    w={COL.disc}
-                    line={line}
-                    onValue={(v) => setLine(i, { discount: v })}
-                    onMode={(m) => setLine(i, { discountMode: m })}
-                  />
-                  <Cell
-                    w={COL.gst}
-                    value={line.taxRate}
-                    onChangeText={(v) => setLine(i, { taxRate: v })}
-                    align="center"
-                  />
-                  <Text
-                    variant="label"
-                    tone="primary"
-                    style={{ width: COL.amount, textAlign: "right" }}
-                  >
-                    {money(c.total)}
-                  </Text>
-                  <Pressable
-                    onPress={() => removeLine(i)}
-                    hitSlop={8}
-                    style={{ width: COL.rm, alignItems: "center" }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove ${line.productName}`}
-                  >
-                    <Trash2
-                      size={16}
-                      color={palette.text.tertiary}
-                      strokeWidth={2}
-                    />
-                  </Pressable>
-                </HStack>
-              </View>
-            ) : (
-              // ---- Narrow: compact line card ----
-              <Card key={i} elevation="base">
-                <HStack align="center" justify="space-between">
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text variant="label" tone="primary" numberOfLines={1}>
-                      {line.productName}
-                    </Text>
-                    {line.salt ? (
-                      <Text variant="caption" tone="tertiary" numberOfLines={1}>
-                        {line.salt}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <Pressable
-                    onPress={() => removeLine(i)}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove ${line.productName}`}
-                  >
-                    <Trash2
-                      size={16}
-                      color={palette.danger.text}
-                      strokeWidth={2}
-                    />
-                  </Pressable>
-                </HStack>
-                <HStack gap={6} align="center" style={{ marginTop: 6 }}>
-                  {line.batchId ? (
-                    <View style={styles.lotBadge}>
-                      <Text
-                        variant="label-sm"
-                        style={{ color: palette.teal[700] }}
-                      >
-                        {line.batchNumber}
-                        {line.expiry ? ` · ${prettyExp(line.expiry)}` : ""}
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.fefoBadge}>
-                      <Text
-                        variant="label-sm"
-                        style={{ color: palette.text.tertiary }}
-                      >
-                        FEFO batch
-                      </Text>
-                    </View>
-                  )}
-                  {issue ? (
-                    <Text variant="caption" tone="danger">
-                      {issue.message}
-                    </Text>
-                  ) : line.available != null ? (
-                    <Text variant="caption" tone="success">
-                      {line.available} in stock
-                    </Text>
-                  ) : null}
-                </HStack>
-                <HStack gap={8} align="flex-end" wrap style={{ marginTop: 10 }}>
-                  <Field label="Qty" w={64}>
-                    <Cell
-                      w={64}
-                      value={line.quantity}
-                      onChangeText={(v) => setLine(i, { quantity: v })}
-                      error={!!issue}
-                      align="center"
-                    />
-                  </Field>
-                  <Field label="Unit" w={104}>
-                    <Select
-                      value={line.unit}
-                      options={unitOptions(line)}
-                      onChange={(v) => setLine(i, { unit: v })}
-                    />
-                  </Field>
-                  <Field label="Price" w={84}>
-                    <Cell
-                      w={84}
-                      value={line.unitPrice}
-                      onChangeText={(v) => setLine(i, { unitPrice: v })}
-                    />
-                  </Field>
-                  <Field label="Disc" w={104}>
-                    <DiscCell
-                      w={104}
-                      line={line}
-                      onValue={(v) => setLine(i, { discount: v })}
-                      onMode={(m) => setLine(i, { discountMode: m })}
-                    />
-                  </Field>
-                  <Field label="GST%" w={56}>
-                    <Cell
-                      w={56}
-                      value={line.taxRate}
-                      onChangeText={(v) => setLine(i, { taxRate: v })}
-                      align="center"
-                    />
-                  </Field>
-                  <View style={{ flex: 1, alignItems: "flex-end" }}>
-                    <Text variant="caption" tone="tertiary">
-                      Amount
-                    </Text>
-                    <Text variant="label-lg" tone="primary">
-                      {money(c.total)}
-                    </Text>
-                  </View>
-                </HStack>
-              </Card>
+                ) : null}
+              </React.Fragment>
             );
           })}
         </VStack>
@@ -849,6 +971,91 @@ export default function NewSaleScreen() {
 
 // ---- small building blocks -------------------------------------------------
 
+/** Same-salt, in-stock substitutes for a line that can't be filled (eVitalRx). */
+function SubstitutePanel({
+  molecule,
+  items,
+  loading,
+  onSwap,
+  onClose,
+}: {
+  molecule?: string;
+  items: AlternativeItem[];
+  loading: boolean;
+  onSwap: (alt: AlternativeItem) => void;
+  onClose: () => void;
+}) {
+  return (
+    <View style={styles.subPanel}>
+      <HStack
+        align="center"
+        justify="space-between"
+        style={{ marginBottom: 6 }}
+      >
+        <HStack gap={6} align="center" style={{ flex: 1, minWidth: 0 }}>
+          <Repeat size={14} color={palette.teal[600]} strokeWidth={2} />
+          <Text variant="label-sm" tone="secondary" numberOfLines={1}>
+            In-stock substitutes{molecule ? ` · ${molecule}` : ""}
+          </Text>
+        </HStack>
+        <Pressable
+          onPress={onClose}
+          hitSlop={8}
+          accessibilityLabel="Close substitutes"
+        >
+          <X size={16} color={palette.text.tertiary} strokeWidth={2} />
+        </Pressable>
+      </HStack>
+      {loading ? (
+        <Text variant="caption" tone="tertiary">
+          Finding same-salt medicines…
+        </Text>
+      ) : items.length === 0 ? (
+        <Text variant="caption" tone="tertiary">
+          No other in-stock medicine shares this salt.
+        </Text>
+      ) : (
+        <VStack gap={0}>
+          {items.slice(0, 5).map((alt) => (
+            <HStack
+              key={alt.productId}
+              align="center"
+              justify="space-between"
+              gap={10}
+              style={styles.subRow}
+            >
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text variant="label-sm" tone="primary" numberOfLines={1}>
+                  {alt.name}
+                </Text>
+                <Text variant="caption" tone="tertiary" numberOfLines={1}>
+                  {alt.brandName ? `${alt.brandName} · ` : ""}
+                  {alt.available} in stock · {money(alt.sellingPrice)}/
+                  {alt.baseUnit}
+                </Text>
+              </View>
+              <Button
+                label="Swap"
+                size="sm"
+                variant="secondary"
+                fullWidth={false}
+                icon={
+                  <CheckCircle2
+                    size={14}
+                    color={palette.teal[600]}
+                    strokeWidth={2}
+                  />
+                }
+                onPress={() => onSwap(alt)}
+              />
+            </HStack>
+          ))}
+        </VStack>
+      )}
+    </View>
+  );
+}
+
 const COL = {
   qty: 60,
   unit: 96,
@@ -1034,6 +1241,21 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   gridRowAlt: { backgroundColor: palette.ink[50] },
+  subPanel: {
+    marginTop: 2,
+    marginBottom: 8,
+    marginHorizontal: 6,
+    padding: 12,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: palette.teal[100],
+    backgroundColor: palette.teal[50],
+  },
+  subRow: {
+    paddingVertical: 7,
+    borderTopWidth: 1,
+    borderTopColor: palette.teal[100],
+  },
   cell: {
     height: 40,
     borderWidth: 1,

@@ -23,6 +23,7 @@ export const emptyLine = (): DraftLine => ({
   expiryDate: "",
   unit: null,
   quantity: "",
+  freeQuantity: "",
   purchasePrice: "",
   mrp: "",
   locationId: null,
@@ -46,9 +47,12 @@ export function unitOptions(
   ];
 }
 
-/** Quantity converted into base units — a pack of 15 tablets is 15, not 1. */
+/**
+ * Quantity converted into base units — a pack of 15 tablets is 15, not 1. Free
+ * (scheme) units are received too, so they count toward what's put on the shelf.
+ */
 export function baseQty(line: DraftLine, product?: ProductLite | null): number {
-  const qty = Number(line.quantity) || 0;
+  const qty = (Number(line.quantity) || 0) + (Number(line.freeQuantity) || 0);
   if (!product) return 0;
   if (!line.unit || line.unit === product.baseUnit) return qty;
   const pack = (product.packs || []).find((p) => p.unit === line.unit);
@@ -143,6 +147,7 @@ export function linesFromScan(bill: ScannedBill): DraftLine[] {
       expiryDate: expiryOk ? isoToDate(l.expiryDate) : "",
       unit,
       quantity: qty != null ? String(qty) : "",
+      freeQuantity: "",
       purchasePrice: cost != null ? String(cost) : "",
       mrp: mrpOk && l.mrp != null ? String(l.mrp) : "",
       locationId: null,
@@ -214,6 +219,10 @@ export function toReceiptLines(lines: DraftLine[]): ReceiptLineInput[] {
       mrp: l.mrp === "" ? undefined : Number(l.mrp),
       unit: l.unit || undefined,
       quantity: Number(l.quantity),
+      freeQuantity:
+        l.freeQuantity === "" || Number(l.freeQuantity) <= 0
+          ? undefined
+          : Number(l.freeQuantity),
       locationId: l.locationId!,
     }));
 }

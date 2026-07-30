@@ -3,7 +3,13 @@ export interface DashboardSummary {
   products: { total: number };
   inventory: { lowStock: number; stockValue: number };
   expiry: { expiringSoon: number; expired: number };
-  sales: { todayCount: number; todayAmount: number };
+  sales: {
+    todayCount: number;
+    todayAmount: number;
+    yesterdayAmount?: number;
+    /** Today vs yesterday change %, null when yesterday was zero. */
+    todayTrendPct?: number | null;
+  };
   stockInward: { todayCount: number };
 }
 
@@ -32,6 +38,9 @@ export interface DashboardFinance {
   sales: {
     last7: number;
     last7Count: number;
+    prev7?: number;
+    /** Last 7 days vs the 7 before, change %, null when no baseline. */
+    trend7Pct?: number | null;
     last30: number;
     last30Count: number;
   };

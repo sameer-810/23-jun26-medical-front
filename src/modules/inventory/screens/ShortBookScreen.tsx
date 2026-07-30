@@ -43,7 +43,7 @@ export default function ShortBookScreen() {
           productId: it.productId,
           productName: it.name,
           sku: it.sku,
-          quantity: it.need || 1,
+          quantity: it.suggested || it.need || 1,
         })),
       },
     });
@@ -80,9 +80,35 @@ export default function ShortBookScreen() {
       ),
     },
     {
+      key: "velocity",
+      header: "Sold · cover",
+      width: 130,
+      align: "center",
+      sortable: true,
+      sortValue: (it) => it.dailyVelocity,
+      render: (it) =>
+        it.sold30 > 0 ? (
+          <VStack gap={1} align="center">
+            <Text variant="body-sm" tone="secondary">
+              {it.sold30}/mo
+            </Text>
+            {it.daysCover != null ? (
+              <StatusChip
+                label={`${it.daysCover}d left`}
+                tone={it.daysCover <= 7 ? "danger" : "warning"}
+              />
+            ) : null}
+          </VStack>
+        ) : (
+          <Text variant="caption" tone="tertiary">
+            no recent sales
+          </Text>
+        ),
+    },
+    {
       key: "status",
       header: "Status",
-      width: 100,
+      width: 90,
       render: (it) => (
         <StatusChip
           label={it.onHand === 0 ? "Out" : "Low"}
@@ -91,16 +117,23 @@ export default function ShortBookScreen() {
       ),
     },
     {
-      key: "need",
+      key: "suggested",
       header: "Order",
-      width: 90,
+      width: 96,
       align: "right",
       sortable: true,
-      sortValue: (it) => it.need,
+      sortValue: (it) => it.suggested ?? it.need,
       render: (it) => (
-        <Text variant="label-lg" weight="700" tone="primary">
-          {it.need}
-        </Text>
+        <VStack gap={0} align="flex-end">
+          <Text variant="label-lg" weight="700" tone="primary">
+            {it.suggested ?? it.need}
+          </Text>
+          {it.suggested != null && it.suggested !== it.need ? (
+            <Text variant="caption" tone="tertiary">
+              min {it.need}
+            </Text>
+          ) : null}
+        </VStack>
       ),
     },
   ];
@@ -190,6 +223,12 @@ function ShortBookRow({ item }: { item: ShortbookItem }) {
             <Text variant="body-sm" tone="secondary">
               {item.onHand} / {item.reorderLevel}
             </Text>
+            {item.sold30 > 0 ? (
+              <Text variant="caption" tone="tertiary">
+                {item.sold30}/mo
+                {item.daysCover != null ? ` · ${item.daysCover}d left` : ""}
+              </Text>
+            ) : null}
           </VStack>
           <StatusChip
             label={item.onHand === 0 ? "Out" : "Low"}
@@ -200,8 +239,13 @@ function ShortBookRow({ item }: { item: ShortbookItem }) {
               Order
             </Text>
             <Text variant="label-lg" weight="700" tone="primary">
-              {item.need}
+              {item.suggested ?? item.need}
             </Text>
+            {item.suggested != null && item.suggested !== item.need ? (
+              <Text variant="caption" tone="tertiary">
+                min {item.need}
+              </Text>
+            ) : null}
           </VStack>
         </HStack>
       </HStack>

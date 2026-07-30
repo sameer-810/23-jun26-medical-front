@@ -49,6 +49,8 @@ interface Attn {
   title: string;
   hint: string;
   nav: string;
+  /** Verb for the one-tap action button (act-from-widget). */
+  action: string;
 }
 
 export default function DashboardScreen() {
@@ -67,7 +69,15 @@ export default function DashboardScreen() {
 
   const tileWidth = `${100 / cols}%` as const;
 
-  const kpis = [
+  const todayTrend = data?.sales.todayTrendPct;
+  const kpis: {
+    label: string;
+    value: string;
+    icon: typeof Package;
+    accent: { color: string; tint: string };
+    nav: string;
+    trend?: { pct: number; good: boolean };
+  }[] = [
     {
       label: "Products",
       value: fmtInt(data?.products.total),
@@ -95,6 +105,10 @@ export default function DashboardScreen() {
       icon: ReceiptIndianRupee,
       accent: accents.blue,
       nav: "Sales",
+      trend:
+        todayTrend != null
+          ? { pct: todayTrend, good: todayTrend >= 0 }
+          : undefined,
     },
   ];
 
@@ -115,6 +129,7 @@ export default function DashboardScreen() {
       title: `${expired} expired batch${expired === 1 ? "" : "es"} to write off`,
       hint: "Remove from sellable stock",
       nav: "Expiry",
+      action: "Write off",
     });
   if (expiringSoon > 0)
     attn.push({
@@ -124,6 +139,7 @@ export default function DashboardScreen() {
       title: `${expiringSoon} batch${expiringSoon === 1 ? "" : "es"} expiring soon`,
       hint: "Sell-through or return before expiry",
       nav: "Expiry",
+      action: "Review",
     });
   if (lowStock > 0)
     attn.push({
@@ -133,6 +149,7 @@ export default function DashboardScreen() {
       title: `${lowStock} product${lowStock === 1 ? "" : "s"} low on stock`,
       hint: "Reorder to avoid stock-outs",
       nav: "ShortBook",
+      action: "Reorder",
     });
   if (receivable > 0)
     attn.push({
@@ -142,6 +159,7 @@ export default function DashboardScreen() {
       title: `${money(receivable)} to collect`,
       hint: "Outstanding customer credit",
       nav: "Customers",
+      action: "Collect",
     });
   if (payable > 0)
     attn.push({
@@ -151,6 +169,7 @@ export default function DashboardScreen() {
       title: `${money(payable)} to pay suppliers`,
       hint: "Outstanding purchase credit",
       nav: "Suppliers",
+      action: "Pay",
     });
   if (pdcCount > 0)
     attn.push({
@@ -160,6 +179,7 @@ export default function DashboardScreen() {
       title: `${pdcCount} post-dated cheque${pdcCount === 1 ? "" : "s"} · ${money(pdcTotal)}`,
       hint: "Payable cheques coming due",
       nav: "PDC",
+      action: "View",
     });
 
   const quickActions = [
@@ -227,6 +247,8 @@ export default function DashboardScreen() {
               value={t.value}
               icon={t.icon}
               accent={t.accent}
+              trend={t.trend}
+              hint={t.trend ? "vs yesterday" : undefined}
               onPress={() => go(t.nav)}
             />
           </View>
@@ -287,10 +309,19 @@ export default function DashboardScreen() {
                         {a.hint}
                       </Text>
                     </VStack>
-                    <ChevronRight
-                      size={18}
-                      color={palette.text.tertiary}
-                      strokeWidth={2}
+                    <Button
+                      label={a.action}
+                      size="sm"
+                      variant="secondary"
+                      fullWidth={false}
+                      onPress={() => go(a.nav)}
+                      rightIcon={
+                        <ChevronRight
+                          size={15}
+                          color={palette.text.primary}
+                          strokeWidth={2}
+                        />
+                      }
                     />
                   </HStack>
                 </Pressable>
@@ -365,6 +396,7 @@ export default function DashboardScreen() {
             <Metric
               label="Sales (7d / 30d)"
               value={`${money(fin?.sales.last7 ?? 0)} / ${money(fin?.sales.last30 ?? 0)}`}
+              trend={fin?.sales.trend7Pct}
             />
             <Metric
               label="Purchases (30d)"
@@ -466,15 +498,36 @@ function FinTile({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  label,
+  value,
+  trend,
+}: {
+  label: string;
+  value: string;
+  trend?: number | null;
+}) {
   return (
     <VStack gap={1}>
       <Text variant="caption" tone="tertiary">
         {label}
       </Text>
-      <Text variant="label-lg" tone="primary">
-        {value}
-      </Text>
+      <HStack gap={6} align="center">
+        <Text variant="label-lg" tone="primary">
+          {value}
+        </Text>
+        {trend != null ? (
+          <Text
+            variant="label-sm"
+            style={{
+              color: trend >= 0 ? palette.success.text : palette.danger.text,
+              fontWeight: "700",
+            }}
+          >
+            {trend >= 0 ? "▲" : "▼"} {Math.abs(trend)}%
+          </Text>
+        ) : null}
+      </HStack>
     </VStack>
   );
 }

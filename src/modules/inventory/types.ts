@@ -72,6 +72,8 @@ export interface ReceiptLineInput {
   mrp?: number;
   unit?: string;
   quantity: number;
+  /** Scheme / free goods received on top of the paid quantity (same unit). */
+  freeQuantity?: number;
   locationId: string;
 }
 
@@ -107,6 +109,8 @@ export interface DraftLine {
   expiryDate: string;
   unit: string | null;
   quantity: string;
+  /** Free/scheme units (e.g. 10+1) — booked to stock, lower the landed cost. */
+  freeQuantity: string;
   purchasePrice: string;
   /** Selling MRP for this lot — prints on the shelf label and prices the sale. */
   mrp: string;
@@ -282,7 +286,16 @@ export interface ShortbookItem {
   baseUnit: string;
   reorderLevel: number;
   onHand: number;
+  /** Gap back to the reorder level (min-fill quantity). */
   need: number;
+  /** Net units sold in the last 30 days. */
+  sold30: number;
+  /** Average units sold per day over that window. */
+  dailyVelocity: number;
+  /** How many days current stock lasts at that velocity (null = no sales). */
+  daysCover: number | null;
+  /** Computed reorder qty — covers a month of demand, never below `need`. */
+  suggested: number;
 }
 
 export interface AlternativeItem {

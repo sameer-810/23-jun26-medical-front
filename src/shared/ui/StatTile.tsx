@@ -25,6 +25,11 @@ interface Props {
   tone?: Tone;
   /** ServRx colour-coded card: adds a top border + tinted icon in this accent. */
   accent?: { color: string; tint: string };
+  /**
+   * Period-over-period change chip. `pct` sign drives the arrow; `good` drives
+   * the colour (a rise in sales is good/green, a rise in dues is bad/red).
+   */
+  trend?: { pct: number; good: boolean };
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }
@@ -40,6 +45,7 @@ export function StatTile({
   hint,
   tone = "light",
   accent,
+  trend,
   onPress,
   style,
 }: Props) {
@@ -71,8 +77,33 @@ export function StatTile({
           ? palette.ink[800]
           : palette.surface.primary;
 
+  const trendColor = trend
+    ? dark
+      ? "#FFFFFF"
+      : trend.good
+        ? palette.success.text
+        : palette.danger.text
+    : undefined;
+  const trendBg = trend
+    ? dark
+      ? "rgba(255,255,255,0.18)"
+      : trend.good
+        ? palette.success.bg
+        : palette.danger.bg
+    : undefined;
+
   const inner = (
     <>
+      {trend ? (
+        <View style={[styles.trend, { backgroundColor: trendBg }]}>
+          <Text
+            variant="label-sm"
+            style={{ color: trendColor, fontWeight: "700" }}
+          >
+            {trend.pct >= 0 ? "▲" : "▼"} {Math.abs(trend.pct)}%
+          </Text>
+        </View>
+      ) : null}
       {Icon ? (
         <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
           <Icon size={18} color={iconColor} strokeWidth={2} />
@@ -153,5 +184,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
+  },
+  trend: {
+    position: "absolute",
+    top: 14,
+    right: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.full,
   },
 });

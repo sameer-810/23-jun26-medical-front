@@ -23,6 +23,7 @@ import { Menu, Activity } from "lucide-react-native";
 import { palette, layout, radius } from "@shared/designSystem";
 import { Text, HStack } from "@shared/ui";
 import { Sidebar } from "./Sidebar";
+import { CommandPalette } from "./CommandPalette";
 import { NAV_ITEMS, useVisibleNavItems } from "./navItems";
 
 import DashboardScreen from "@modules/dashboard/screens/DashboardScreen";
@@ -106,59 +107,66 @@ export default function AppNavigator() {
   );
 
   return (
-    <Drawer.Navigator
-      initialRouteName="Dashboard"
-      drawerContent={drawerContent}
-      screenOptions={{
-        // The permanent drawer IS the sidebar on desktop; phones get an app bar.
-        drawerType: isWide ? "permanent" : "front",
-        headerShown: !isWide,
-        header: ({ route, navigation }) => (
-          <SafeAreaView edges={["top"]} style={styles.appBarSafe}>
-            <HStack align="center" gap={12} style={styles.appBar}>
-              <Pressable
-                onPress={() => navigation.openDrawer()}
-                hitSlop={8}
-                style={styles.menuBtn}
-                accessibilityLabel="Open menu"
-              >
-                <Menu size={22} color={palette.text.primary} strokeWidth={2} />
-              </Pressable>
-              <View style={styles.appBarLogo}>
-                <Activity size={16} color="#FFFFFF" strokeWidth={2.4} />
-              </View>
-              <Text variant="h4" tone="primary">
-                {NAV_ITEMS.find((i) => i.name === route.name)?.label ||
-                  "Plusveda"}
-              </Text>
-            </HStack>
-          </SafeAreaView>
-        ),
-        drawerStyle: {
-          width:
-            isWide && collapsed
-              ? layout.sidebarCollapsedWidth
-              : layout.sidebarWidth,
-          // The Sidebar draws its own right border.
-          borderRightWidth: 0,
-        },
-        overlayColor: "rgba(15,23,42,0.4)",
-        sceneStyle: { backgroundColor: palette.surface.secondary },
-      }}
-    >
-      {items.map((item) => {
-        const Component = SCREENS[item.name];
-        if (!Component) return null;
-        return (
-          <Drawer.Screen
-            key={item.name}
-            name={item.name}
-            component={Component}
-            options={{ title: item.label }}
-          />
-        );
-      })}
-    </Drawer.Navigator>
+    <View style={{ flex: 1 }}>
+      <Drawer.Navigator
+        initialRouteName="Dashboard"
+        drawerContent={drawerContent}
+        screenOptions={{
+          // The permanent drawer IS the sidebar on desktop; phones get an app bar.
+          drawerType: isWide ? "permanent" : "front",
+          headerShown: !isWide,
+          header: ({ route, navigation }) => (
+            <SafeAreaView edges={["top"]} style={styles.appBarSafe}>
+              <HStack align="center" gap={12} style={styles.appBar}>
+                <Pressable
+                  onPress={() => navigation.openDrawer()}
+                  hitSlop={8}
+                  style={styles.menuBtn}
+                  accessibilityLabel="Open menu"
+                >
+                  <Menu
+                    size={22}
+                    color={palette.text.primary}
+                    strokeWidth={2}
+                  />
+                </Pressable>
+                <View style={styles.appBarLogo}>
+                  <Activity size={16} color="#FFFFFF" strokeWidth={2.4} />
+                </View>
+                <Text variant="h4" tone="primary">
+                  {NAV_ITEMS.find((i) => i.name === route.name)?.label ||
+                    "Plusveda"}
+                </Text>
+              </HStack>
+            </SafeAreaView>
+          ),
+          drawerStyle: {
+            width:
+              isWide && collapsed
+                ? layout.sidebarCollapsedWidth
+                : layout.sidebarWidth,
+            // The Sidebar draws its own right border.
+            borderRightWidth: 0,
+          },
+          overlayColor: "rgba(15,23,42,0.4)",
+          sceneStyle: { backgroundColor: palette.surface.secondary },
+        }}
+      >
+        {items.map((item) => {
+          const Component = SCREENS[item.name];
+          if (!Component) return null;
+          return (
+            <Drawer.Screen
+              key={item.name}
+              name={item.name}
+              component={Component}
+              options={{ title: item.label }}
+            />
+          );
+        })}
+      </Drawer.Navigator>
+      <CommandPalette />
+    </View>
   );
 }
 
