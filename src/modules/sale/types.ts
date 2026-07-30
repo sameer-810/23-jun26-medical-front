@@ -138,7 +138,11 @@ export interface InvoiceProfile {
     drugLicenseNo: string;
     gstin: string;
   };
-  tax: { defaultRatePct: number; invoicePrefix: string };
+  tax: {
+    defaultRatePct: number;
+    invoicePrefix: string;
+    priceIncludesTax?: boolean;
+  };
   currency: string;
 }
 

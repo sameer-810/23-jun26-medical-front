@@ -33,6 +33,25 @@ export const emptyLine = (): DraftLine => ({
 export const isoToDate = (iso: string | null) =>
   iso ? String(iso).slice(0, 10) : "";
 
+/**
+ * Normalise a date cell for the server, which requires a full YYYY-MM-DD. The
+ * grid accepts a month-only "YYYY-MM"; expand it (expiry -> last day of month so
+ * FEFO/expiry logic is right; mfg -> the 1st). Full dates and blanks pass through.
+ */
+export function normalizeDateInput(
+  s: string,
+  kind: "expiry" | "mfg",
+): string | undefined {
+  const t = (s || "").trim();
+  if (!t) return undefined;
+  const m = /^(\d{4})-(\d{2})$/.exec(t);
+  if (!m) return t; // already YYYY-MM-DD (or something the server will validate)
+  const y = +m[1];
+  const mo = +m[2];
+  const day = kind === "expiry" ? new Date(y, mo, 0).getDate() : 1;
+  return `${m[1]}-${m[2]}-${String(day).padStart(2, "0")}`;
+}
+
 /** Units this product can be received in: its base unit plus any packs. */
 export function unitOptions(
   product?: ProductLite | null,
@@ -212,8 +231,8 @@ export function toReceiptLines(lines: DraftLine[]): ReceiptLineInput[] {
     .map((l) => ({
       productId: l.productId!,
       batchNumber: l.batchNumber.trim(),
-      mfgDate: l.mfgDate.trim() || undefined,
-      expiryDate: l.expiryDate.trim() || undefined,
+      mfgDate: normalizeDateInput(l.mfgDate, "mfg"),
+      expiryDate: normalizeDateInput(l.expiryDate, "expiry"),
       purchasePrice:
         l.purchasePrice === "" ? undefined : Number(l.purchasePrice),
       mrp: l.mrp === "" ? undefined : Number(l.mrp),

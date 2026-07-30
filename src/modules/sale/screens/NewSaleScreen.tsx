@@ -28,7 +28,7 @@ import {
   useCustomers,
   useCreateCustomer,
 } from "@modules/customer/hooks/useCustomers";
-import { useCreateSale } from "@modules/sale/hooks/useSales";
+import { useCreateSale, useInvoiceProfile } from "@modules/sale/hooks/useSales";
 import { SaleLineInput } from "@modules/sale/types";
 import { apiErrorMessage } from "@api/apiClient";
 import { palette, radius } from "@shared/designSystem";
@@ -91,6 +91,8 @@ export default function NewSaleScreen() {
   });
   const createCustomer = useCreateCustomer();
   const mut = useCreateSale();
+  const { data: invoiceProfile } = useInvoiceProfile();
+  const priceIncludesTax = invoiceProfile?.tax?.priceIncludesTax ?? false;
 
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [taxType, setTaxType] = useState<"intra" | "inter">("intra");
@@ -151,6 +153,17 @@ export default function NewSaleScreen() {
     setLines((cur) =>
       cur.map((l, idx) => (idx === i ? { ...l, ...patch } : l)),
     );
+
+  /** Price for a product in a given unit = base price × that unit's pack factor. */
+  const priceForUnit = (productId: string, unit: string | null) => {
+    const p = productsById[productId];
+    if (!p) return "";
+    const factor =
+      !unit || unit === p.baseUnit
+        ? 1
+        : (p.packs || []).find((x) => x.unit === unit)?.factor || 1;
+    return String(Math.round((p.sellingPrice || 0) * factor * 100) / 100);
+  };
   const removeLine = (i: number) =>
     setLines((cur) => cur.filter((_, idx) => idx !== i));
 
@@ -345,9 +358,12 @@ export default function NewSaleScreen() {
       l.discountMode === "pct"
         ? (gross * Math.min(discountInput, 100)) / 100
         : discountInput;
-    const taxable = Math.max(gross - discount, 0);
+    const net = Math.max(gross - discount, 0);
     const rate = l.taxRate === "" ? p?.taxRatePct || 0 : Number(l.taxRate) || 0;
-    const tax = (taxable * rate) / 100;
+    // Mirror the server: when prices are tax-inclusive, the net already contains
+    // the tax; otherwise tax is added on top.
+    const taxable = priceIncludesTax ? net / (1 + rate / 100) : net;
+    const tax = priceIncludesTax ? net - taxable : (taxable * rate) / 100;
     return { gross, discount, taxable, tax, total: taxable + tax };
   };
 
@@ -582,7 +598,12 @@ export default function NewSaleScreen() {
                         <Select
                           value={line.unit}
                           options={unitOptions(line)}
-                          onChange={(v) => setLine(i, { unit: v })}
+                          onChange={(v) =>
+                            setLine(i, {
+                              unit: v,
+                              unitPrice: priceForUnit(line.productId, v),
+                            })
+                          }
                         />
                       </View>
                       <Cell
@@ -727,7 +748,12 @@ export default function NewSaleScreen() {
                         <Select
                           value={line.unit}
                           options={unitOptions(line)}
-                          onChange={(v) => setLine(i, { unit: v })}
+                          onChange={(v) =>
+                            setLine(i, {
+                              unit: v,
+                              unitPrice: priceForUnit(line.productId, v),
+                            })
+                          }
                         />
                       </Field>
                       <Field label="Price" w={84}>
@@ -852,7 +878,13 @@ export default function NewSaleScreen() {
         {taxType === "intra" ? (
           <>
             <Row label="CGST" value={money(totals.tax / 2)} muted />
-            <Row label="SGST" value={money(totals.tax / 2)} muted />
+            <Row
+              label="SGST"
+              value={money(
+                totals.tax - Math.round((totals.tax / 2) * 100) / 100,
+              )}
+              muted
+            />
           </>
         ) : (
           <Row label="IGST" value={money(totals.tax)} muted />

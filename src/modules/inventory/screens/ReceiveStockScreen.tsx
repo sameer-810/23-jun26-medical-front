@@ -258,8 +258,17 @@ export default function ReceiveStockScreen() {
 
   const validLines = toReceiptLines(lines);
   const totalBase = totalBaseUnits(lines, productsById);
+  // Rate is per BASE unit, so the payable for a line received in a pack unit is
+  // qty × pack-factor × rate — matching the lineValue the server stores.
+  const factorOf = (l: DraftLine) => {
+    const p = l.productId ? productsById[l.productId] : null;
+    if (!p || !l.unit || l.unit === p.baseUnit) return 1;
+    return (p.packs || []).find((x) => x.unit === l.unit)?.factor || 1;
+  };
   const totalValue = lines.reduce(
-    (s, l) => s + (Number(l.quantity) || 0) * (Number(l.purchasePrice) || 0),
+    (s, l) =>
+      s +
+      (Number(l.quantity) || 0) * factorOf(l) * (Number(l.purchasePrice) || 0),
     0,
   );
   const freeUnits = lines.reduce(
@@ -297,7 +306,7 @@ export default function ReceiveStockScreen() {
         batchNumber: l.batchNumber,
         expiry: l.expiryDate,
         mrp: l.mrp,
-        copies: Math.max(1, Math.round(l.quantity)),
+        copies: Math.max(1, Math.round(l.baseQuantity)),
       }));
     if (specs.length) void printLabels(specs, shopName);
   };
@@ -526,7 +535,7 @@ export default function ReceiveStockScreen() {
               const p = line.productId ? productsById[line.productId] : null;
               const qtyN = Number(line.quantity) || 0;
               const rateN = Number(line.purchasePrice) || 0;
-              const amount = qtyN * rateN;
+              const amount = qtyN * factorOf(line) * rateN;
               const started = Boolean(line.productId);
               const units = p
                 ? [

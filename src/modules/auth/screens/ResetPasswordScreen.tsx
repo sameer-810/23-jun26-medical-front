@@ -30,7 +30,11 @@ export default function ResetPasswordScreen({
   });
 
   const submit = handleSubmit((d) =>
-    mut.mutate({ token: d.token.trim(), password: d.password }),
+    mut.mutate({
+      email: route?.params?.email || "",
+      token: d.token.trim(),
+      password: d.password,
+    }),
   );
 
   return (
