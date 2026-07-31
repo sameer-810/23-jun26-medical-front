@@ -6,10 +6,11 @@ import {
   Platform,
   StyleSheet,
   useWindowDimensions,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { Activity, ShieldCheck, Boxes, TrendingUp } from "lucide-react-native";
+import { ShieldCheck, Boxes, TrendingUp } from "lucide-react-native";
 import { palette, gradients, radius, layout } from "@shared/designSystem";
 import { Text, VStack, HStack } from "@shared/ui";
 
@@ -49,9 +50,12 @@ export function AuthLayout({ title, subtitle, children }: Props) {
             style={{ flex: 1, justifyContent: "space-between", padding: 48 }}
           >
             <HStack gap={12} align="center">
-              <View style={styles.logo}>
-                <Activity size={24} color="#FFFFFF" strokeWidth={2.4} />
-              </View>
+              <Image
+                source={require("../../../../assets/brand/mark.png")}
+                style={styles.brandMark}
+                resizeMode="contain"
+                accessibilityLabel="Plusveda"
+              />
               <Text variant="h2" tone="inverse">
                 Plusveda
               </Text>
@@ -98,19 +102,12 @@ export function AuthLayout({ title, subtitle, children }: Props) {
             >
               <View style={styles.formInner}>
                 {!isWide && (
-                  <HStack gap={10} align="center" style={{ marginBottom: 28 }}>
-                    <View
-                      style={[
-                        styles.logo,
-                        { backgroundColor: palette.teal[600] },
-                      ]}
-                    >
-                      <Activity size={20} color="#FFFFFF" strokeWidth={2.4} />
-                    </View>
-                    <Text variant="h3" tone="primary">
-                      Plusveda
-                    </Text>
-                  </HStack>
+                  <Image
+                    source={require("../../../../assets/brand/wordmark.png")}
+                    style={[styles.authWordmark, { marginBottom: 28 }]}
+                    resizeMode="contain"
+                    accessibilityLabel="Plusveda"
+                  />
                 )}
                 <VStack gap={6} style={{ marginBottom: 24 }}>
                   <Text variant="h1" tone="primary">
@@ -132,13 +129,16 @@ export function AuthLayout({ title, subtitle, children }: Props) {
 
 const styles = StyleSheet.create({
   brandPanel: { flex: 1, maxWidth: 520 },
-  logo: {
+  /** White "p" badge — reads cleanly on the teal brand gradient. */
+  brandMark: {
     width: 44,
     height: 44,
     borderRadius: radius.md,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    alignItems: "center",
-    justifyContent: "center",
+  },
+  /** Full wordmark above the form on narrow screens (light background). */
+  authWordmark: {
+    width: 170,
+    height: 37,
   },
   hIcon: {
     width: 34,

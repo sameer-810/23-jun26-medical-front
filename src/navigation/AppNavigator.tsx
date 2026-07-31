@@ -12,14 +12,20 @@
  * required, and either alone does nothing.
  */
 import React, { useCallback, useState } from "react";
-import { View, Pressable, StyleSheet, useWindowDimensions } from "react-native";
+import {
+  View,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+  Image,
+} from "react-native";
 import {
   createDrawerNavigator,
   DrawerContentComponentProps,
 } from "@react-navigation/drawer";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Menu, Activity } from "lucide-react-native";
+import { Menu } from "lucide-react-native";
 import { palette, layout, radius } from "@shared/designSystem";
 import { Text, HStack } from "@shared/ui";
 import { Sidebar } from "./Sidebar";
@@ -130,9 +136,12 @@ export default function AppNavigator() {
                     strokeWidth={2}
                   />
                 </Pressable>
-                <View style={styles.appBarLogo}>
-                  <Activity size={16} color="#FFFFFF" strokeWidth={2.4} />
-                </View>
+                <Image
+                  source={require("../../assets/brand/mark.png")}
+                  style={styles.appBarLogo}
+                  resizeMode="contain"
+                  accessibilityLabel="Plusveda"
+                />
                 <Text variant="h4" tone="primary">
                   {NAV_ITEMS.find((i) => i.name === route.name)?.label ||
                     "Plusveda"}
@@ -190,8 +199,5 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: radius.sm,
-    backgroundColor: palette.teal[600],
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

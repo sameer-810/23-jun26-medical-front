@@ -1,12 +1,7 @@
 import React from "react";
-import { View, Pressable, StyleSheet, ScrollView } from "react-native";
+import { View, Pressable, StyleSheet, ScrollView, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  Activity,
-  LogOut,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react-native";
+import { LogOut, ChevronsLeft, ChevronsRight } from "lucide-react-native";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { palette, radius, layout } from "@shared/designSystem";
 import { Text, VStack, HStack, Avatar } from "@shared/ui";
@@ -54,15 +49,22 @@ export function Sidebar({
           marginBottom: 20,
         }}
       >
-        <View style={styles.logo}>
-          <Activity size={20} color="#FFFFFF" strokeWidth={2.4} />
-        </View>
-        {!collapsed && (
+        {collapsed ? (
+          <Image
+            source={require("../../assets/brand/mark.png")}
+            style={styles.mark}
+            resizeMode="contain"
+            accessibilityLabel="Plusveda"
+          />
+        ) : (
           <>
-            <VStack gap={1} flex={1}>
-              <Text variant="h4" tone="primary" numberOfLines={1}>
-                Plusveda
-              </Text>
+            <VStack gap={3} flex={1}>
+              <Image
+                source={require("../../assets/brand/wordmark.png")}
+                style={styles.wordmark}
+                resizeMode="contain"
+                accessibilityLabel="Plusveda"
+              />
               <Text variant="caption" tone="tertiary" numberOfLines={1}>
                 {organization?.name || "Inventory"}
               </Text>
@@ -249,13 +251,16 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: palette.border.default,
   },
-  logo: {
-    width: 38,
-    height: 38,
+  /** Brand wordmark in the expanded sidebar (720x156 source → 4.6:1). */
+  wordmark: {
+    width: 138,
+    height: 30,
+  },
+  /** Compact "p" mark shown when the rail is collapsed. */
+  mark: {
+    width: 34,
+    height: 34,
     borderRadius: radius.md,
-    backgroundColor: palette.teal[600],
-    alignItems: "center",
-    justifyContent: "center",
   },
   toggleBtn: {
     width: 30,
