@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { View, Switch } from "react-native";
+import { View, Switch, Pressable } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useForm, useWatch, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Trash2 } from "lucide-react-native";
+import { Trash2, Camera } from "lucide-react-native";
+import { CameraScanner } from "@shared/CameraScanner";
 import {
   useProduct,
   useCreateProduct,
@@ -69,10 +70,11 @@ export default function ProductFormScreen() {
   const removeMut = useRemoveProduct();
   const mut = editing ? updateMut : createMut;
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
 
   // One form holds every value — text, numbers, dropdowns, switch and packs —
   // so the edit screen populates with a single reset() and nothing side-syncs.
-  const { control, handleSubmit, reset } = useForm({
+  const { control, handleSubmit, reset, setValue } = useForm({
     resolver: zodResolver(productSchema),
     mode: "onTouched",
     defaultValues: {
@@ -227,6 +229,22 @@ export default function ProductFormScreen() {
                 placeholder="EAN / UPC"
                 keyboardType="number-pad"
               />
+              <Pressable
+                onPress={() => setScanOpen(true)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
+                  marginTop: 6,
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Scan barcode with camera"
+              >
+                <Camera size={14} color={palette.teal[600]} strokeWidth={2} />
+                <Text variant="label-sm" style={{ color: palette.teal[600] }}>
+                  Scan with camera
+                </Text>
+              </Pressable>
             </View>
           </HStack>
         </VStack>
@@ -385,6 +403,16 @@ export default function ProductFormScreen() {
           removeMut.mutate(id!, { onSuccess: () => navigation.goBack() })
         }
         onCancel={() => setConfirmOpen(false)}
+      />
+
+      <CameraScanner
+        visible={scanOpen}
+        title="Scan product barcode"
+        onDetected={(code) => {
+          setValue("barcode", code, { shouldDirty: true });
+          setScanOpen(false);
+        }}
+        onClose={() => setScanOpen(false)}
       />
     </Screen>
   );

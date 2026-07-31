@@ -12,6 +12,7 @@ import {
   History,
   PackageCheck,
   ScanLine,
+  Camera,
   Printer,
   Search,
   Trash2,
@@ -28,6 +29,8 @@ import {
   useCreateSupplier,
 } from "@modules/supplier/hooks/useSuppliers";
 import { useReceiveStock } from "@modules/inventory/hooks/useInventory";
+import { inventoryApi } from "@modules/inventory/api/inventoryApi";
+import { CameraScanner } from "@shared/CameraScanner";
 import { QuickAddProduct } from "@modules/inventory/components/QuickAddProduct";
 import {
   NewProductDraft,
@@ -221,6 +224,32 @@ export default function ReceiveStockScreen() {
       cur.map((l, idx) => (idx === i ? { ...l, ...patch } : l)),
     );
 
+  // Camera scan → resolve the barcode to a product and add it as a GRN line.
+  // Unknown barcodes aren't linked to any product yet, so we say so.
+  const [scanOpen, setScanOpen] = useState(false);
+  const handleCameraScan = async (code: string) => {
+    setScanOpen(false);
+    try {
+      const res = await inventoryApi.scan(code);
+      const sp = res.product;
+      if (!sp) throw new Error("no match");
+      const lite: ProductLite = {
+        id: sp.id,
+        name: sp.name,
+        sku: sp.sku,
+        baseUnit: sp.baseUnit,
+        packs: sp.packs || [],
+      };
+      setKnownProducts((cur) => ({ ...cur, [lite.id]: lite }));
+      addLineForProduct(lite.id);
+      setScanNote(`Added ${sp.name} from its barcode.`);
+    } catch {
+      setScanNote(
+        `Barcode "${code}" isn't linked to a product yet. Search the product below and save this barcode on it (in Add/Edit product).`,
+      );
+    }
+  };
+
   /**
    * The picker had nothing — open the create form for this line.
    *
@@ -344,6 +373,15 @@ export default function ReceiveStockScreen() {
             fullWidth={false}
             icon={<ScanLine size={16} color="#FFFFFF" strokeWidth={2} />}
             onPress={() => navigation.navigate("ScanBill")}
+          />
+          <Button
+            label="Camera"
+            variant="secondary"
+            fullWidth={false}
+            icon={
+              <Camera size={16} color={palette.text.primary} strokeWidth={2} />
+            }
+            onPress={() => setScanOpen(true)}
           />
           <Button
             label="History"
@@ -729,6 +767,13 @@ export default function ReceiveStockScreen() {
           onSave={saveNewProduct}
         />
       )}
+
+      <CameraScanner
+        visible={scanOpen}
+        title="Scan pack barcode"
+        onDetected={handleCameraScan}
+        onClose={() => setScanOpen(false)}
+      />
     </Screen>
   );
 }

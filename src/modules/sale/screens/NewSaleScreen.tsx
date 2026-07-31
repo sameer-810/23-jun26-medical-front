@@ -19,7 +19,9 @@ import {
   Repeat,
   X,
   CheckCircle2,
+  Camera,
 } from "lucide-react-native";
+import { CameraScanner } from "@shared/CameraScanner";
 import { useProducts } from "@modules/product/hooks/useProducts";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { AlternativeItem } from "@modules/inventory/types";
@@ -99,6 +101,7 @@ export default function NewSaleScreen() {
   const [paymentMode, setPaymentMode] = useState("cash");
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
   const scanBusy = useRef(false);
   type ProductRow = NonNullable<typeof products>["data"][number];
   type CustomerRow = NonNullable<typeof customers>["data"][number];
@@ -960,15 +963,26 @@ export default function NewSaleScreen() {
       title="New sale"
       subtitle="Scan or search · FEFO auto-picks nearest-expiry batches"
       right={
-        <Button
-          label="Invoices"
-          variant="secondary"
-          fullWidth={false}
-          icon={
-            <History size={16} color={palette.text.primary} strokeWidth={2} />
-          }
-          onPress={() => navigation.navigate("SalesList")}
-        />
+        <HStack gap={8}>
+          <Button
+            label="Camera"
+            variant="secondary"
+            fullWidth={false}
+            icon={
+              <Camera size={16} color={palette.text.primary} strokeWidth={2} />
+            }
+            onPress={() => setScanOpen(true)}
+          />
+          <Button
+            label="Invoices"
+            variant="secondary"
+            fullWidth={false}
+            icon={
+              <History size={16} color={palette.text.primary} strokeWidth={2} />
+            }
+            onPress={() => navigation.navigate("SalesList")}
+          />
+        </HStack>
       }
     >
       <View
@@ -997,6 +1011,16 @@ export default function NewSaleScreen() {
         </View>
         <View style={{ width: wide ? 344 : "100%" }}>{rail}</View>
       </View>
+
+      <CameraScanner
+        visible={scanOpen}
+        title="Scan pack barcode"
+        onDetected={(code) => {
+          setScanOpen(false);
+          void handleScan(code);
+        }}
+        onClose={() => setScanOpen(false)}
+      />
     </Screen>
   );
 }
