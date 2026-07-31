@@ -1,22 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Modal, Pressable, StyleSheet, Platform } from "react-native";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import type { BarcodeType } from "expo-camera";
 import { X, Camera as CameraIcon } from "lucide-react-native";
 import { palette, radius } from "@shared/designSystem";
 import { Text, Button } from "@shared/ui";
 
 /**
- * Camera barcode scanner for the web app — turns a phone/tablet camera into a
- * scanner so a pharmacy without a USB gun can still ring up sales or capture
- * barcodes. A detected code is handed to `onDetected`, which feeds the SAME
- * resolve flow as a USB scan.
- *
- * Two engines, picked automatically:
- *  - `BarcodeDetector` — native & fast, on Chrome (Android / desktop);
- *  - `@zxing/browser` — a JS decoder loaded lazily as the fallback for browsers
- *    without it (notably iOS Safari), so iPhones work too.
+ * Barcode scanner that works EVERYWHERE the app runs:
+ *  - Native app (Android/iOS APK): expo-camera `CameraView` live scanning;
+ *  - Web on Chrome (Android/desktop): the browser's native `BarcodeDetector`;
+ *  - Web on iOS Safari / no BarcodeDetector: `@zxing/browser` (loaded lazily).
+ * A detected code is handed to `onDetected`, feeding the SAME resolve flow as a
+ * USB scan — so pharmacies without a scanner gun can use a phone camera instead.
  */
 
-const FORMATS = [
+// Web BarcodeDetector format hints.
+const WEB_FORMATS = [
   "ean_13",
   "ean_8",
   "upc_a",
@@ -26,6 +26,18 @@ const FORMATS = [
   "itf",
   "codabar",
   "qr_code",
+];
+// expo-camera barcode types (native).
+const NATIVE_FORMATS: BarcodeType[] = [
+  "ean13",
+  "ean8",
+  "upc_a",
+  "upc_e",
+  "code128",
+  "code39",
+  "itf14",
+  "codabar",
+  "qr",
 ];
 
 const detectorSupported = () =>
@@ -46,6 +58,7 @@ export function CameraScanner({
   onClose,
   title = "Scan barcode",
 }: Props) {
+  const isWeb = Platform.OS === "web";
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -53,6 +66,7 @@ export function CameraScanner({
   const doneRef = useRef(false);
   const [status, setStatus] = useState<null | "scanning" | "error">(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const [permission, requestPermission] = useCameraPermissions();
 
   // Keep the latest callback so the scan loop never needs the effect re-bound.
   const detectedRef = useRef(onDetected);
@@ -60,9 +74,14 @@ export function CameraScanner({
     detectedRef.current = onDetected;
   });
 
+  // Fresh scan each time the sheet opens.
   useEffect(() => {
-    if (!visible || Platform.OS !== "web") return;
-    doneRef.current = false;
+    if (visible) doneRef.current = false;
+  }, [visible]);
+
+  // ---- Web engines (BarcodeDetector → zxing fallback) ----------------------
+  useEffect(() => {
+    if (!visible || !isWeb) return;
     let cancelled = false;
 
     function stopAll() {
@@ -93,21 +112,19 @@ export function CameraScanner({
     }
 
     (async () => {
-      // Deferred (after an await) so this isn't a synchronous effect setState.
-      await Promise.resolve();
+      await Promise.resolve(); // defer so this isn't a synchronous effect setState
       if (cancelled) return;
       setStatus(null);
       setErrorMsg("");
       try {
         if (detectorSupported()) {
-          // ---- Native BarcodeDetector path -------------------------------
           const detector = new (
             window as unknown as {
               BarcodeDetector: new (o: unknown) => {
                 detect: (v: unknown) => Promise<{ rawValue?: string }[]>;
               };
             }
-          ).BarcodeDetector({ formats: FORMATS });
+          ).BarcodeDetector({ formats: WEB_FORMATS });
           const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: { ideal: "environment" } },
             audio: false,
@@ -128,11 +145,10 @@ export function CameraScanner({
               const codes = await detector.detect(videoRef.current);
               if (codes?.[0]?.rawValue) hit(codes[0].rawValue);
             } catch {
-              /* frame not ready — try next tick */
+              /* frame not ready */
             }
           }, 250);
         } else {
-          // ---- zxing fallback (iOS Safari & anything without BarcodeDetector)
           const { BrowserMultiFormatReader } = await import("@zxing/browser");
           if (cancelled || !videoRef.current) return;
           const reader = new BrowserMultiFormatReader();
@@ -156,10 +172,10 @@ export function CameraScanner({
         setStatus("error");
         setErrorMsg(
           name === "NotAllowedError"
-            ? "Camera permission was denied. Allow camera access in the browser and try again."
+            ? "Camera permission was denied. Allow camera access and try again."
             : name === "NotFoundError"
               ? "No camera was found on this device."
-              : "Couldn't start the camera. Make sure the page is on HTTPS and no other app is using the camera.",
+              : "Couldn't start the camera. Make sure the page is on HTTPS and no other app is using it.",
         );
       }
     })();
@@ -168,11 +184,16 @@ export function CameraScanner({
       cancelled = true;
       stopAll();
     };
-  }, [visible]);
+  }, [visible, isWeb]);
 
   if (!visible) return null;
 
-  const native = Platform.OS !== "web";
+  const onNativeScan = (raw: string) => {
+    const code = String(raw || "").trim();
+    if (!code || doneRef.current) return;
+    doneRef.current = true;
+    detectedRef.current(code);
+  };
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -192,7 +213,40 @@ export function CameraScanner({
           </View>
 
           <View style={styles.viewport}>
-            {native ? (
+            {isWeb ? (
+              status === "error" ? (
+                <View style={styles.msg}>
+                  <Text
+                    variant="body-sm"
+                    tone="danger"
+                    style={{ textAlign: "center" }}
+                  >
+                    {errorMsg}
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {React.createElement("video", {
+                    ref: videoRef,
+                    autoPlay: true,
+                    muted: true,
+                    playsInline: true,
+                    style: {
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    },
+                  })}
+                  <View style={styles.frame} />
+                </>
+              )
+            ) : !permission ? (
+              <View style={styles.msg}>
+                <Text variant="body-sm" tone="tertiary">
+                  Checking camera…
+                </Text>
+              </View>
+            ) : !permission.granted ? (
               <View style={styles.msg}>
                 <CameraIcon
                   size={28}
@@ -202,48 +256,42 @@ export function CameraScanner({
                 <Text
                   variant="body-sm"
                   tone="tertiary"
-                  style={{ textAlign: "center", marginTop: 10 }}
+                  style={{
+                    textAlign: "center",
+                    marginTop: 10,
+                    marginBottom: 12,
+                  }}
                 >
-                  Camera scanning is available in the web app.
+                  Allow camera access to scan barcodes.
                 </Text>
-              </View>
-            ) : status === "error" ? (
-              <View style={styles.msg}>
-                <Text
-                  variant="body-sm"
-                  tone="danger"
-                  style={{ textAlign: "center" }}
-                >
-                  {errorMsg}
-                </Text>
+                <Button
+                  label="Allow camera"
+                  fullWidth={false}
+                  onPress={() => void requestPermission()}
+                />
               </View>
             ) : (
               <>
-                {React.createElement("video", {
-                  ref: videoRef,
-                  autoPlay: true,
-                  muted: true,
-                  playsInline: true,
-                  style: {
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  },
-                })}
+                <CameraView
+                  style={StyleSheet.absoluteFill}
+                  facing="back"
+                  barcodeScannerSettings={{ barcodeTypes: NATIVE_FORMATS }}
+                  onBarcodeScanned={(e) => onNativeScan(e.data)}
+                />
                 <View style={styles.frame} />
               </>
             )}
           </View>
 
-          {!native && status !== "error" ? (
+          {(isWeb ? status !== "error" : !!permission?.granted) ? (
             <Text
               variant="caption"
               tone="tertiary"
               style={{ textAlign: "center", marginTop: 10 }}
             >
-              {status === "scanning"
-                ? "Point the camera at the barcode on the pack"
-                : "Starting camera…"}
+              {isWeb && status !== "scanning"
+                ? "Starting camera…"
+                : "Point the camera at the barcode on the pack"}
             </Text>
           ) : null}
 

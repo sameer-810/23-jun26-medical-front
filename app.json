@@ -30,7 +30,17 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": ["expo-secure-store", "expo-localization", "expo-font"],
+    "plugins": [
+      "expo-secure-store",
+      "expo-localization",
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Plusveda to use the camera to scan barcodes on medicine packs."
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "4320ec62-c3c0-46ba-b623-a873d5f59903"
