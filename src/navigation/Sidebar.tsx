@@ -5,7 +5,7 @@ import { LogOut, ChevronsLeft, ChevronsRight } from "lucide-react-native";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { palette, radius, layout } from "@shared/designSystem";
 import { Text, VStack, HStack, Avatar } from "@shared/ui";
-import { NavItem, SECTION_ORDER, useVisibleNavItems } from "./navItems";
+import { NavItem, SECTION_ORDER, useSidebarNavItems } from "./navItems";
 
 interface Props {
   activeRoute: string;
@@ -27,7 +27,7 @@ export function Sidebar({
   const organization = useAuthStore((s) => s.organization);
   const logout = useAuthStore((s) => s.logout);
   // Same list the navigator registers routes from — one source of truth.
-  const items = useVisibleNavItems();
+  const items = useSidebarNavItems();
 
   return (
     <View

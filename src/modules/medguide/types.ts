@@ -49,8 +49,12 @@ export interface Medicine {
   medicineInfo?: MedicineInfo;
 }
 
+/**
+ * No `total`/`pages` on purpose — the global catalogue's size is platform IP and
+ * is never exposed to a pharmacy. Paging is driven by `hasMore` alone.
+ */
 export interface MedGuideMeta {
-  total: number;
-  pages: number;
   page: number;
+  limit: number;
+  hasMore: boolean;
 }

@@ -11,9 +11,9 @@ import {
   VStack,
   HStack,
   Card,
+  Button,
   StatusChip,
   TextField,
-  Pagination,
   EmptyState,
 } from "@shared/ui";
 
@@ -21,13 +21,18 @@ export default function MedGuideScreen() {
   const navigation = useNavigation<any>();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const limit = 20;
 
+  // Only query once something is typed. Browsing the whole catalogue page-by-page
+  // is useless to a pharmacist AND would reveal how large the master list is.
+  const term = search.trim();
+  const active = term.length >= 2;
   const { data, isLoading } = useQuery({
-    queryKey: ["medguide", search, page, limit],
-    queryFn: () => medguideApi.search({ search, page, limit }),
+    queryKey: ["medguide", term, page, limit],
+    queryFn: () => medguideApi.search({ search: term, page, limit }),
+    enabled: active,
   });
-  const items = data?.data ?? [];
+  const items = active ? (data?.data ?? []) : [];
   const meta = data?.meta;
 
   return (
@@ -54,7 +59,18 @@ export default function MedGuideScreen() {
       {items.length === 0 ? (
         <EmptyState
           icon={BookOpen}
-          title={isLoading ? "Loading…" : "Search the medicine guide"}
+          title={
+            !active
+              ? "Search the medicine guide"
+              : isLoading
+                ? "Searching…"
+                : "No medicine matches that search"
+          }
+          message={
+            !active
+              ? "Type a medicine name, salt or manufacturer to look it up."
+              : undefined
+          }
         />
       ) : (
         <VStack gap={8}>
@@ -89,21 +105,24 @@ export default function MedGuideScreen() {
         </VStack>
       )}
 
-      {meta && meta.total > 0 ? (
-        <View style={{ marginTop: 16 }}>
-          <Pagination
-            page={meta.page}
-            totalPages={meta.pages}
-            total={meta.total}
-            limit={limit}
-            onPageChange={setPage}
-            onLimitChange={(l) => {
-              setLimit(l);
-              setPage(1);
-            }}
-            label="medicines"
+      {/* Prev / Next only — never "x of N", so the catalogue size stays private. */}
+      {items.length > 0 && (page > 1 || meta?.hasMore) ? (
+        <HStack gap={10} justify="center" style={{ marginTop: 16 }}>
+          <Button
+            label="Previous"
+            variant="secondary"
+            fullWidth={false}
+            disabled={page <= 1}
+            onPress={() => setPage((p) => Math.max(1, p - 1))}
           />
-        </View>
+          <Button
+            label="Next"
+            variant="secondary"
+            fullWidth={false}
+            disabled={!meta?.hasMore}
+            onPress={() => setPage((p) => p + 1)}
+          />
+        </HStack>
       ) : null}
     </Screen>
   );

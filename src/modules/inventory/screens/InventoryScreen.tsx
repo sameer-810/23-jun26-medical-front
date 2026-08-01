@@ -6,6 +6,7 @@ import {
   IndianRupee,
   PackageX,
   ChevronRight,
+  Search as SearchIcon,
 } from "lucide-react-native";
 import { useStock, useStockValue } from "@modules/inventory/hooks/useInventory";
 import { StockSummaryItem } from "@modules/inventory/types";
@@ -16,6 +17,7 @@ import {
   VStack,
   HStack,
   Card,
+  Button,
   StatTile,
   StatusChip,
   ChipsRow,
@@ -165,6 +167,22 @@ export default function InventoryScreen() {
       subtitle="Live quantity, availability and valuation"
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
+      right={
+        <Button
+          label="Batch & expiry"
+          size="sm"
+          variant="secondary"
+          fullWidth={false}
+          icon={
+            <SearchIcon
+              size={16}
+              color={palette.text.primary}
+              strokeWidth={2}
+            />
+          }
+          onPress={() => navigation.navigate("Search")}
+        />
+      }
     >
       <View
         style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 }}
