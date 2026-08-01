@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   View,
   Pressable,
@@ -30,6 +31,8 @@ import {
 } from "@modules/supplier/hooks/useSuppliers";
 import { useReceiveStock } from "@modules/inventory/hooks/useInventory";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
+import { productApi } from "@modules/product/api/productApi";
+import { medguideApi } from "@modules/medguide/api/medguideApi";
 import { CameraScanner } from "@shared/CameraScanner";
 import { QuickAddProduct } from "@modules/inventory/components/QuickAddProduct";
 import {
@@ -73,6 +76,8 @@ import { useAuthStore } from "@shared/store/useAuthStore";
 
 /** Stock expiring within this many days is flagged short at receiving. */
 const SHORT_EXPIRY_DAYS = 90;
+/** Marks a picker row that comes from the GLOBAL catalogue, not this store. */
+const CATALOG_PREFIX = "catalog:";
 
 /** Parse a "YYYY-MM" or "YYYY-MM-DD" entry to the last date the lot is valid. */
 function parseExpiry(s: string): Date | null {
@@ -191,17 +196,41 @@ export default function ReceiveStockScreen() {
     return map;
   }, [searchResults, knownProducts]);
 
+  /**
+   * The global medicine catalogue (4 lakh+ medicines), searched alongside this
+   * pharmacy's own products. A shop stocking an item for the first time
+   * shouldn't have to retype name/pack/MRP/GST/HSN that the platform already
+   * knows — picking a catalogue hit imports it in one tap (eVitalRx-style).
+   */
+  const { data: catalogHits } = useQuery({
+    queryKey: ["grn-catalog", productQuery],
+    queryFn: () => medguideApi.search({ search: productQuery, limit: 8 }),
+    enabled: productQuery.trim().length >= 2,
+  });
+
   // Keyboard-first "add a line" search — filling the first blank line, else
   // appending. Mirrors the POS add-bar so building a multi-line GRN is fast.
-  const productItems = useMemo(
-    () =>
-      searchResults.map((p) => ({
-        value: p.id,
-        label: p.name,
-        sublabel: p.sku,
-      })),
-    [searchResults],
-  );
+  const productItems = useMemo(() => {
+    const mine = searchResults.map((p) => ({
+      value: p.id,
+      label: p.name,
+      sublabel: p.sku,
+    }));
+    // Only offer catalogue entries this store doesn't already stock.
+    const haveSku = new Set(searchResults.map((p) => p.sku));
+    const fromCatalog = (catalogHits?.data || [])
+      .filter((m) => !haveSku.has(m.sku))
+      .map((m) => ({
+        value: `${CATALOG_PREFIX}${m._id}`,
+        label: m.name,
+        sublabel: [m.saltComposition, m.manufacturerName]
+          .filter(Boolean)
+          .join(" · "),
+        right: "+ Catalogue",
+      }));
+    return [...mine, ...fromCatalog];
+  }, [searchResults, catalogHits]);
+
   const addLineForProduct = (id: string) => {
     const p = productsById[id];
     if (p) setKnownProducts((cur) => ({ ...cur, [p.id]: p }));
@@ -217,6 +246,36 @@ export default function ReceiveStockScreen() {
         { ...emptyLine(), productId: id, unit: p?.baseUnit || null },
       ];
     });
+  };
+
+  /**
+   * Import a global-catalogue medicine into this store, then put it on a line.
+   * Everything the catalogue knows (salt, brand, pack unit + factor, MRP, GST,
+   * HSN, Rx flag) is copied server-side, so nothing has to be typed.
+   */
+  const addLineFromCatalog = async (catalogId: string) => {
+    try {
+      const created = await medguideApi.addToStore(catalogId);
+      const full = await productApi.get(created.id);
+      const lite: ProductLite = {
+        id: full.id,
+        name: full.name,
+        sku: full.sku,
+        baseUnit: full.baseUnit,
+        packs: full.packs || [],
+      };
+      setKnownProducts((cur) => ({ ...cur, [lite.id]: lite }));
+      setLines((cur) => {
+        const blank = cur.findIndex((l) => !l.productId);
+        const patch = { productId: lite.id, unit: lite.baseUnit };
+        if (blank >= 0)
+          return cur.map((l, k) => (k === blank ? { ...l, ...patch } : l));
+        return [...cur, { ...emptyLine(), ...patch }];
+      });
+      setScanNote(`Added ${lite.name} from the global catalogue.`);
+    } catch (e) {
+      setScanNote(apiErrorMessage(e));
+    }
   };
 
   const setLine = (i: number, patch: Partial<DraftLine>) =>
@@ -528,7 +587,7 @@ export default function ReceiveStockScreen() {
 
       <View style={{ marginBottom: 12, zIndex: 20 }}>
         <Combobox
-          placeholder="Search a medicine to add a line — or use Scan bill above"
+          placeholder="Search your stock or the global catalogue — or use Scan bill"
           query={addQuery}
           onQueryChange={(t) => {
             setAddQuery(t);
@@ -537,7 +596,11 @@ export default function ReceiveStockScreen() {
           items={productItems}
           loading={productsLoading}
           onSelect={(id) => {
-            addLineForProduct(id);
+            if (id.startsWith(CATALOG_PREFIX)) {
+              void addLineFromCatalog(id.slice(CATALOG_PREFIX.length));
+            } else {
+              addLineForProduct(id);
+            }
             setAddQuery("");
           }}
           leading={
