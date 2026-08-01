@@ -55,13 +55,6 @@ export interface NavItem {
   permission?: string;
   /** Visible to Admin only. */
   adminOnly?: boolean;
-  /**
-   * Route stays registered (deep links + ⌘K still reach it) but it is NOT drawn
-   * in the sidebar. Used for utilities that aren't destinations — every major
-   * pharmacy suite (eVitalRx, GoFrugal, Marg, RetailGraph) puts search inside
-   * the screen that needs it rather than in the main menu.
-   */
-  hidden?: boolean;
 }
 
 /**
@@ -95,12 +88,10 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     name: "Search",
-    label: "Batch & expiry search",
+    label: "Search",
     icon: Search,
     section: "Catalogue",
     permission: PERMISSIONS.PRODUCT_SEARCH,
-    // Not a sidebar destination — reachable via ⌘K and /search.
-    hidden: true,
   },
   // ---- Inventory ----
   {
@@ -244,13 +235,4 @@ export function useVisibleNavItems(): NavItem[] {
     if (it.permission) return hasPermission(it.permission);
     return true;
   });
-}
-
-/**
- * What the SIDEBAR draws — the routed set minus `hidden` utilities. The
- * navigator and ⌘K keep using `useVisibleNavItems()` so those routes stay
- * registered and searchable.
- */
-export function useSidebarNavItems(): NavItem[] {
-  return useVisibleNavItems().filter((it) => !it.hidden);
 }
