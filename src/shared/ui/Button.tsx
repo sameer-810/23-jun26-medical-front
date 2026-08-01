@@ -110,10 +110,13 @@ export function Button({
 function getVariantColors(v: Variant) {
   switch (v) {
     case "primary":
+      // 700, not the 600 logo green: button labels are 13–16px (normal-size
+      // text), so the fill needs 4.5:1 against white. 600 gives 3.39, 700 gives
+      // 5.48. Same brand hue, just deep enough to read all day.
       return {
-        bg: palette.teal[600],
+        bg: palette.teal[700],
         text: "#FFFFFF",
-        border: palette.teal[600],
+        border: palette.teal[700],
         borderWidth: 0,
       };
     case "accent":

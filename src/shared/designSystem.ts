@@ -1,11 +1,11 @@
 /**
  * Plusveda Design System — ServRx-aligned (2026).
  *
- * Bright clinical teal as the single confident brand colour, cobalt blue as the
- * secondary accent, on clean cool-white surfaces (never warm/greige). Friendly
- * rounded headings (Poppins) + highly legible data type (Inter). Modelled on the
- * ServRx pharmacy portal: colour-coded KPI cards, tinted summary bars, teal tab
- * underlines and active states, soft shadows over hairline borders.
+ * The Plusveda logo green (#10A058) is the single confident brand colour, cobalt
+ * blue the secondary accent, on clean cool-white surfaces (never warm/greige).
+ * Friendly rounded headings (Poppins) + highly legible data type (Inter).
+ * Colour-coded KPI cards, tinted summary bars, brand tab underlines and active
+ * states, soft shadows over hairline borders.
  *
  * Token *structure* is unchanged from the previous system, so every screen and
  * the shared/ui kit re-skin from these values alone.
@@ -26,18 +26,25 @@ export const palette = {
     50: "#F6F9FB",
   },
 
-  // Primary brand — bright clinical teal (ServRx)
+  /**
+   * Primary brand — Plusveda green. 600 is sampled straight from the logo
+   * ("plus" wordmark + leaf, #10A058); the rest is a tonal ramp around it at the
+   * same hue, so the UI and the logo are the same colour family.
+   *
+   * NOTE: the key is still `teal` because ~100 call-sites reference
+   * `palette.teal[...]`. `palette.brand` is the preferred alias going forward.
+   */
   teal: {
-    900: "#0A4F49",
-    800: "#0C6E64",
-    700: "#0E8C7F",
-    600: "#16B2A2",
-    500: "#22C3B2",
-    400: "#43D0C1",
-    300: "#7CE0D4",
-    200: "#AEEBE3",
-    100: "#D7F5F0",
-    50: "#EDFBF9",
+    900: "#073C21",
+    800: "#0A5730",
+    700: "#0C7942",
+    600: "#10A058", // ← exact logo green
+    500: "#1EB86B",
+    400: "#39D080",
+    300: "#76DBA5",
+    200: "#AEEACC",
+    100: "#D6F5E7",
+    50: "#EEFBF5",
   },
 
   // Accent — cobalt blue (links, secondary CTAs, info, "sales")
@@ -85,7 +92,7 @@ export const palette = {
     tertiary: "#788690",
     disabled: "#A9B4BC",
     inverse: "#FFFFFF",
-    accent: "#0E8C7F",
+    accent: "#0C7942", // brand green 700 — passes AA on white
     link: "#1E8FE6",
   },
 
@@ -93,7 +100,7 @@ export const palette = {
     subtle: "#EFF3F5",
     default: "#E4EAEE",
     strong: "#D5DDE2",
-    focus: "#16B2A2",
+    focus: "#10A058",
     dark: "#2A3A44",
   },
 
@@ -105,11 +112,18 @@ export const palette = {
 } as const;
 
 /**
- * KPI accent set — the ServRx colour-coded metric cards. Each entry is a
+ * Preferred alias for the primary brand ramp. New code should use
+ * `palette.brand[600]`; `palette.teal[600]` is the same object, kept because
+ * ~100 existing call-sites already reference it.
+ */
+export const brand = palette.teal;
+
+/**
+ * KPI accent set — colour-coded metric cards. Each entry is a
  * { color, tint } pair for a card's top border + soft icon background.
  */
 export const accents = {
-  teal: { color: "#16B2A2", tint: "#E4F6F3" },
+  teal: { color: "#10A058", tint: "#E6F9F0" },
   blue: { color: "#1E8FE6", tint: "#E7F1FC" },
   amber: { color: "#C1801C", tint: "#FBF1DC" },
   red: { color: "#DB4B3D", tint: "#FCEAE7" },
@@ -317,13 +331,13 @@ export const motion = {
   },
 } as const;
 
-/** Gradients — the ServRx cyan→blue brand sweep, consumed by expo-linear-gradient. */
+/** Gradients — the Plusveda green→blue brand sweep, for expo-linear-gradient. */
 export const gradients = {
-  hero: ["#16B2A2", "#12A6AE", "#1E8FE6"] as const, // teal → cyan → blue
-  teal: ["#22C3B2", "#12A096"] as const,
+  hero: ["#10A058", "#0E9B76", "#1E8FE6"] as const, // brand green → teal → blue
+  teal: ["#1EB86B", "#0D874A"] as const,
   cobalt: ["#3B9AEA", "#1673C0"] as const,
   light: ["#FFFFFF", "#F3F6F8"] as const,
-  mist: ["#EDFBF9", "#EFF6FE"] as const,
+  mist: ["#EEFBF5", "#EFF6FE"] as const,
 } as const;
 
 /** Glass — translucent frosted panels for overlays over gradients/imagery. */
