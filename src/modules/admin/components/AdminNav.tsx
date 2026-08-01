@@ -148,8 +148,8 @@ const styles = StyleSheet.create({
     borderColor: palette.border.default,
   },
   chipOn: {
-    backgroundColor: palette.teal[600],
-    borderColor: palette.teal[600],
+    backgroundColor: palette.teal[700],
+    borderColor: palette.teal[700],
   },
   signout: {
     borderColor: palette.danger.border,

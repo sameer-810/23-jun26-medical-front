@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surface.primary,
   },
   checkOn: {
-    backgroundColor: palette.teal[600],
-    borderColor: palette.teal[600],
+    backgroundColor: palette.teal[700],
+    borderColor: palette.teal[700],
   },
 });

@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  sizeActive: { backgroundColor: palette.teal[600] },
+  sizeActive: { backgroundColor: palette.teal[700] },
   nav: {
     width: 30,
     height: 30,
@@ -254,6 +254,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  numActive: { backgroundColor: palette.teal[600] },
+  numActive: { backgroundColor: palette.teal[700] },
   compact: { paddingHorizontal: 8 },
 });

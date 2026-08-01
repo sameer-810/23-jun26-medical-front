@@ -56,7 +56,9 @@ export function StatTile({
 
   const dark = tone !== "light";
   const valueColor = dark ? "#FFFFFF" : palette.text.primary;
-  const labelColor = dark ? "rgba(255,255,255,0.82)" : palette.text.tertiary;
+  // 0.9 (not 0.82): the caption under a filled tile is ~12px, so it needs all
+  // the contrast it can get against the brand fill.
+  const labelColor = dark ? "rgba(255,255,255,0.90)" : palette.text.tertiary;
   const iconColor = dark
     ? "#FFFFFF"
     : accent
@@ -70,7 +72,7 @@ export function StatTile({
 
   const fill =
     tone === "teal"
-      ? palette.teal[600]
+      ? palette.teal[700] // white value + caption sit on this — needs 4.5:1
       : tone === "cobalt"
         ? palette.cobalt[600]
         : tone === "slate"

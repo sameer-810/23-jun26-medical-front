@@ -67,7 +67,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   chipActive: {
-    backgroundColor: palette.teal[600],
-    borderColor: palette.teal[600],
+    // 700 (not the 600 logo green): the active chip carries a white ~14px
+    // label, which needs 4.5:1 — 600 only reaches 3.4.
+    backgroundColor: palette.teal[700],
+    borderColor: palette.teal[700],
   },
 });

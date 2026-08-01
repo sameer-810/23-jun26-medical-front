@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
     width: 58,
     height: 58,
     borderRadius: radius.full,
-    backgroundColor: palette.teal[600],
+    backgroundColor: palette.teal[700],
     alignItems: "center",
     justifyContent: "center",
     ...shadows.lg,

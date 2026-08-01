@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: radius.md,
-    backgroundColor: palette.teal[600],
+    backgroundColor: palette.teal[700],
     alignItems: "center",
     justifyContent: "center",
   },

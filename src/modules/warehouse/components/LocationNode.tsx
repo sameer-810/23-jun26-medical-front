@@ -78,7 +78,7 @@ export function LocationNode({
         <View
           style={[
             styles.iconWrap,
-            node.type === "warehouse" && { backgroundColor: palette.teal[600] },
+            node.type === "warehouse" && { backgroundColor: palette.teal[700] },
           ]}
         >
           <Icon

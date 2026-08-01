@@ -260,5 +260,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border.default,
   },
-  tabOn: { backgroundColor: palette.teal[600], borderColor: palette.teal[600] },
+  tabOn: { backgroundColor: palette.teal[700], borderColor: palette.teal[700] },
 });

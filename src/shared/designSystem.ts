@@ -331,10 +331,14 @@ export const motion = {
   },
 } as const;
 
-/** Gradients — the Plusveda green→blue brand sweep, for expo-linear-gradient. */
+/**
+ * Gradients — the Plusveda green→blue brand sweep, for expo-linear-gradient.
+ * Stops are deliberately a shade deeper than the 600 logo green: these panels
+ * carry white body copy, so every stop clears 4.5:1 (600 would only reach 3.4).
+ */
 export const gradients = {
-  hero: ["#10A058", "#0E9B76", "#1E8FE6"] as const, // brand green → teal → blue
-  teal: ["#1EB86B", "#0D874A"] as const,
+  hero: ["#0C7942", "#0C7963", "#1873C0"] as const, // brand green → teal → blue
+  teal: ["#0FA05C", "#0A6B3B"] as const,
   cobalt: ["#3B9AEA", "#1673C0"] as const,
   light: ["#FFFFFF", "#F3F6F8"] as const,
   mist: ["#EEFBF5", "#EFF6FE"] as const,

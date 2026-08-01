@@ -1353,7 +1353,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  discToggleBtnOn: { backgroundColor: palette.teal[600] },
+  discToggleBtnOn: { backgroundColor: palette.teal[700] },
   lotBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
