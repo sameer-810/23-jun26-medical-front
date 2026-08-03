@@ -6,6 +6,7 @@ import type {
   AdminOverview,
   ListMeta,
   CreatePharmacyInput,
+  UpdatePharmacyInput,
   OrgUser,
   CatalogProduct,
   CatalogStats,
@@ -60,7 +61,7 @@ export const adminApi = {
       .post("/organizations", body)
       .then((r) => r.data.data as AdminOrg),
 
-  updateOrganization: (id: string, body: Partial<AdminOrg>) =>
+  updateOrganization: (id: string, body: UpdatePharmacyInput) =>
     adminApiClient
       .patch(`/organizations/${id}`, body)
       .then((r) => r.data.data as AdminOrg),

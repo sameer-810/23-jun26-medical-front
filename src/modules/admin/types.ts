@@ -21,6 +21,22 @@ export interface Subscription {
   currentPeriodEndsAt: string | null;
 }
 
+/**
+ * Per-pharmacy controls. `deviceLimit` is the number actually in force;
+ * `deviceLimitSource` says whether it came from this pharmacy, its plan, or the
+ * platform default, so an operator can tell an inherited limit from a
+ * deliberate override. The Gemini key is only ever a mask — the real value
+ * stays on the server.
+ */
+export interface AdminOrgSettings {
+  deviceLimit: number;
+  deviceLimitSource: "pharmacy" | "plan" | "platform";
+  deviceLimitOverride: number;
+  geminiConfigured: boolean;
+  geminiKeyMasked: string;
+  geminiModel: string;
+}
+
 export interface AdminOrg {
   id: string;
   name: string;
@@ -29,6 +45,7 @@ export interface AdminOrg {
   status: "active" | "suspended";
   owner: AdminOrgOwner | null;
   stats: { users: number; products: number; sales: number };
+  settings?: AdminOrgSettings | null;
   email?: string;
   phone?: string;
   address?: string;
@@ -37,6 +54,22 @@ export interface AdminOrg {
   subscription?: Subscription;
   createdAt: string;
   updatedAt: string;
+}
+
+/** What the edit form may send. Omitted keys are left untouched server-side. */
+export interface UpdatePharmacyInput {
+  name?: string;
+  industry?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  gstin?: string;
+  drugLicenseNo?: string;
+  /** 0 clears the override and falls back to the plan / platform default. */
+  maxDevicesPerUser?: number;
+  /** "" removes this pharmacy's key so it uses the platform key. */
+  geminiApiKey?: string;
+  geminiModel?: string;
 }
 
 export interface OrgUser {

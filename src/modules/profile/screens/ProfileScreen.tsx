@@ -2,12 +2,20 @@ import React from "react";
 import { View } from "react-native";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { User, Phone, Lock, LogOut, Building2 } from "lucide-react-native";
+import {
+  User,
+  Phone,
+  Lock,
+  LogOut,
+  Building2,
+  Monitor,
+} from "lucide-react-native";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import {
   useUpdateProfile,
   useChangePassword,
 } from "@modules/profile/hooks/useProfile";
+import { useSessions, useLogoutAll } from "@modules/profile/hooks/useSessions";
 import {
   profileDetailsSchema,
   changePasswordSchema,
@@ -32,6 +40,8 @@ export default function ProfileScreen() {
   const logout = useAuthStore((s) => s.logout);
   const profileMut = useUpdateProfile();
   const pwdMut = useChangePassword();
+  const { data: sessions } = useSessions();
+  const logoutAll = useLogoutAll();
 
   // Two independent forms on one screen — profile details and a password change.
   const detailsForm = useForm({
@@ -205,6 +215,65 @@ export default function ProfileScreen() {
             loading={pwdMut.isPending}
             onPress={changePassword}
           />
+        </VStack>
+      </Card>
+
+      {/* Signed-in devices */}
+      <Text variant="h3" tone="primary" style={{ marginBottom: 4 }}>
+        Signed-in devices
+      </Text>
+      <Text variant="body-sm" tone="tertiary" style={{ marginBottom: 12 }}>
+        {sessions
+          ? `Using ${sessions.used} of ${sessions.limit} allowed device${sessions.limit === 1 ? "" : "s"}.`
+          : "Loading your devices…"}
+      </Text>
+      <Card style={{ marginBottom: 24 }}>
+        <VStack gap={14}>
+          {logoutAll.isError && (
+            <Text variant="caption" tone="danger">
+              {apiErrorMessage(logoutAll.error)}
+            </Text>
+          )}
+          {logoutAll.isSuccess && (
+            <Text variant="caption" tone="success">
+              {logoutAll.data?.message}
+            </Text>
+          )}
+
+          {(sessions?.sessions || []).map((s) => (
+            <HStack key={s.id} gap={12} align="center">
+              <View style={iconWrap}>
+                <Monitor
+                  size={18}
+                  color={palette.text.tertiary}
+                  strokeWidth={1.8}
+                />
+              </View>
+              <VStack gap={2} flex={1}>
+                <HStack gap={8} align="center">
+                  <Text variant="label" tone="primary" numberOfLines={1}>
+                    {s.deviceName}
+                  </Text>
+                  {s.current && <StatusChip label="This device" tone="info" />}
+                </HStack>
+                <Text variant="caption" tone="tertiary" numberOfLines={1}>
+                  {[s.ip, new Date(s.lastSeenAt).toLocaleString()]
+                    .filter(Boolean)
+                    .join("  ·  ")}
+                </Text>
+              </VStack>
+            </HStack>
+          ))}
+
+          {/* Only meaningful when something else is holding a slot. */}
+          {(sessions?.used ?? 0) > 1 && (
+            <Button
+              label="Sign out of other devices"
+              variant="secondary"
+              loading={logoutAll.isPending}
+              onPress={() => logoutAll.mutate(true)}
+            />
+          )}
         </VStack>
       </Card>
 

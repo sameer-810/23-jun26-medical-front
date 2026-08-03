@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminApi, ListOrgsParams, ListParams } from "../api/adminApi";
-import type { AdminOrg, CatalogProduct, Plan } from "../types";
+import type { CatalogProduct, Plan, UpdatePharmacyInput } from "../types";
 
 const invalidate = (qc: ReturnType<typeof useQueryClient>) =>
   qc.invalidateQueries({ queryKey: ["admin"] });
@@ -37,7 +37,7 @@ export function useCreatePharmacy() {
 export function useUpdatePharmacy(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Partial<AdminOrg>) =>
+    mutationFn: (body: UpdatePharmacyInput) =>
       adminApi.updateOrganization(id, body),
     onSuccess: () => invalidate(qc),
   });

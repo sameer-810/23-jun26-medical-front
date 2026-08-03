@@ -6,6 +6,7 @@ import {
   LoginPayload,
   SignupPayload,
   ForgotPasswordPayload,
+  SessionList,
   ResetPasswordPayload,
 } from "@modules/auth/types";
 
@@ -43,5 +44,28 @@ export const authApi = {
   logout: async (refreshToken: string): Promise<MessageResponse> => {
     const res = await apiClient.post("/auth/logout", { refreshToken });
     return res.data;
+  },
+
+  /** Devices this account is signed in on, with the current one flagged. */
+  sessions: async (refreshToken: string | null): Promise<SessionList> => {
+    const res = await apiClient.get("/auth/sessions", {
+      params: refreshToken ? { refreshToken } : undefined,
+    });
+    return res.data.data as SessionList;
+  },
+
+  /**
+   * Signs out other devices. `keepCurrent` defaults to true so freeing a stuck
+   * slot doesn't also sign out the person doing it.
+   */
+  logoutAll: async (
+    refreshToken: string | null,
+    keepCurrent = true,
+  ): Promise<{ message: string; signedOut: number }> => {
+    const res = await apiClient.post("/auth/logout-all", {
+      refreshToken: refreshToken || undefined,
+      keepCurrent,
+    });
+    return res.data.data;
   },
 };
