@@ -15,9 +15,12 @@ import {
   UsersRound,
   Trash2,
   CreditCard,
+  MonitorSmartphone,
 } from "lucide-react-native";
 import {
   useAdminOrganization,
+  useOrgSessions,
+  useRevokeOrgSessions,
   useSetSuspended,
   useArchivePharmacy,
   useAssignPlan,
@@ -46,6 +49,8 @@ export default function PharmacyDetailScreen() {
   const id = route.params?.id as string;
 
   const { data: org, isLoading } = useAdminOrganization(id);
+  const { data: sessions } = useOrgSessions(id);
+  const revoke = useRevokeOrgSessions(id);
   const { data: plans } = usePlans(false);
   const setSuspended = useSetSuspended();
   const archive = useArchivePharmacy();
@@ -214,6 +219,102 @@ export default function PharmacyDetailScreen() {
               style={styles.tile}
             />
           </HStack>
+
+          {/* Signed-in devices.
+              Kept separate from Suspend and Reset password: those already sign
+              people out, but as a side effect of a much heavier action. A
+              pharmacy admin locked out on their device limit needs a seat
+              freed, not their password changed or their shop suspended. */}
+          <Card>
+            <VStack gap={12}>
+              <HStack gap={8} align="center">
+                <MonitorSmartphone
+                  size={18}
+                  color={palette.text.accent}
+                  strokeWidth={2}
+                />
+                <Text variant="h4" tone="primary">
+                  Signed-in devices
+                </Text>
+              </HStack>
+
+              <Text variant="body-sm" tone="secondary">
+                {sessions
+                  ? `${sessions.totalSessions} device${sessions.totalSessions === 1 ? "" : "s"} signed in · limit ${sessions.deviceLimit} per user (${
+                      sessions.deviceLimitSource === "pharmacy"
+                        ? "set for this pharmacy"
+                        : sessions.deviceLimitSource === "plan"
+                          ? "from its plan"
+                          : "platform default"
+                    })`
+                  : "Loading…"}
+              </Text>
+
+              {/* Lowering a limit doesn't evict anyone already signed in — the
+                  count is only checked when a NEW session is created. */}
+              {sessions?.overLimit?.length ? (
+                <Text variant="caption" tone="warning">
+                  Over the current limit:{" "}
+                  {sessions.overLimit
+                    .map((o) => `${o.name} (${o.count})`)
+                    .join(", ")}
+                  . Existing devices stay signed in until you sign them out.
+                </Text>
+              ) : null}
+
+              {revoke.isSuccess ? (
+                <Text variant="caption" tone="success">
+                  {revoke.data?.message}
+                </Text>
+              ) : null}
+
+              {(sessions?.sessions || []).map((s) => (
+                <HStack key={s.id} gap={10} align="center">
+                  <VStack gap={2} flex={1}>
+                    <Text variant="label" tone="primary" numberOfLines={1}>
+                      {s.userName}{" "}
+                      <Text variant="caption" tone="tertiary">
+                        {s.userEmail}
+                      </Text>
+                    </Text>
+                    <Text variant="caption" tone="tertiary" numberOfLines={1}>
+                      {[
+                        s.deviceName,
+                        s.ip,
+                        new Date(s.lastSeenAt).toLocaleString(),
+                      ]
+                        .filter(Boolean)
+                        .join("  ·  ")}
+                    </Text>
+                  </VStack>
+                  <Button
+                    label="Sign out"
+                    size="sm"
+                    variant="secondary"
+                    fullWidth={false}
+                    disabled={revoke.isPending}
+                    onPress={() => revoke.mutate({ sessionId: s.id })}
+                  />
+                </HStack>
+              ))}
+
+              {sessions && sessions.totalSessions === 0 ? (
+                <Text variant="body-sm" tone="tertiary">
+                  Nobody is signed in right now.
+                </Text>
+              ) : null}
+
+              {sessions && sessions.totalSessions > 0 ? (
+                <Button
+                  label="Sign out all devices"
+                  size="sm"
+                  variant="destructive"
+                  loading={revoke.isPending}
+                  onPress={() => revoke.mutate({})}
+                />
+              ) : null}
+            </VStack>
+          </Card>
 
           {/* Subscription */}
           <Card>

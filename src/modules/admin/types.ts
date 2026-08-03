@@ -174,3 +174,27 @@ export interface CreatePharmacyInput {
     password: string;
   };
 }
+
+/** One signed-in device inside a pharmacy, as the platform console sees it. */
+export interface OrgDeviceSession {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userRole: string;
+  deviceName: string;
+  userAgent: string;
+  ip: string;
+  lastSeenAt: string;
+  createdAt: string;
+}
+
+export interface OrgSessions {
+  pharmacy: { id: string; name: string };
+  deviceLimit: number;
+  deviceLimitSource: "pharmacy" | "plan" | "platform";
+  totalSessions: number;
+  sessions: OrgDeviceSession[];
+  /** Staff over the current limit — a limit change doesn't evict anyone. */
+  overLimit: { userId: string; name: string; count: number }[];
+}

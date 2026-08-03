@@ -13,6 +13,7 @@ import type {
   Plan,
   PlatformAdminRow,
   AuditEntry,
+  OrgSessions,
 } from "../types";
 
 const ADMIN_URL = `${environment.apiUrl}/admin`;
@@ -76,6 +77,24 @@ export const adminApi = {
     adminApiClient
       .post(`/organizations/${id}/plan`, body)
       .then((r) => r.data.data as AdminOrg),
+
+  /** Devices currently signed in to a pharmacy, grouped by staff member. */
+  orgSessions: (id: string) =>
+    adminApiClient
+      .get(`/organizations/${id}/sessions`)
+      .then((r) => r.data.data as OrgSessions),
+
+  /**
+   * Force sign-out. Omit both ids for the whole pharmacy, pass `userId` for one
+   * staff member, or `sessionId` for a single device.
+   */
+  revokeOrgSessions: (
+    id: string,
+    body: { userId?: string; sessionId?: string } = {},
+  ) =>
+    adminApiClient
+      .post(`/organizations/${id}/sessions/revoke`, body)
+      .then((r) => r.data.data as { signedOut: number; message: string }),
 
   suspend: (id: string) =>
     adminApiClient

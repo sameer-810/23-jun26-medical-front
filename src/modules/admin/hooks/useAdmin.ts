@@ -208,3 +208,27 @@ export function useAudit(params: {
     queryFn: () => adminApi.listAudit(params),
   });
 }
+
+/** Devices signed in to one pharmacy. */
+export function useOrgSessions(id: string | undefined) {
+  return useQuery({
+    queryKey: ["admin", "org-sessions", id],
+    queryFn: () => adminApi.orgSessions(id as string),
+    enabled: Boolean(id),
+  });
+}
+
+/**
+ * Force sign-out for a pharmacy, one staff member, or one device.
+ *
+ * Invalidates the pharmacy row too — its device count is shown there, and a
+ * stale number after a revoke would look like the action didn't work.
+ */
+export function useRevokeOrgSessions(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { userId?: string; sessionId?: string } = {}) =>
+      adminApi.revokeOrgSessions(id, body),
+    onSuccess: () => invalidate(qc),
+  });
+}
