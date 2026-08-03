@@ -55,6 +55,17 @@ export interface NavItem {
   permission?: string;
   /** Visible to Admin only. */
   adminOnly?: boolean;
+  /**
+   * Registered as a route — deep links, ⌘K and in-app buttons all still reach
+   * it — but given no sidebar row.
+   *
+   * A nav slot is for a place you go and work. These two are lookups you do
+   * *while* working: MedGuide answers a question about a medicine (opened from
+   * Products, the way Marg opens PharmaNXT from a button while billing), and
+   * batch/expiry is a question about stock you're already looking at (opened
+   * from Inventory). Neither is a destination, so neither earns a slot.
+   */
+  hidden?: boolean;
 }
 
 /**
@@ -85,13 +96,15 @@ export const NAV_ITEMS: NavItem[] = [
     icon: BookOpen,
     section: "Catalogue",
     permission: PERMISSIONS.DASHBOARD_VIEW,
+    hidden: true, // opened from the Products header
   },
   {
     name: "Search",
-    label: "Search",
+    label: "Batch & expiry search",
     icon: Search,
     section: "Catalogue",
     permission: PERMISSIONS.PRODUCT_SEARCH,
+    hidden: true, // opened from the Inventory header
   },
   // ---- Inventory ----
   {
@@ -235,4 +248,15 @@ export function useVisibleNavItems(): NavItem[] {
     if (it.permission) return hasPermission(it.permission);
     return true;
   });
+}
+
+/**
+ * What the Sidebar draws — permitted AND not `hidden`.
+ *
+ * Deliberately narrower than useVisibleNavItems(): the navigator must keep
+ * registering hidden routes, or the buttons and ⌘K entries that open them would
+ * dead-end.
+ */
+export function useSidebarNavItems(): NavItem[] {
+  return useVisibleNavItems().filter((it) => !it.hidden);
 }

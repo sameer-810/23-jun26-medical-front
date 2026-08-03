@@ -6,6 +6,7 @@ import {
   IndianRupee,
   PackageX,
   ChevronRight,
+  CalendarSearch,
 } from "lucide-react-native";
 import { useStock, useStockValue } from "@modules/inventory/hooks/useInventory";
 import { StockSummaryItem } from "@modules/inventory/types";
@@ -16,6 +17,7 @@ import {
   VStack,
   HStack,
   Card,
+  Button,
   StatTile,
   StatusChip,
   ChipsRow,
@@ -165,6 +167,23 @@ export default function InventoryScreen() {
       subtitle="Live quantity, availability and valuation"
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
+      // "Which batch, expiring when" is a question about the stock you're
+      // already looking at — so it opens from here rather than from the nav.
+      right={
+        <Button
+          label="Batch & expiry"
+          variant="secondary"
+          fullWidth={false}
+          icon={
+            <CalendarSearch
+              size={18}
+              color={palette.text.primary}
+              strokeWidth={1.9}
+            />
+          }
+          onPress={() => navigation.navigate("Search")}
+        />
+      }
     >
       <View
         style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 }}
