@@ -78,6 +78,8 @@ import { useAuthStore } from "@shared/store/useAuthStore";
 const SHORT_EXPIRY_DAYS = 90;
 /** Marks a picker row that comes from the GLOBAL catalogue, not this store. */
 const CATALOG_PREFIX = "catalog:";
+/** Below this, a catalogue search matches too much to be worth the round trip. */
+const CATALOG_MIN_CHARS = 2;
 
 /** Parse a "YYYY-MM" or "YYYY-MM-DD" entry to the last date the lot is valid. */
 function parseExpiry(s: string): Date | null {
@@ -135,6 +137,14 @@ export default function ReceiveStockScreen() {
   const [supplierId, setSupplierId] = useState<string | null>(null);
   const [referenceNo, setReference] = useState("");
   const [addQuery, setAddQuery] = useState("");
+  // Debounce what the two searches actually receive. Typing "paracetamol" used
+  // to fire 11 product searches AND 10 catalogue searches, whose replies could
+  // land out of order — so the list you saw was whichever request happened to
+  // finish last, not the one matching what you'd typed.
+  useEffect(() => {
+    const t = setTimeout(() => setProductQuery(addQuery.trim()), 250);
+    return () => clearTimeout(t);
+  }, [addQuery]);
   const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
   // The whole receipt, not just its number — its lines carry the label codes
   // the "Print labels" step needs.
@@ -202,11 +212,26 @@ export default function ReceiveStockScreen() {
    * shouldn't have to retype name/pack/MRP/GST/HSN that the platform already
    * knows — picking a catalogue hit imports it in one tap (eVitalRx-style).
    */
-  const { data: catalogHits } = useQuery({
+  const catalogReady = productQuery.trim().length >= CATALOG_MIN_CHARS;
+  const { data: catalogHits, isFetching: catalogLoading } = useQuery({
     queryKey: ["grn-catalog", productQuery],
     queryFn: () => medguideApi.search({ search: productQuery, limit: 8 }),
-    enabled: productQuery.trim().length >= 2,
+    enabled: catalogReady,
+    // A given search over a 4-lakh-row catalogue doesn't change during a GRN.
+    staleTime: 5 * 60 * 1000,
   });
+
+  /**
+   * True while any part of the answer is still coming — including the debounce
+   * gap, when no request is in flight yet. Without that last term the dropdown
+   * renders "No match" for the ~250ms between your last keystroke and the
+   * request, which reads as "we don't stock it" and sends people off to create a
+   * duplicate product. Silence is not a negative result.
+   */
+  const searching =
+    productsLoading ||
+    catalogLoading ||
+    addQuery.trim() !== productQuery.trim();
 
   // Keyboard-first "add a line" search — filling the first blank line, else
   // appending. Mirrors the POS add-bar so building a multi-line GRN is fast.
@@ -589,12 +614,9 @@ export default function ReceiveStockScreen() {
         <Combobox
           placeholder="Search your stock or the global catalogue — or use Scan bill"
           query={addQuery}
-          onQueryChange={(t) => {
-            setAddQuery(t);
-            setProductQuery(t);
-          }}
+          onQueryChange={setAddQuery}
           items={productItems}
-          loading={productsLoading}
+          loading={searching}
           onSelect={(id) => {
             if (id.startsWith(CATALOG_PREFIX)) {
               void addLineFromCatalog(id.slice(CATALOG_PREFIX.length));
@@ -606,7 +628,11 @@ export default function ReceiveStockScreen() {
           leading={
             <Search size={18} color={palette.teal[600]} strokeWidth={2} />
           }
-          emptyText="No match — type the full name, or add the line manually below"
+          emptyText={
+            addQuery.trim().length < CATALOG_MIN_CHARS
+              ? `Type ${CATALOG_MIN_CHARS} letters to search your stock and the global catalogue`
+              : "No match in your stock or the catalogue — add the line manually below"
+          }
         />
       </View>
 

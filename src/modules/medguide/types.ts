@@ -49,8 +49,12 @@ export interface Medicine {
   medicineInfo?: MedicineInfo;
 }
 
+/**
+ * Deliberately has no `total`: the catalogue's size is platform data, and
+ * counting a match set to render one page is what made search slow.
+ */
 export interface MedGuideMeta {
-  total: number;
-  pages: number;
   page: number;
+  limit: number;
+  hasMore: boolean;
 }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
@@ -11,24 +11,46 @@ import {
   VStack,
   HStack,
   Card,
+  Button,
   StatusChip,
   TextField,
-  Pagination,
   EmptyState,
 } from "@shared/ui";
+
+/** Below this a lookup matches most of the catalogue — it isn't a search yet. */
+const MIN_CHARS = 2;
+const LIMIT = 20;
 
 export default function MedGuideScreen() {
   const navigation = useNavigation<any>();
   const [search, setSearch] = useState("");
+  const [term, setTerm] = useState("");
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["medguide", search, page, limit],
-    queryFn: () => medguideApi.search({ search, page, limit }),
+  // Debounce. Typing "paracetamol" used to fire eleven searches over a 254k-row
+  // catalogue, each one a full scan, arriving out of order — so the list you
+  // ended up looking at was whichever reply happened to land last.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setTerm(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const ready = term.length >= MIN_CHARS;
+  const { data, isFetching } = useQuery({
+    queryKey: ["medguide", term, page],
+    queryFn: () => medguideApi.search({ search: term, page, limit: LIMIT }),
+    enabled: ready,
+    staleTime: 5 * 60 * 1000,
   });
   const items = data?.data ?? [];
-  const meta = data?.meta;
+  const hasMore = data?.meta?.hasMore ?? false;
+  // The debounce gap counts as searching — otherwise the screen flashes "no
+  // medicine matches" in the pause between the last keystroke and the request.
+  const searching =
+    isFetching || (search.trim() !== term && search.trim().length >= MIN_CHARS);
 
   return (
     <Screen
@@ -39,10 +61,7 @@ export default function MedGuideScreen() {
       <View style={{ marginBottom: 12 }}>
         <TextField
           value={search}
-          onChangeText={(v) => {
-            setSearch(v);
-            setPage(1);
-          }}
+          onChangeText={setSearch}
           placeholder="Search by name, salt or manufacturer"
           leading={
             <Search size={18} color={palette.text.tertiary} strokeWidth={1.8} />
@@ -54,7 +73,18 @@ export default function MedGuideScreen() {
       {items.length === 0 ? (
         <EmptyState
           icon={BookOpen}
-          title={isLoading ? "Loading…" : "Search the medicine guide"}
+          title={
+            searching
+              ? "Searching…"
+              : ready
+                ? "No medicine matches that"
+                : "Search the medicine guide"
+          }
+          message={
+            !searching && !ready
+              ? `Type at least ${MIN_CHARS} letters of a brand, salt or manufacturer.`
+              : undefined
+          }
         />
       ) : (
         <VStack gap={8}>
@@ -89,21 +119,25 @@ export default function MedGuideScreen() {
         </VStack>
       )}
 
-      {meta && meta.total > 0 ? (
-        <View style={{ marginTop: 16 }}>
-          <Pagination
-            page={meta.page}
-            totalPages={meta.pages}
-            total={meta.total}
-            limit={limit}
-            onPageChange={setPage}
-            onLimitChange={(l) => {
-              setLimit(l);
-              setPage(1);
-            }}
-            label="medicines"
+      {/* Prev/Next, not "page 3 of 412" — there's no total to page against any
+          more, and a lookup is something you refine rather than paginate. */}
+      {items.length > 0 && (page > 1 || hasMore) ? (
+        <HStack gap={10} justify="center" style={{ marginTop: 16 }}>
+          <Button
+            label="Previous"
+            variant="secondary"
+            fullWidth={false}
+            disabled={page === 1 || searching}
+            onPress={() => setPage((n) => Math.max(1, n - 1))}
           />
-        </View>
+          <Button
+            label="Next"
+            variant="secondary"
+            fullWidth={false}
+            disabled={!hasMore || searching}
+            onPress={() => setPage((n) => n + 1)}
+          />
+        </HStack>
       ) : null}
     </Screen>
   );
