@@ -276,7 +276,9 @@ export default function ReceiveStockScreen() {
       ...productItems,
       {
         value: CREATE_NEW,
-        label: typed ? `Create “${typed}” as a new product` : "Create new product",
+        label: typed
+          ? `Create “${typed}” as a new product`
+          : "Create new product",
         sublabel: "Not in your stock or the catalogue",
         right: "New",
       },
@@ -292,7 +294,9 @@ export default function ReceiveStockScreen() {
     if (p) setKnownProducts((cur) => ({ ...cur, [p.id]: p }));
     const patch = { productId: id, unit: p?.baseUnit || null };
     if (row !== null) {
-      setLines((cur) => cur.map((l, k) => (k === row ? { ...l, ...patch } : l)));
+      setLines((cur) =>
+        cur.map((l, k) => (k === row ? { ...l, ...patch } : l)),
+      );
       return;
     }
     setLines((cur) => {
@@ -748,7 +752,9 @@ export default function ReceiveStockScreen() {
                         tone={p ? "primary" : "link"}
                         numberOfLines={1}
                       >
-                        {p?.name || line.fromBill?.productName || "Set product…"}
+                        {p?.name ||
+                          line.fromBill?.productName ||
+                          "Set product…"}
                       </Text>
                     </Pressable>
                   </View>

@@ -49,11 +49,7 @@ export function ProductPicker({
           <VStack gap={14}>
             <HStack align="center" gap={10}>
               <View style={styles.icon}>
-                <Search
-                  size={18}
-                  color={palette.teal[700]}
-                  strokeWidth={2}
-                />
+                <Search size={18} color={palette.teal[700]} strokeWidth={2} />
               </View>
               <VStack gap={1} flex={1}>
                 <Text variant="h4" tone="primary">

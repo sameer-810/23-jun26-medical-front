@@ -82,15 +82,36 @@ export default function NewSaleScreen() {
   const { width } = useWindowDimensions();
   const wide = width >= 1200;
 
+  // What's typed vs what's actually searched. The counter search is the busiest
+  // input in the product — undebounced it fired one request per keystroke, and
+  // replies could land out of order, so the list you saw was whichever response
+  // happened to return last rather than the one matching what you'd typed.
   const [productQuery, setProductQuery] = useState("");
-  const { data: products, isFetching: productsLoading } = useProducts({
-    search: productQuery || undefined,
+  const [productTerm, setProductTerm] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setProductTerm(productQuery.trim()), 200);
+    return () => clearTimeout(t);
+  }, [productQuery]);
+  const { data: products, isFetching: productsFetching } = useProducts({
+    search: productTerm || undefined,
     limit: 50,
   });
+  // The debounce gap still counts as searching, or the dropdown flashes
+  // "no medicine matches" between the last keystroke and the request.
+  const productsLoading =
+    productsFetching || productQuery.trim() !== productTerm;
+
   const [customerQuery, setCustomerQuery] = useState("");
-  const { data: customers, isFetching: customersLoading } = useCustomers({
-    search: customerQuery || undefined,
+  const [customerTerm, setCustomerTerm] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setCustomerTerm(customerQuery.trim()), 250);
+    return () => clearTimeout(t);
+  }, [customerQuery]);
+  const { data: customers, isFetching: customersFetching } = useCustomers({
+    search: customerTerm || undefined,
   });
+  const customersLoading =
+    customersFetching || customerQuery.trim() !== customerTerm;
   const createCustomer = useCreateCustomer();
   const mut = useCreateSale();
   const { data: invoiceProfile } = useInvoiceProfile();

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Pressable,
@@ -54,10 +54,18 @@ export default function OrderFormScreen() {
   const [search, setSearch] = useState("");
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const { data: results, isFetching: productsLoading } = useProducts({
-    search: search || undefined,
+  // Debounced: one request per pause, not per keystroke, and out-of-order
+  // replies can't leave a stale list on screen.
+  const [term, setTerm] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setTerm(search.trim()), 250);
+    return () => clearTimeout(t);
+  }, [search]);
+  const { data: results, isFetching } = useProducts({
+    search: term || undefined,
     limit: 8,
   });
+  const productsLoading = isFetching || search.trim() !== term;
 
   const productsById = useMemo(() => {
     const map: Record<string, { id: string; name: string; sku: string }> = {};
