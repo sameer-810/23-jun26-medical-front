@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View } from "react-native";
+import { View, Platform } from "react-native";
 import {
   CalendarClock,
   Plus,
@@ -9,6 +9,8 @@ import {
   Check,
   Ban,
   Trash2,
+  Camera,
+  ScanText,
 } from "lucide-react-native";
 import {
   useCheques,
@@ -17,7 +19,9 @@ import {
   useSetChequeStatus,
   useRemoveCheque,
 } from "@modules/cheque/hooks/useCheques";
-import { Cheque, ChequeStatus } from "@modules/cheque/types";
+import { Cheque, ChequeStatus, ChequeRead } from "@modules/cheque/types";
+import { chequeApi } from "@modules/cheque/api/chequeApi";
+import { useImageCapture, CapturedImage } from "@shared/useImageCapture";
 import { apiErrorMessage } from "@api/apiClient";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
@@ -80,6 +84,49 @@ export default function PdcScreen() {
   const [form, setForm] = useState(emptyForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  // Camera capture: the photo is held until the cheque is saved, then attached
+  // to it. Reading and storing are separate jobs — one fills the form, the
+  // other is the evidence if the cheque ever bounces.
+  const { capture, inputRef, onWebFile } = useImageCapture();
+  const [photo, setPhoto] = useState<CapturedImage | null>(null);
+  const [reading, setReading] = useState(false);
+  const [readResult, setReadResult] = useState<ChequeRead | null>(null);
+  const [readError, setReadError] = useState<string | null>(null);
+
+  const scanCheque = async () => {
+    const img = await capture();
+    if (!img) return;
+    setPhoto(img);
+    setReadError(null);
+    setReading(true);
+    try {
+      const r = await chequeApi.read(img);
+      setReadResult(r);
+      setShowForm(true);
+      // Only the machine-printed fields are written straight in. The amount and
+      // date are shown as a suggestion — nothing we hold could contradict a
+      // misread amount, so a human has to agree to it.
+      setForm((f) => ({
+        ...f,
+        chequeNo: r.autofill.chequeNo || f.chequeNo,
+        bankName: r.autofill.bankName || f.bankName,
+        partyName: r.confirm.payeeName || f.partyName,
+      }));
+    } catch (e) {
+      setReadError(apiErrorMessage(e));
+    } finally {
+      setReading(false);
+    }
+  };
+
+  /** Copy a read-but-unconfirmed value into the form, on purpose. */
+  const acceptAmount = () =>
+    readResult?.confirm.amount != null &&
+    set("amount", String(readResult.confirm.amount));
+  const acceptDate = () =>
+    readResult?.confirm.chequeDate &&
+    set("chequeDate", readResult.confirm.chequeDate);
+
   const canManage = useAuthStore((s) => s.hasPermission)(
     PERMISSIONS.SUPPLIERS_MANAGE,
   );
@@ -112,8 +159,22 @@ export default function PdcScreen() {
         note: form.note.trim() || undefined,
       },
       {
-        onSuccess: () => {
+        onSuccess: async (created) => {
+          // Attach the photo AFTER the cheque exists — it hangs off the record.
+          // A failed upload must not lose the cheque itself, so it's best-effort
+          // and reported rather than thrown.
+          if (photo && created?._id) {
+            try {
+              await chequeApi.attachImage(created._id, photo);
+            } catch (e) {
+              setReadError(
+                `Cheque saved, but the photo didn't attach: ${apiErrorMessage(e)}`,
+              );
+            }
+          }
           setForm(emptyForm);
+          setPhoto(null);
+          setReadResult(null);
           setShowForm(false);
         },
       },
@@ -150,19 +211,108 @@ export default function PdcScreen() {
       </HStack>
 
       {canManage ? (
-        <Button
-          label={showForm ? "Cancel" : "Add cheque"}
-          variant={showForm ? "secondary" : "primary"}
-          icon={
-            showForm ? (
-              <X size={16} color={palette.text.secondary} strokeWidth={2} />
-            ) : (
-              <Plus size={16} color="#FFFFFF" strokeWidth={2} />
-            )
-          }
-          style={{ marginBottom: 16 }}
-          onPress={() => setShowForm((s) => !s)}
-        />
+        <HStack gap={10} style={{ marginBottom: 16 }}>
+          <View style={{ flex: 1 }}>
+            <Button
+              label={showForm ? "Cancel" : "Add cheque"}
+              variant={showForm ? "secondary" : "primary"}
+              icon={
+                showForm ? (
+                  <X size={16} color={palette.text.secondary} strokeWidth={2} />
+                ) : (
+                  <Plus size={16} color="#FFFFFF" strokeWidth={2} />
+                )
+              }
+              onPress={() => setShowForm((s) => !s)}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              label={reading ? "Reading…" : "Scan cheque"}
+              variant="secondary"
+              loading={reading}
+              icon={
+                <Camera
+                  size={16}
+                  color={palette.text.primary}
+                  strokeWidth={2}
+                />
+              }
+              onPress={() => void scanCheque()}
+            />
+          </View>
+          {/* Web capture target — a phone browser opens the camera directly. */}
+          {Platform.OS === "web" ? (
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              style={{ display: "none" }}
+              onChange={onWebFile}
+            />
+          ) : null}
+        </HStack>
+      ) : null}
+
+      {readError ? (
+        <View style={[errorBox, { marginBottom: 16 }]}>
+          <Text variant="body-sm" tone="danger">
+            {readError}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* What the camera read, and what still needs a human. The printed fields
+          are already in the form; these two are not, on purpose. */}
+      {readResult ? (
+        <Card style={{ marginBottom: 16 }}>
+          <VStack gap={12}>
+            <HStack gap={8} align="center">
+              <ScanText size={18} color={palette.teal[700]} strokeWidth={2} />
+              <Text variant="label-lg" tone="primary">
+                Read from the cheque
+              </Text>
+              {photo ? (
+                <StatusChip label="Photo will be attached" tone="info" />
+              ) : null}
+            </HStack>
+
+            {readResult.warnings.map((w) => (
+              <Text key={w} variant="caption" tone="warning">
+                {w}
+              </Text>
+            ))}
+
+            <HStack gap={10} wrap>
+              {readResult.confirm.amount != null ? (
+                <Button
+                  label={`Use amount ₹${readResult.confirm.amount}`}
+                  variant="secondary"
+                  size="sm"
+                  fullWidth={false}
+                  onPress={acceptAmount}
+                />
+              ) : null}
+              {readResult.confirm.chequeDate ? (
+                <Button
+                  label={`Use date ${readResult.confirm.chequeDate}`}
+                  variant="secondary"
+                  size="sm"
+                  fullWidth={false}
+                  onPress={acceptDate}
+                />
+              ) : null}
+            </HStack>
+
+            {readResult.confirm.amountInWords ? (
+              <Text variant="caption" tone="tertiary">
+                Words on the cheque: “{readResult.confirm.amountInWords}” —
+                check this matches the figure you enter.
+              </Text>
+            ) : null}
+          </VStack>
+        </Card>
       ) : null}
 
       {showForm ? (
