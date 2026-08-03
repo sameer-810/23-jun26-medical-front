@@ -159,6 +159,10 @@ export default function ReceiveStockScreen() {
   // the "Print labels" step needs.
   const [done, setDone] = useState<ReceiptDetail | null>(null);
   const [scanNote, setScanNote] = useState<string | null>(null);
+  /** Supplier name read off a scanned bill that matched nothing in the master. */
+  const [unmatchedSupplier, setUnmatchedSupplier] = useState<string | null>(
+    null,
+  );
   const [dupWarning, setDupWarning] = useState<string | null>(null);
   const [knownProducts, setKnownProducts] = useState<
     Record<string, ProductLite>
@@ -181,6 +185,11 @@ export default function ReceiveStockScreen() {
     setLines(linesFromScan(scanned));
     setReference(scanned.invoiceNo || "");
     if (scanned.supplierMatch) setSupplierId(scanned.supplierMatch.id);
+    // The bill named a supplier we couldn't match. Hold the name and offer to
+    // create it, rather than dropping it — the pharmacist would otherwise
+    // retype a name that's sitting right there on the scanned page.
+    else if (scanned.supplierName?.trim())
+      setUnmatchedSupplier(scanned.supplierName.trim());
     setScanNote(scanSummary(scanned));
     setDupWarning(duplicateWarning(scanned));
     navigation.setParams({ scanned: undefined });
@@ -646,6 +655,47 @@ export default function ReceiveStockScreen() {
             }
             allowClear
           />
+          {/* Deliberately a prompt, not an auto-create. OCR returns "SAFE LIFE
+              ENTERPRISES PVT. LTD." one week and "SAFELIFE ENTERPRISES" the
+              next; creating silently would quietly split one distributor's
+              ledger across two supplier records. */}
+          {unmatchedSupplier && !supplierId ? (
+            <Banner
+              tone="info"
+              title={`"${unmatchedSupplier}" isn't in your suppliers yet`}
+              message="Read from the scanned bill. Add it, or pick the right supplier above if you already have them under another name."
+            >
+              <HStack gap={10} wrap style={{ marginTop: 10 }}>
+                {canManageSuppliers ? (
+                  <Button
+                    label="Add this supplier"
+                    size="sm"
+                    fullWidth={false}
+                    loading={createSupplier.isPending}
+                    onPress={async () => {
+                      try {
+                        const s = await createSupplier.mutateAsync({
+                          name: unmatchedSupplier,
+                        });
+                        setSupplierId(s.id);
+                        setUnmatchedSupplier(null);
+                        setScanNote(`Supplier "${s.name}" added and selected.`);
+                      } catch (e) {
+                        setScanNote(apiErrorMessage(e));
+                      }
+                    }}
+                  />
+                ) : null}
+                <Button
+                  label="Not now"
+                  size="sm"
+                  variant="secondary"
+                  fullWidth={false}
+                  onPress={() => setUnmatchedSupplier(null)}
+                />
+              </HStack>
+            </Banner>
+          ) : null}
           <TextField
             label="Reference / PO no."
             value={referenceNo}

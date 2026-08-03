@@ -9,6 +9,7 @@ import {
   usePermissionCatalogue,
 } from "@modules/team/hooks/useTeam";
 import { addUserSchema } from "@modules/team/team.validation";
+import { normalizePhone } from "@shared/form/fields";
 import { apiErrorMessage } from "@api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
@@ -59,7 +60,9 @@ export default function AddUserScreen() {
         firstName: f.firstName.trim(),
         lastName: f.lastName.trim() || undefined,
         email: f.email.trim(),
-        phone: f.phone.trim() || undefined,
+        // Send the normalised digits, not what was typed — the server's regex
+        // has no room for the spaces and dashes people naturally write.
+        phone: normalizePhone(f.phone) || undefined,
         password: f.password,
         roleLabel: roleLabel || undefined,
         permissions,

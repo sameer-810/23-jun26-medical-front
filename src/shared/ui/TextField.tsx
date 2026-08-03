@@ -1,6 +1,13 @@
 /** TextField — clinical, focus-aware, soft rounded. */
 import React, { useState } from "react";
-import { View, TextInput, TextInputProps, StyleSheet } from "react-native";
+import {
+  View,
+  TextInput,
+  TextInputProps,
+  StyleSheet,
+  Pressable,
+} from "react-native";
+import { Eye, EyeOff } from "lucide-react-native";
 import { palette, radius, outline } from "../designSystem";
 import { Text } from "./Text";
 
@@ -21,6 +28,25 @@ export function TextField({
   ...inputProps
 }: Props) {
   const [focused, setFocused] = useState(false);
+  // Any password field gets a reveal toggle, unless the caller supplies its own
+  // trailing element. Admins setting someone else's temporary password have no
+  // way to check what they typed — and they are about to read it out loud.
+  const [revealed, setRevealed] = useState(false);
+  const isPassword = Boolean(inputProps.secureTextEntry);
+  const eye =
+    isPassword && !trailing ? (
+      <Pressable
+        onPress={() => setRevealed((r) => !r)}
+        hitSlop={10}
+        accessibilityLabel={revealed ? "Hide password" : "Show password"}
+      >
+        {revealed ? (
+          <EyeOff size={18} color={palette.text.tertiary} strokeWidth={1.8} />
+        ) : (
+          <Eye size={18} color={palette.text.tertiary} strokeWidth={1.8} />
+        )}
+      </Pressable>
+    ) : null;
 
   const borderColor = error
     ? palette.danger.text
@@ -48,6 +74,7 @@ export function TextField({
         {leading && <View style={{ marginRight: 10 }}>{leading}</View>}
         <TextInput
           {...inputProps}
+          secureTextEntry={isPassword && !revealed}
           placeholderTextColor={palette.text.tertiary}
           onFocus={(e) => {
             setFocused(true);
@@ -60,7 +87,9 @@ export function TextField({
           // @ts-expect-error web-only outline reset
           style={[styles.input, { outlineStyle: "none" }]}
         />
-        {trailing && <View style={{ marginLeft: 10 }}>{trailing}</View>}
+        {(trailing || eye) && (
+          <View style={{ marginLeft: 10 }}>{trailing || eye}</View>
+        )}
       </View>
       {error ? (
         <Text variant="caption" tone="danger" style={{ marginTop: 6 }}>

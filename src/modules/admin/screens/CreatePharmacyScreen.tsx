@@ -28,6 +28,8 @@ export default function CreatePharmacyScreen() {
     mode: "onTouched",
     defaultValues: {
       organizationName: "",
+      gstin: "",
+      drugLicenseNo: "",
       firstName: "",
       lastName: "",
       email: "",
@@ -41,6 +43,8 @@ export default function CreatePharmacyScreen() {
     createMut.mutate(
       {
         organizationName: f.organizationName.trim(),
+        gstin: f.gstin.trim().toUpperCase() || undefined,
+        drugLicenseNo: f.drugLicenseNo.trim() || undefined,
         admin: {
           firstName: f.firstName.trim(),
           lastName: f.lastName.trim() || undefined,
@@ -102,6 +106,25 @@ export default function CreatePharmacyScreen() {
                 strokeWidth={1.8}
               />
             }
+          />
+          {/* Captured at creation rather than left for later: the GSTIN prints
+              on every invoice and the drug licence is a legal requirement to
+              trade, so a pharmacy created without them is non-compliant from
+              its first sale. */}
+          <ControlledTextField
+            control={control}
+            name="gstin"
+            label="GSTIN (optional)"
+            placeholder="27AAAAA0000A1Z5"
+            autoCapitalize="characters"
+            hint="15 characters — prints on every invoice"
+          />
+          <ControlledTextField
+            control={control}
+            name="drugLicenseNo"
+            label="Drug licence no. (optional)"
+            placeholder="e.g. MH-ALX-123456"
+            autoCapitalize="characters"
           />
         </VStack>
       </Card>

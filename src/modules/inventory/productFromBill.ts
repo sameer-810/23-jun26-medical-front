@@ -19,6 +19,9 @@ export interface NewProductDraft {
   mrp: string;
   gstPct: string;
   hsnCode: string;
+  /** Optional classification — picked in the popup, not read off the bill. */
+  categoryId: string | null;
+  brandId: string | null;
 }
 
 /**
@@ -95,6 +98,9 @@ export function draftFromLine(
     packFactor: parsed && parsed.count > 1 ? String(parsed.count) : "",
     mrp: bill?.mrp != null ? String(bill.mrp) : "",
     gstPct: bill?.gstPct != null ? String(bill.gstPct) : "",
+    // A bill names neither — the pharmacist classifies it in the popup.
+    categoryId: null,
+    brandId: null,
     hsnCode: bill?.hsn || "",
   };
 }
@@ -122,8 +128,14 @@ export function toCreatePayload(d: NewProductDraft) {
     baseUnit: d.baseUnit.trim(),
     packs,
     mrp: num(d.mrp),
+    // A product created mid-GRN used to reach the till at ₹0, because nothing
+    // seeds a selling price and nothing blocks a ₹0 sale line. MRP is the legal
+    // ceiling and the default counter price — the pharmacist can discount it.
+    sellingPrice: num(d.mrp),
     taxRatePct: num(d.gstPct),
     hsnCode: d.hsnCode.trim() || undefined,
+    categoryId: d.categoryId || undefined,
+    brandId: d.brandId || undefined,
   };
 }
 

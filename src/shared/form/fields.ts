@@ -38,6 +38,31 @@ export const optionalGstin = optional(
 
 export const freeText = z.string().trim();
 
+/**
+ * Strips the separators people actually type into a phone box.
+ * "+91 98765-43210" -> "+919876543210". Export it so a form can send the
+ * normalised value, not just validate it.
+ */
+export const normalizePhone = (v: string) => {
+  const s = String(v || "").trim();
+  const digits = s.replace(/[^\d]/g, "");
+  return s.startsWith("+") ? `+${digits}` : digits;
+};
+
+/**
+ * A phone the SERVER will accept: `/^\+?[1-9]\d{7,14}$/`.
+ *
+ * The rule is duplicated here on purpose. When the client validated this as
+ * free text, anything with a space, a dash or a leading zero sailed through the
+ * form and was rejected by the API — which surfaced as "valid input rejected"
+ * with a raw server error and no field highlighted. A client rule looser than
+ * the server's isn't lenient, it just moves the error somewhere unhelpful.
+ */
+export const optionalPhone = optional(
+  (v) => /^\+?[1-9]\d{7,14}$/.test(normalizePhone(v)),
+  "Enter a valid phone number (8–15 digits, no leading zero)",
+);
+
 // Numeric inputs are strings from a TextField; "" means "not set".
 export const optionalNonNegative = optional(
   (v) => Number.isFinite(Number(v)) && Number(v) >= 0,

@@ -163,6 +163,9 @@ export interface ListMeta {
 export interface CreatePharmacyInput {
   organizationName: string;
   industry?: string;
+  /** Statutory identifiers — GSTIN prints on invoices, DL is a legal must. */
+  gstin?: string;
+  drugLicenseNo?: string;
   admin: {
     firstName: string;
     lastName?: string;

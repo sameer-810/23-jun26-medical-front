@@ -6,6 +6,8 @@ import { X, PackagePlus } from "lucide-react-native";
 import { NewProductDraft } from "@modules/inventory/productFromBill";
 import { quickProductSchema } from "@modules/inventory/quickProduct.validation";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
+import { ControlledSelect } from "@shared/form/ControlledSelect";
+import { useCategories, useBrands } from "@modules/product/hooks/useProducts";
 import { palette, radius } from "@shared/designSystem";
 import { Text, VStack, HStack, Button } from "@shared/ui";
 
@@ -41,6 +43,9 @@ export function QuickAddProduct({
   onCancel,
   onSave,
 }: Props) {
+  const { data: categories } = useCategories();
+  const { data: brands } = useBrands();
+
   // The parent remounts this per open (keyed), so `initial` seeds the form once.
   const { control, handleSubmit } = useForm({
     resolver: zodResolver(quickProductSchema),
@@ -168,9 +173,44 @@ export function QuickAddProduct({
                 </View>
               </HStack>
 
+              {/* Classified here rather than "later on the Products screen" —
+                  in practice later never comes, and an uncategorised catalogue
+                  makes every report and filter useless. Both lists get a search
+                  box automatically once they pass 8 entries, and can create a
+                  missing option inline. */}
+              <HStack gap={12}>
+                <View style={{ flex: 1 }}>
+                  <ControlledSelect
+                    control={control}
+                    name="categoryId"
+                    label="Category (optional)"
+                    placeholder="Select category"
+                    options={(categories || []).map((c) => ({
+                      value: c.id,
+                      label: c.name,
+                    }))}
+                    allowClear
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ControlledSelect
+                    control={control}
+                    name="brandId"
+                    label="Brand (optional)"
+                    placeholder="Select brand"
+                    options={(brands || []).map((b) => ({
+                      value: b.id,
+                      label: b.name,
+                    }))}
+                    allowClear
+                  />
+                </View>
+              </HStack>
+
               <Text variant="caption" tone="tertiary">
-                An SKU is generated automatically. You can fill in category,
-                brand and salt later on the Products screen.
+                An SKU is generated automatically. Selling price starts at the
+                MRP you enter — change it on the Products screen if you sell
+                below MRP.
               </Text>
 
               {error && (
