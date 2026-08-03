@@ -411,3 +411,37 @@ export interface ScannedBill {
     readScore: number;
   };
 }
+
+/** What the camera made out on a pack — before anything is matched to stock. */
+export interface PackTextRead {
+  batchNumber: string | null;
+  expiryDate: string | null;
+  mfgDate: string | null;
+  mrp: number | null;
+  productName: string | null;
+}
+
+/** One resolved lot, same shape the barcode/label scan returns. */
+export interface PackBatchMatch {
+  kind: "batch";
+  product: { id: string; name: string; sku: string; baseUnit: string } | null;
+  batch: {
+    id: string;
+    batchNumber: string;
+    mfgDate: string | null;
+    expiryDate: string | null;
+    mrp: number;
+    labelCode?: string;
+    expired: boolean;
+  };
+  available: number;
+}
+
+export interface PackRead {
+  read: PackTextRead;
+  /** Set only when the batch number matched a lot exactly. */
+  match: PackBatchMatch | null;
+  /** Near-matches to confirm when OCR misread a character. */
+  candidates: PackBatchMatch[];
+  message: string | null;
+}

@@ -1,5 +1,5 @@
 import { apiClient } from "@api/apiClient";
-import { ScannedBill } from "@modules/inventory/types";
+import { ScannedBill, PackRead } from "@modules/inventory/types";
 
 export interface ScanFile {
   uri: string;
@@ -47,6 +47,37 @@ export const ocrApi = {
         // Two OCR passes on a big photo — well beyond the default timeout.
         timeout: 120000,
       },
+    );
+    return res.data.data;
+  },
+
+  /**
+   * Reads a photo of a medicine pack and resolves it to a stock lot.
+   *
+   * Most strips print the batch number as ink, not a barcode, so a scanner has
+   * nothing to decode — this reads the printed panel instead. The reply is a
+   * PROPOSAL: `match` when the batch resolved exactly, `candidates` when OCR
+   * produced something close, and the raw `read` either way so the counter can
+   * see what the camera actually made out.
+   */
+  readPack: async (file: ScanFile): Promise<PackRead> => {
+    const form = new FormData();
+    if (file.uri.startsWith("data:") || file.uri.startsWith("blob:")) {
+      const blob = await (await fetch(file.uri)).blob();
+      form.append("file", new File([blob], file.name, { type: file.mimeType }));
+    } else {
+      form.append("file", {
+        uri: file.uri,
+        name: file.name,
+        type: file.mimeType,
+      } as unknown as Blob);
+    }
+
+    const res = await apiClient.post<{ success: boolean; data: PackRead }>(
+      "/ocr/pack",
+      form,
+      // One small image, one pass — nothing like the bill's multi-read budget.
+      { headers: { "Content-Type": "multipart/form-data" }, timeout: 40000 },
     );
     return res.data.data;
   },

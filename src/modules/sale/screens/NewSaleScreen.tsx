@@ -20,8 +20,10 @@ import {
   X,
   CheckCircle2,
   Camera,
+  ScanText,
 } from "lucide-react-native";
 import { CameraScanner } from "@shared/CameraScanner";
+import { PackTextScanner } from "@shared/PackTextScanner";
 import { useProducts } from "@modules/product/hooks/useProducts";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { AlternativeItem } from "@modules/inventory/types";
@@ -123,6 +125,8 @@ export default function NewSaleScreen() {
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  /** Camera OCR for packs whose batch number is printed as text, not a barcode. */
+  const [packOpen, setPackOpen] = useState(false);
   const scanBusy = useRef(false);
   type ProductRow = NonNullable<typeof products>["data"][number];
   type CustomerRow = NonNullable<typeof customers>["data"][number];
@@ -994,6 +998,22 @@ export default function NewSaleScreen() {
             }
             onPress={() => setScanOpen(true)}
           />
+          {/* Separate from "Camera": that one decodes a barcode, this one reads
+              printed text. Most strips have no barcode at all, so without this
+              the only way to pin a batch is to type it. */}
+          <Button
+            label="Read pack"
+            variant="secondary"
+            fullWidth={false}
+            icon={
+              <ScanText
+                size={16}
+                color={palette.text.primary}
+                strokeWidth={2}
+              />
+            }
+            onPress={() => setPackOpen(true)}
+          />
           <Button
             label="Invoices"
             variant="secondary"
@@ -1042,6 +1062,20 @@ export default function NewSaleScreen() {
         }}
         onClose={() => setScanOpen(false)}
       />
+
+      {/* Feeds the SAME handleScan path as a barcode, so the expiry guard,
+          out-of-stock guard and line de-duplication behave identically however
+          the lot was identified. Prefers the shelf-label code when the lot has
+          one — it's unambiguous even if two products share a batch number. */}
+      {packOpen && (
+        <PackTextScanner
+          onPicked={(m) => {
+            setPackOpen(false);
+            void handleScan(m.batch.labelCode || m.batch.batchNumber);
+          }}
+          onClose={() => setPackOpen(false)}
+        />
+      )}
     </Screen>
   );
 }
