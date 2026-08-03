@@ -108,6 +108,29 @@ export const inventoryApi = {
     return res.data;
   },
 
+  /**
+   * Put a medicine on the ShortBook — including one this pharmacy has never
+   * stocked, straight from the global catalogue. Creates the product if needed
+   * and records how many to keep on the shelf.
+   */
+  addToShortbook: async (body: {
+    productId?: string;
+    catalogProductId?: string;
+    quantity?: number;
+  }) => {
+    const res = await apiClient.post<{
+      success: boolean;
+      data: {
+        product: { id: string; name: string; sku: string };
+        created: boolean;
+        reorderLevel: number;
+        onHand: number;
+        need: number;
+      };
+    }>("/inventory/shortbook", body);
+    return res.data.data;
+  },
+
   /** Alternative medicines (same molecule, in stock). */
   alternatives: async (
     productId: string,

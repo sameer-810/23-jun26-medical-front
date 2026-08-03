@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { View } from "react-native";
+import { View, Pressable, ActivityIndicator, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, Search } from "lucide-react-native";
+import { BookOpen, Search, ListPlus } from "lucide-react-native";
 import { medguideApi } from "@modules/medguide/api/medguideApi";
-import { palette } from "@shared/designSystem";
+import { Medicine } from "@modules/medguide/types";
+import { inventoryApi } from "@modules/inventory/api/inventoryApi";
+import { apiErrorMessage } from "@api/apiClient";
+import { useAuthStore } from "@shared/store/useAuthStore";
+import { PERMISSIONS } from "@shared/permissions";
+import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -38,6 +43,39 @@ export default function MedGuideScreen() {
     return () => clearTimeout(t);
   }, [search]);
 
+  const canOrder = useAuthStore((s) => s.hasPermission)(
+    PERMISSIONS.PRODUCTS_MANAGE,
+  );
+  const [adding, setAdding] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  /**
+   * Note that this medicine needs buying.
+   *
+   * Sends quantity 1 — a single "someone asked for this" signal. ShortBook
+   * treats it as a reorder level, and asking again never lowers an existing
+   * one, so a pharmacy that already keeps 50 isn't reset by one request.
+   */
+  const addToShortbook = async (m: Medicine) => {
+    setAdding(m._id);
+    setNote(null);
+    try {
+      const r = await inventoryApi.addToShortbook({
+        catalogProductId: m._id,
+        quantity: 1,
+      });
+      setNote(
+        r.created
+          ? `${r.product.name} added to your products and put on the ShortBook — need ${r.need}.`
+          : `${r.product.name} is on the ShortBook — need ${r.need}.`,
+      );
+    } catch (e) {
+      setNote(apiErrorMessage(e));
+    } finally {
+      setAdding(null);
+    }
+  };
+
   const ready = term.length >= MIN_CHARS;
   const { data, isFetching } = useQuery({
     queryKey: ["medguide", term, page],
@@ -69,6 +107,14 @@ export default function MedGuideScreen() {
           autoCapitalize="none"
         />
       </View>
+
+      {note ? (
+        <View style={styles.note}>
+          <Text variant="body-sm" tone="secondary">
+            {note}
+          </Text>
+        </View>
+      ) : null}
 
       {items.length === 0 ? (
         <EmptyState
@@ -113,6 +159,41 @@ export default function MedGuideScreen() {
                     <StatusChip label="Rx" tone="warning" />
                   ) : null}
                 </VStack>
+                {/* The reason anyone looks a medicine up here is usually that a
+                    customer asked for it and it wasn't on the shelf. This is
+                    where that turns into a purchase note instead of a paper
+                    chit — it works whether or not the pharmacy has ever
+                    stocked the medicine. */}
+                {canOrder ? (
+                  <Pressable
+                    onPress={() => void addToShortbook(m)}
+                    disabled={adding === m._id}
+                    hitSlop={8}
+                    style={styles.shortbookBtn}
+                    accessibilityLabel={`Add ${m.name} to ShortBook`}
+                  >
+                    {adding === m._id ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={palette.teal[700]}
+                      />
+                    ) : (
+                      <HStack gap={5} align="center">
+                        <ListPlus
+                          size={15}
+                          color={palette.teal[700]}
+                          strokeWidth={2}
+                        />
+                        <Text
+                          variant="label-sm"
+                          style={{ color: palette.teal[700] }}
+                        >
+                          ShortBook
+                        </Text>
+                      </HStack>
+                    )}
+                  </Pressable>
+                ) : null}
               </HStack>
             </Card>
           ))}
@@ -142,3 +223,23 @@ export default function MedGuideScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  shortbookBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.teal[700],
+    marginLeft: 10,
+    minWidth: 96,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  note: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: palette.teal[50],
+  },
+});
