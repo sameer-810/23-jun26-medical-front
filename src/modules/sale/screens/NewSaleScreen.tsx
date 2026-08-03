@@ -21,9 +21,16 @@ import {
   CheckCircle2,
   Camera,
   ScanText,
+  Volume2,
+  VolumeX,
 } from "lucide-react-native";
 import { CameraScanner } from "@shared/CameraScanner";
 import { PackTextScanner } from "@shared/PackTextScanner";
+import {
+  scanFeedback,
+  setScanSoundMuted,
+  isScanSoundMuted,
+} from "@shared/scanFeedback";
 import { useProducts } from "@modules/product/hooks/useProducts";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { AlternativeItem } from "@modules/inventory/types";
@@ -125,6 +132,7 @@ export default function NewSaleScreen() {
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  const [soundOff, setSoundOff] = useState(isScanSoundMuted());
   /** Camera OCR for packs whose batch number is printed as text, not a barcode. */
   const [packOpen, setPackOpen] = useState(false);
   const scanBusy = useRef(false);
@@ -317,13 +325,18 @@ export default function NewSaleScreen() {
       }));
       if (res.kind === "batch" && res.batch) {
         const b = res.batch;
+        // A rejection must SOUND different. The scanner gun already beeped
+        // when it decoded the barcode — if the app stayed silent here the
+        // cashier would hear a normal beep and carry on, having added nothing.
         if (b.expired) {
+          scanFeedback("error");
           setScanError(
             `${sp.name} · batch ${b.batchNumber} has EXPIRED — not added.`,
           );
           return;
         }
         if (res.available <= 0) {
+          scanFeedback("error");
           setScanError(`${sp.name} · batch ${b.batchNumber} is out of stock.`);
           return;
         }
@@ -355,10 +368,15 @@ export default function NewSaleScreen() {
             },
           ];
         });
+        scanFeedback("ok");
       } else {
+        // Resolved to a product but not a specific lot — FEFO will choose, so
+        // it went on the bill, but the cashier didn't pin a batch.
         addProduct(sp.id);
+        scanFeedback("warn");
       }
     } catch (e) {
+      scanFeedback("error");
       setScanError(apiErrorMessage(e));
     } finally {
       scanBusy.current = false;
@@ -989,6 +1007,34 @@ export default function NewSaleScreen() {
       subtitle="Scan or search · FEFO auto-picks nearest-expiry batches"
       right={
         <HStack gap={8}>
+          {/* A counter that can't silence the beeps ends up with the machine
+              volume down, which kills the error tone too. */}
+          <Button
+            label={soundOff ? "Sound off" : "Sound on"}
+            variant="secondary"
+            fullWidth={false}
+            icon={
+              soundOff ? (
+                <VolumeX
+                  size={16}
+                  color={palette.text.tertiary}
+                  strokeWidth={2}
+                />
+              ) : (
+                <Volume2
+                  size={16}
+                  color={palette.text.primary}
+                  strokeWidth={2}
+                />
+              )
+            }
+            onPress={() => {
+              const next = !soundOff;
+              setSoundOff(next);
+              setScanSoundMuted(next);
+              if (!next) scanFeedback("ok"); // prove it works when turning it on
+            }}
+          />
           <Button
             label="Camera"
             variant="secondary"

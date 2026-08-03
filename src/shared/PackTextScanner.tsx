@@ -13,6 +13,7 @@ import { X, Camera as CameraIcon, ScanText } from "lucide-react-native";
 import { ocrApi } from "@modules/inventory/api/ocrApi";
 import { PackRead, PackBatchMatch } from "@modules/inventory/types";
 import { apiErrorMessage } from "@api/apiClient";
+import { scanFeedback } from "@shared/scanFeedback";
 import { palette, radius } from "@shared/designSystem";
 import { Text, VStack, HStack, Button, StatusChip } from "@shared/ui";
 
@@ -49,8 +50,16 @@ export function PackTextScanner({ onPicked, onClose }: Props) {
       const res = await ocrApi.readPack({ uri, name: "pack.jpg", mimeType });
       setResult(res);
       // An exact hit needs no decision — take it and get out of the way.
-      if (res.match) onPicked(res.match);
+      if (res.match) {
+        scanFeedback("ok");
+        onPicked(res.match);
+      } else {
+        // Read something, but it needs confirming — a different sound, because
+        // the user is about to be asked a question rather than moved along.
+        scanFeedback(res.candidates.length ? "warn" : "error");
+      }
     } catch (e) {
+      scanFeedback("error");
       setError(apiErrorMessage(e));
     } finally {
       setBusy(false);

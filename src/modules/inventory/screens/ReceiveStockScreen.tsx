@@ -34,6 +34,7 @@ import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { productApi } from "@modules/product/api/productApi";
 import { medguideApi } from "@modules/medguide/api/medguideApi";
 import { CameraScanner } from "@shared/CameraScanner";
+import { scanFeedback } from "@shared/scanFeedback";
 import { QuickAddProduct } from "@modules/inventory/components/QuickAddProduct";
 import { ProductPicker } from "@modules/inventory/components/ProductPicker";
 import {
@@ -337,8 +338,10 @@ export default function ReceiveStockScreen() {
           return cur.map((l, k) => (k === blank ? { ...l, ...patch } : l));
         return [...cur, { ...emptyLine(), ...patch }];
       });
+      scanFeedback("ok");
       setScanNote(`Added ${lite.name} from the global catalogue.`);
     } catch (e) {
+      scanFeedback("error");
       setScanNote(apiErrorMessage(e));
     }
   };
@@ -366,8 +369,10 @@ export default function ReceiveStockScreen() {
       };
       setKnownProducts((cur) => ({ ...cur, [lite.id]: lite }));
       addLineForProduct(lite.id);
+      scanFeedback("ok");
       setScanNote(`Added ${sp.name} from its barcode.`);
     } catch {
+      scanFeedback("error");
       setScanNote(
         `Barcode "${code}" isn't linked to a product yet. Search the product below and save this barcode on it (in Add/Edit product).`,
       );
