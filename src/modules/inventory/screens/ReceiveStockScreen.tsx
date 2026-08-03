@@ -35,6 +35,7 @@ import { productApi } from "@modules/product/api/productApi";
 import { medguideApi } from "@modules/medguide/api/medguideApi";
 import { CameraScanner } from "@shared/CameraScanner";
 import { QuickAddProduct } from "@modules/inventory/components/QuickAddProduct";
+import { ProductPicker } from "@modules/inventory/components/ProductPicker";
 import {
   NewProductDraft,
   draftFromLine,
@@ -80,6 +81,8 @@ const SHORT_EXPIRY_DAYS = 90;
 const CATALOG_PREFIX = "catalog:";
 /** Below this, a catalogue search matches too much to be worth the round trip. */
 const CATALOG_MIN_CHARS = 2;
+/** Sentinel for the row picker's last-resort "make one by hand" option. */
+const CREATE_NEW = "__create_new__";
 
 /** Parse a "YYYY-MM" or "YYYY-MM-DD" entry to the last date the lot is valid. */
 function parseExpiry(s: string): Date | null {
@@ -137,14 +140,19 @@ export default function ReceiveStockScreen() {
   const [supplierId, setSupplierId] = useState<string | null>(null);
   const [referenceNo, setReference] = useState("");
   const [addQuery, setAddQuery] = useState("");
+  /** Which row is currently picking its product inline (null = none). */
+  const [pickingFor, setPickingFor] = useState<number | null>(null);
+  const [rowQuery, setRowQuery] = useState("");
+  // Whichever picker the pharmacist is actually typing in feeds the search.
+  const activeQuery = pickingFor === null ? addQuery : rowQuery;
   // Debounce what the two searches actually receive. Typing "paracetamol" used
   // to fire 11 product searches AND 10 catalogue searches, whose replies could
   // land out of order — so the list you saw was whichever request happened to
   // finish last, not the one matching what you'd typed.
   useEffect(() => {
-    const t = setTimeout(() => setProductQuery(addQuery.trim()), 250);
+    const t = setTimeout(() => setProductQuery(activeQuery.trim()), 250);
     return () => clearTimeout(t);
-  }, [addQuery]);
+  }, [activeQuery]);
   const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
   // The whole receipt, not just its number — its lines carry the label codes
   // the "Print labels" step needs.
@@ -231,7 +239,7 @@ export default function ReceiveStockScreen() {
   const searching =
     productsLoading ||
     catalogLoading ||
-    addQuery.trim() !== productQuery.trim();
+    activeQuery.trim() !== productQuery.trim();
 
   // Keyboard-first "add a line" search — filling the first blank line, else
   // appending. Mirrors the POS add-bar so building a multi-line GRN is fast.
@@ -256,20 +264,43 @@ export default function ReceiveStockScreen() {
     return [...mine, ...fromCatalog];
   }, [searchResults, catalogHits]);
 
-  const addLineForProduct = (id: string) => {
+  /**
+   * The row picker's list: everything the top bar offers, plus creating one by
+   * hand as the LAST entry. Creating stays one tap away, but it is now the
+   * fallback after searching rather than the thing the row does by default.
+   */
+  const pickerItems = useMemo(() => {
+    if (!canManageProducts) return productItems;
+    const typed = rowQuery.trim();
+    return [
+      ...productItems,
+      {
+        value: CREATE_NEW,
+        label: typed ? `Create “${typed}” as a new product` : "Create new product",
+        sublabel: "Not in your stock or the catalogue",
+        right: "New",
+      },
+    ];
+  }, [productItems, rowQuery, canManageProducts]);
+
+  /**
+   * Put a product on a line. `row` is the line that asked for it; null means
+   * the top bar, which fills the first blank line or appends one.
+   */
+  const addLineForProduct = (id: string, row: number | null = null) => {
     const p = productsById[id];
     if (p) setKnownProducts((cur) => ({ ...cur, [p.id]: p }));
+    const patch = { productId: id, unit: p?.baseUnit || null };
+    if (row !== null) {
+      setLines((cur) => cur.map((l, k) => (k === row ? { ...l, ...patch } : l)));
+      return;
+    }
     setLines((cur) => {
       const blank = cur.findIndex((l) => !l.productId);
       if (blank >= 0) {
-        return cur.map((l, k) =>
-          k === blank ? { ...l, productId: id, unit: p?.baseUnit || null } : l,
-        );
+        return cur.map((l, k) => (k === blank ? { ...l, ...patch } : l));
       }
-      return [
-        ...cur,
-        { ...emptyLine(), productId: id, unit: p?.baseUnit || null },
-      ];
+      return [...cur, { ...emptyLine(), ...patch }];
     });
   };
 
@@ -278,7 +309,10 @@ export default function ReceiveStockScreen() {
    * Everything the catalogue knows (salt, brand, pack unit + factor, MRP, GST,
    * HSN, Rx flag) is copied server-side, so nothing has to be typed.
    */
-  const addLineFromCatalog = async (catalogId: string) => {
+  const addLineFromCatalog = async (
+    catalogId: string,
+    row: number | null = null,
+  ) => {
     try {
       const created = await medguideApi.addToStore(catalogId);
       const full = await productApi.get(created.id);
@@ -290,9 +324,11 @@ export default function ReceiveStockScreen() {
         packs: full.packs || [],
       };
       setKnownProducts((cur) => ({ ...cur, [lite.id]: lite }));
+      const patch = { productId: lite.id, unit: lite.baseUnit };
       setLines((cur) => {
+        if (row !== null)
+          return cur.map((l, k) => (k === row ? { ...l, ...patch } : l));
         const blank = cur.findIndex((l) => !l.productId);
-        const patch = { productId: lite.id, unit: lite.baseUnit };
         if (blank >= 0)
           return cur.map((l, k) => (k === blank ? { ...l, ...patch } : l));
         return [...cur, { ...emptyLine(), ...patch }];
@@ -612,7 +648,10 @@ export default function ReceiveStockScreen() {
 
       <View style={{ marginBottom: 12, zIndex: 20 }}>
         <Combobox
-          placeholder="Search your stock or the global catalogue — or use Scan bill"
+          // Named for its job, so it doesn't read as a second way to do what the
+          // row's own picker does: this one APPENDS lines, for working down a
+          // bill without touching each row.
+          placeholder="Add a line — search your stock or the catalogue"
           query={addQuery}
           onQueryChange={setAddQuery}
           items={productItems}
@@ -690,26 +729,28 @@ export default function ReceiveStockScreen() {
                   >
                     {i + 1}
                   </Text>
+                  {/* The product cell SEARCHES. It used to jump straight to
+                      "New product", which skipped both your own stock and the
+                      4-lakh catalogue — so the quickest way to fill a line was
+                      to retype a medicine the system already knew, under a
+                      slightly different spelling. That is how duplicates are
+                      born. Creating one by hand is still there, as the last
+                      option in the picker. */}
                   <View style={{ width: COL.product }}>
-                    {p ? (
-                      <Text variant="body-sm" tone="primary" numberOfLines={1}>
-                        {p.name}
-                      </Text>
-                    ) : (
-                      <Pressable
-                        onPress={() =>
-                          canManageProducts &&
-                          requestCreateProduct(
-                            i,
-                            line.fromBill?.productName || "",
-                          )
-                        }
+                    <Pressable
+                      onPress={() => {
+                        setPickingFor(i);
+                        setRowQuery(p ? "" : line.fromBill?.productName || "");
+                      }}
+                    >
+                      <Text
+                        variant="body-sm"
+                        tone={p ? "primary" : "link"}
+                        numberOfLines={1}
                       >
-                        <Text variant="body-sm" tone="link" numberOfLines={1}>
-                          {line.fromBill?.productName || "Set product…"}
-                        </Text>
-                      </Pressable>
-                    )}
+                        {p?.name || line.fromBill?.productName || "Set product…"}
+                      </Text>
+                    </Pressable>
                   </View>
                   <GrnCell
                     w={COL.batch}
@@ -800,6 +841,36 @@ export default function ReceiveStockScreen() {
           </View>
         </ScrollView>
       </Card>
+
+      <ProductPicker
+        visible={pickingFor !== null}
+        query={rowQuery}
+        onQueryChange={setRowQuery}
+        items={pickerItems}
+        loading={searching}
+        emptyText={
+          rowQuery.trim().length < CATALOG_MIN_CHARS
+            ? "Type 2 letters to search your stock and the catalogue"
+            : "No match — choose “Create new product” below"
+        }
+        onSelect={(id) => {
+          const row = pickingFor;
+          if (row === null) return;
+          if (id === CREATE_NEW) {
+            requestCreateProduct(row, rowQuery.trim());
+          } else if (id.startsWith(CATALOG_PREFIX)) {
+            void addLineFromCatalog(id.slice(CATALOG_PREFIX.length), row);
+          } else {
+            addLineForProduct(id, row);
+          }
+          setPickingFor(null);
+          setRowQuery("");
+        }}
+        onCancel={() => {
+          setPickingFor(null);
+          setRowQuery("");
+        }}
+      />
 
       <Pressable onPress={addLine} style={styles.addRow}>
         <Plus size={18} color={palette.teal[600]} strokeWidth={2.2} />
