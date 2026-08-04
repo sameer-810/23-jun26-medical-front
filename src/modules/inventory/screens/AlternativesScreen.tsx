@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Repeat2 } from "lucide-react-native";
+import { Repeat2 } from "lucide-react-native";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { palette, radius } from "@shared/designSystem";
 import {
@@ -11,10 +11,10 @@ import {
   VStack,
   HStack,
   Card,
-  Button,
   StatusChip,
   EmptyState,
   Skeleton,
+  BackLink,
 } from "@shared/ui";
 
 type Sort = "expiry" | "price" | "margin";
@@ -69,22 +69,9 @@ export default function AlternativesScreen() {
       overline="Alternatives"
       title={name || "Alternatives"}
       subtitle={data?.molecule ? `Same as ${data.molecule}` : undefined}
-      right={
-        <Button
-          label="Back"
-          size="sm"
-          variant="secondary"
-          icon={
-            <ArrowLeft
-              size={16}
-              color={palette.text.secondary}
-              strokeWidth={2}
-            />
-          }
-          onPress={() => navigation.goBack()}
-        />
-      }
     >
+      <BackLink label="Back to product" onPress={() => navigation.goBack()} />
+
       <HStack gap={8} style={{ marginBottom: 14 }}>
         {TABS.map((t) => {
           const on = t.key === sort;

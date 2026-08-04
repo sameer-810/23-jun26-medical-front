@@ -2,13 +2,21 @@ import React, { useState } from "react";
 import { View, TextInput, ScrollView, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Undo2 } from "lucide-react-native";
+import { Undo2 } from "lucide-react-native";
 import { useReceipt } from "@modules/inventory/hooks/useInventory";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import type { PurchaseReturnPayload } from "@modules/inventory/types";
 import { apiErrorMessage } from "@api/apiClient";
 import { palette, radius } from "@shared/designSystem";
-import { Screen, Text, Card, Button, TextField, Banner } from "@shared/ui";
+import {
+  Screen,
+  Text,
+  Card,
+  Button,
+  TextField,
+  Banner,
+  BackLink,
+} from "@shared/ui";
 
 export default function PurchaseReturnScreen() {
   const navigation = useNavigation<any>();
@@ -63,22 +71,9 @@ export default function PurchaseReturnScreen() {
       overline="Purchase return"
       title={receipt?.receiptNo ? `Return · ${receipt.receiptNo}` : "Return"}
       subtitle={receipt?.supplierName || ""}
-      right={
-        <Button
-          label="Back"
-          size="sm"
-          variant="secondary"
-          icon={
-            <ArrowLeft
-              size={16}
-              color={palette.text.secondary}
-              strokeWidth={2}
-            />
-          }
-          onPress={() => navigation.goBack()}
-        />
-      }
     >
+      <BackLink label="Back to receipt" onPress={() => navigation.goBack()} />
+
       {serverError ? (
         <Banner
           tone="danger"

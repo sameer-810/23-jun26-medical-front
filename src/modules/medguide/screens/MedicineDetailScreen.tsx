@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { View, Image, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, PlusCircle, CheckCircle2 } from "lucide-react-native";
+import { PlusCircle, CheckCircle2 } from "lucide-react-native";
 import { medguideApi } from "@modules/medguide/api/medguideApi";
 import type { Medicine } from "@modules/medguide/types";
 import { useAuthStore } from "@shared/store/useAuthStore";
@@ -18,6 +18,7 @@ import {
   Button,
   StatusChip,
   Skeleton,
+  BackLink,
 } from "@shared/ui";
 
 // Some source fields carry inline HTML (<p>, <br>) — flatten to plain text.
@@ -97,25 +98,9 @@ export default function MedicineDetailScreen() {
     : [];
 
   return (
-    <Screen
-      overline="MedGuide"
-      title={m?.name || "Medicine"}
-      right={
-        <Button
-          label="Back"
-          size="sm"
-          variant="secondary"
-          icon={
-            <ArrowLeft
-              size={16}
-              color={palette.text.secondary}
-              strokeWidth={2}
-            />
-          }
-          onPress={() => navigation.goBack()}
-        />
-      }
-    >
+    <Screen overline="MedGuide" title={m?.name || "Medicine"}>
+      <BackLink label="Back to MedGuide" onPress={() => navigation.goBack()} />
+
       {!m ? (
         isLoading ? (
           <VStack gap={12}>

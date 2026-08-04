@@ -8,7 +8,6 @@ import {
   Receipt,
   Mail,
   Phone,
-  ArrowLeft,
   Ban,
   CheckCircle2,
   Pencil,
@@ -41,6 +40,7 @@ import {
   Select,
   ConfirmDialog,
   Skeleton,
+  BackLink,
 } from "@shared/ui";
 
 export default function PharmacyDetailScreen() {
@@ -67,25 +67,12 @@ export default function PharmacyDetailScreen() {
   }));
 
   return (
-    <Screen
-      overline="Pharmacy"
-      title={org?.name || "Pharmacy"}
-      right={
-        <Button
-          label="Back"
-          size="sm"
-          variant="secondary"
-          icon={
-            <ArrowLeft
-              size={16}
-              color={palette.text.secondary}
-              strokeWidth={2}
-            />
-          }
-          onPress={() => navigation.goBack()}
-        />
-      }
-    >
+    <Screen overline="Pharmacy" title={org?.name || "Pharmacy"}>
+      <BackLink
+        label="Back to pharmacies"
+        onPress={() => navigation.goBack()}
+      />
+
       <AdminNav active="pharmacies" />
 
       {!org ? (

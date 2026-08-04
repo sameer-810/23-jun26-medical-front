@@ -70,7 +70,7 @@ export default function CustomerFormScreen() {
       overline="Customers"
       title={editing ? "Edit customer" : "Add customer"}
     >
-      <BackLink label="Back" onPress={() => navigation.goBack()} />
+      <BackLink label="Back to customers" onPress={() => navigation.goBack()} />
 
       {mut.isError && (
         <View style={errorBox}>

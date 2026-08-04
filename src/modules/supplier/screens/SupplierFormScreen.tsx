@@ -76,7 +76,7 @@ export default function SupplierFormScreen() {
       overline="Suppliers"
       title={editing ? "Edit supplier" : "Add supplier"}
     >
-      <BackLink label="Back" onPress={() => navigation.goBack()} />
+      <BackLink label="Back to suppliers" onPress={() => navigation.goBack()} />
       {mut.isError && (
         <View style={errorBox}>
           <Text variant="body-sm" tone="danger">

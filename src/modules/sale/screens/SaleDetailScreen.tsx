@@ -99,7 +99,7 @@ export default function SaleDetailScreen() {
         style={{ marginBottom: 16 }}
         wrap
       >
-        <BackLink label="Back" onPress={() => navigation.goBack()} />
+        <BackLink label="Back to sales" onPress={() => navigation.goBack()} />
         <HStack gap={10}>
           {sale.customerMobile ? (
             <Button

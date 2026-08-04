@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ScrollText } from "lucide-react-native";
+import { ScrollText } from "lucide-react-native";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { palette } from "@shared/designSystem";
 import {
@@ -11,11 +11,11 @@ import {
   VStack,
   HStack,
   Card,
-  Button,
   StatTile,
   Pagination,
   EmptyState,
   Skeleton,
+  BackLink,
 } from "@shared/ui";
 
 export default function ProductLedgerScreen() {
@@ -62,25 +62,9 @@ export default function ProductLedgerScreen() {
   }
 
   return (
-    <Screen
-      overline="Inventory"
-      title={product?.name || "Ledger"}
-      right={
-        <Button
-          label="Back"
-          size="sm"
-          variant="secondary"
-          icon={
-            <ArrowLeft
-              size={16}
-              color={palette.text.secondary}
-              strokeWidth={2}
-            />
-          }
-          onPress={() => navigation.goBack()}
-        />
-      }
-    >
+    <Screen overline="Inventory" title={product?.name || "Ledger"}>
+      <BackLink label="Back to product" onPress={() => navigation.goBack()} />
+
       {product ? (
         <VStack gap={12} style={{ marginBottom: 16 }}>
           <Text variant="body-sm" tone="tertiary">

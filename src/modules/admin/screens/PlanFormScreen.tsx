@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useForm } from "react-hook-form";
-import { ArrowLeft, Trash2 } from "lucide-react-native";
+import { Trash2 } from "lucide-react-native";
 import {
   usePlans,
   useCreatePlan,
@@ -12,7 +12,15 @@ import {
 import { apiErrorMessage } from "@shared/api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Screen, Text, VStack, Card, Button, ConfirmDialog } from "@shared/ui";
+import {
+  Screen,
+  Text,
+  VStack,
+  Card,
+  Button,
+  ConfirmDialog,
+  BackLink,
+} from "@shared/ui";
 
 export default function PlanFormScreen() {
   const navigation = useNavigation<any>();
@@ -83,25 +91,9 @@ export default function PlanFormScreen() {
   };
 
   return (
-    <Screen
-      overline="Plans"
-      title={editing ? "Edit plan" : "Add plan"}
-      right={
-        <Button
-          label="Back"
-          size="sm"
-          variant="secondary"
-          icon={
-            <ArrowLeft
-              size={16}
-              color={palette.text.secondary}
-              strokeWidth={2}
-            />
-          }
-          onPress={() => navigation.goBack()}
-        />
-      }
-    >
+    <Screen overline="Plans" title={editing ? "Edit plan" : "Add plan"}>
+      <BackLink label="Back to plans" onPress={() => navigation.goBack()} />
+
       {serverError ? (
         <View style={styles.errorBox}>
           <Text variant="body-sm" tone="danger">

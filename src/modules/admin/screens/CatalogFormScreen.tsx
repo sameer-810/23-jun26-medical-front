@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Switch, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useForm, Controller } from "react-hook-form";
-import { ArrowLeft, Trash2 } from "lucide-react-native";
+import { Trash2 } from "lucide-react-native";
 import {
   useCatalogProduct,
   useCreateCatalog,
@@ -20,6 +20,7 @@ import {
   Card,
   Button,
   ConfirmDialog,
+  BackLink,
 } from "@shared/ui";
 
 export default function CatalogFormScreen() {
@@ -92,22 +93,9 @@ export default function CatalogFormScreen() {
     <Screen
       overline="Catalogue"
       title={editing ? "Edit product" : "Add product"}
-      right={
-        <Button
-          label="Back"
-          size="sm"
-          variant="secondary"
-          icon={
-            <ArrowLeft
-              size={16}
-              color={palette.text.secondary}
-              strokeWidth={2}
-            />
-          }
-          onPress={() => navigation.goBack()}
-        />
-      }
     >
+      <BackLink label="Back to catalogue" onPress={() => navigation.goBack()} />
+
       {serverError ? (
         <View style={styles.errorBox}>
           <Text variant="body-sm" tone="danger">

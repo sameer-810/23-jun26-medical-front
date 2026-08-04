@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { ArrowLeft, UserRound, KeyRound } from "lucide-react-native";
+import { UserRound, KeyRound } from "lucide-react-native";
 import {
   useOrgUsers,
   useResetUserPassword,
@@ -19,6 +19,7 @@ import {
   StatusChip,
   EmptyState,
   PromptDialog,
+  BackLink,
 } from "@shared/ui";
 
 export default function PharmacyUsersScreen() {
@@ -36,25 +37,9 @@ export default function PharmacyUsersScreen() {
   } | null>(null);
 
   return (
-    <Screen
-      overline="Pharmacy"
-      title="Users"
-      right={
-        <Button
-          label="Back"
-          size="sm"
-          variant="secondary"
-          icon={
-            <ArrowLeft
-              size={16}
-              color={palette.text.secondary}
-              strokeWidth={2}
-            />
-          }
-          onPress={() => navigation.goBack()}
-        />
-      }
-    >
+    <Screen overline="Pharmacy" title="Users">
+      <BackLink label="Back to pharmacy" onPress={() => navigation.goBack()} />
+
       <AdminNav active="pharmacies" />
 
       {msg ? (

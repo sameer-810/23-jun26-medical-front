@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useForm } from "react-hook-form";
-import { ArrowLeft } from "lucide-react-native";
 import {
   useAdminOrganization,
   useUpdatePharmacy,
@@ -10,7 +9,7 @@ import {
 import { apiErrorMessage } from "@shared/api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Screen, Text, VStack, Card, Button } from "@shared/ui";
+import { Screen, Text, VStack, Card, Button, BackLink } from "@shared/ui";
 import type { UpdatePharmacyInput } from "@modules/admin/types";
 
 export default function EditPharmacyScreen() {
@@ -88,25 +87,9 @@ export default function EditPharmacyScreen() {
   };
 
   return (
-    <Screen
-      overline="Pharmacy"
-      title="Edit pharmacy"
-      right={
-        <Button
-          label="Back"
-          size="sm"
-          variant="secondary"
-          icon={
-            <ArrowLeft
-              size={16}
-              color={palette.text.secondary}
-              strokeWidth={2}
-            />
-          }
-          onPress={() => navigation.goBack()}
-        />
-      }
-    >
+    <Screen overline="Pharmacy" title="Edit pharmacy">
+      <BackLink label="Back to pharmacy" onPress={() => navigation.goBack()} />
+
       {serverError ? (
         <View style={styles.errorBox}>
           <Text variant="body-sm" tone="danger">

@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useMutation } from "@tanstack/react-query";
-import { ArrowLeft, X, Search, PackageSearch } from "lucide-react-native";
+import { X, Search, PackageSearch } from "lucide-react-native";
 import { purchaseOrderApi } from "@modules/purchaseOrder/api/purchaseOrderApi";
 import type { SeededLine } from "@modules/purchaseOrder/types";
 import { useProducts } from "@modules/product/hooks/useProducts";
@@ -25,6 +25,7 @@ import {
   Combobox,
   Banner,
   EmptyState,
+  BackLink,
 } from "@shared/ui";
 
 interface Line {
@@ -131,25 +132,9 @@ export default function OrderFormScreen() {
   };
 
   return (
-    <Screen
-      overline="eOrders"
-      title="New purchase order"
-      right={
-        <Button
-          label="Back"
-          size="sm"
-          variant="secondary"
-          icon={
-            <ArrowLeft
-              size={16}
-              color={palette.text.secondary}
-              strokeWidth={2}
-            />
-          }
-          onPress={() => navigation.goBack()}
-        />
-      }
-    >
+    <Screen overline="eOrders" title="New purchase order">
+      <BackLink label="Back to orders" onPress={() => navigation.goBack()} />
+
       {serverError ? (
         <Banner
           tone="danger"

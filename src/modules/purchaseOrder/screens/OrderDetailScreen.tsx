@@ -1,14 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowLeft,
-  Send,
-  CheckCircle2,
-  Ban,
-  MessageCircle,
-} from "lucide-react-native";
+import { Send, CheckCircle2, Ban, MessageCircle } from "lucide-react-native";
 import { purchaseOrderApi } from "@modules/purchaseOrder/api/purchaseOrderApi";
 import { useSupplier } from "@modules/supplier/hooks/useSuppliers";
 import { useAuthStore } from "@shared/store/useAuthStore";
@@ -24,11 +18,16 @@ import {
   Button,
   StatusChip,
   Skeleton,
+  BackLink,
+  ConfirmDialog,
 } from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 export default function OrderDetailScreen() {
+  // Cancelling a placed order is not a style choice — it ends a commitment to a
+  // distributor. It gets a confirm like every other destructive action.
+  const [cancelOpen, setCancelOpen] = useState(false);
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const id = route.params?.id as string;
@@ -68,22 +67,9 @@ export default function OrderDetailScreen() {
       overline="Purchase order"
       title={order?.orderNo || "Order"}
       subtitle={order?.supplierName || ""}
-      right={
-        <Button
-          label="Back"
-          size="sm"
-          variant="secondary"
-          icon={
-            <ArrowLeft
-              size={16}
-              color={palette.text.secondary}
-              strokeWidth={2}
-            />
-          }
-          onPress={() => navigation.goBack()}
-        />
-      }
     >
+      <BackLink label="Back to orders" onPress={() => navigation.goBack()} />
+
       {!order ? (
         isLoading ? (
           <VStack gap={16}>
@@ -213,7 +199,7 @@ export default function OrderDetailScreen() {
                 variant="destructive"
                 icon={<Ban size={16} color="#FFFFFF" strokeWidth={2} />}
                 loading={statusMut.isPending}
-                onPress={() => statusMut.mutate("cancelled")}
+                onPress={() => setCancelOpen(true)}
               />
             </VStack>
           ) : null}
@@ -247,6 +233,20 @@ export default function OrderDetailScreen() {
           </VStack>
         </VStack>
       )}
+      <ConfirmDialog
+        visible={cancelOpen}
+        title="Cancel this order?"
+        message="The distributor will no longer be expected to deliver it. This cannot be undone."
+        confirmLabel="Cancel order"
+        destructive
+        loading={statusMut.isPending}
+        onConfirm={() =>
+          statusMut.mutate("cancelled", {
+            onSettled: () => setCancelOpen(false),
+          })
+        }
+        onCancel={() => setCancelOpen(false)}
+      />
     </Screen>
   );
 }
