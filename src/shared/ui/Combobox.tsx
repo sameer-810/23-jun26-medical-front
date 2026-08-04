@@ -39,6 +39,17 @@ interface Props {
   autoFocus?: boolean;
   nativeID?: string;
   emptyText?: string;
+  /**
+   * Keep the result list open and in normal layout flow, instead of floating it
+   * below the field and hiding it on blur.
+   *
+   * For a field embedded in a page, a dropdown that closes when you look away is
+   * right. Inside a modal that exists ONLY to pick something, it is wrong twice:
+   * the list disappears the moment the user reaches for the mouse, and an
+   * absolutely-positioned panel reserves no height, so the sheet is left showing
+   * a large empty area that reads as a broken screen.
+   */
+  alwaysOpen?: boolean;
 }
 
 export function Combobox({
@@ -53,12 +64,14 @@ export function Combobox({
   autoFocus,
   nativeID,
   emptyText = "No matches",
+  alwaysOpen = false,
 }: Props) {
   const [focused, setFocused] = useState(false);
   const [hi, setHi] = useState(-1);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const open = focused && query.trim().length > 0;
+  // `alwaysOpen` keeps the list mounted regardless of focus (modal pickers).
+  const open = alwaysOpen || (focused && query.trim().length > 0);
 
   const pick = (i: number) => {
     const item = items[i];
@@ -133,7 +146,7 @@ export function Combobox({
       </View>
 
       {open ? (
-        <View style={styles.panel}>
+        <View style={[styles.panel, alwaysOpen && styles.panelInline]}>
           {items.length === 0 ? (
             <View style={styles.empty}>
               <Text variant="body-sm" tone="tertiary">
@@ -209,6 +222,14 @@ const styles = StyleSheet.create({
     ...shadows.lg,
     zIndex: 50,
     overflow: "hidden",
+  },
+  /** In-flow variant: takes real height so nothing sits over a blank gap. */
+  panelInline: {
+    position: "relative",
+    top: 0,
+    marginTop: 8,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   empty: { padding: 16, alignItems: "center" },
   row: {

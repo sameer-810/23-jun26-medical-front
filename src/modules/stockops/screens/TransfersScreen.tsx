@@ -38,11 +38,19 @@ export default function TransfersScreen() {
   const [done, setDone] = useState<string | null>(null);
 
   const sourceLoc = (locations || []).find((l) => l.id === cell.locationId);
-  // Destination must be the same level (drawer↔drawer, rack↔rack) and not the source.
+  /**
+   * Anywhere else in the same warehouse.
+   *
+   * This used to also require the same level (drawer→drawer, rack→rack), which
+   * left the dropdown empty for any pharmacy whose warehouse is a single chain
+   * — one wall, one shelf, one rack — because nothing shared a level. That is
+   * the ordinary small-pharmacy setup, so transfers simply never worked there.
+   */
   const destOptions = (locations || [])
     .filter(
       (l) =>
-        l.id !== cell.locationId && (!sourceLoc || l.type === sourceLoc.type),
+        l.id !== cell.locationId &&
+        (!sourceLoc || l.warehouseId === sourceLoc.warehouseId),
     )
     .map((l) => ({ value: l.id, label: `${l.code} — ${l.name}` }));
 

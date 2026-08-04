@@ -58,10 +58,15 @@ export const normalizePhone = (v: string) => {
  * with a raw server error and no field highlighted. A client rule looser than
  * the server's isn't lenient, it just moves the error somewhere unhelpful.
  */
-export const optionalPhone = optional(
-  (v) => /^\+?[1-9]\d{7,14}$/.test(normalizePhone(v)),
-  "Enter a valid phone number (8–15 digits, no leading zero)",
-);
+export const optionalPhone = optional((v) => {
+  const n = normalizePhone(v);
+  // With a country code, trust the server's range (8–15 digits).
+  if (n.startsWith("+")) return /^\+[1-9]\d{7,14}$/.test(n);
+  // Without one it's an Indian mobile: exactly 10 digits, starting 6–9.
+  // Allowing 11–15 bare digits here let "12345678901" through — long enough to
+  // satisfy the server, still not a number anyone can ring.
+  return /^[6-9]\d{9}$/.test(n);
+}, "Enter a 10-digit mobile number, or include the country code (+91…)");
 
 // Numeric inputs are strings from a TextField; "" means "not set".
 export const optionalNonNegative = optional(

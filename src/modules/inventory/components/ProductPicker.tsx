@@ -78,6 +78,7 @@ export function ProductPicker({
               loading={loading}
               onSelect={onSelect}
               emptyText={emptyText}
+              alwaysOpen
               leading={
                 <Search
                   size={18}
@@ -86,8 +87,6 @@ export function ProductPicker({
                 />
               }
             />
-            {/* The dropdown draws under the field; give it room to open. */}
-            <View style={{ height: 300 }} />
           </VStack>
         </Pressable>
       </Pressable>

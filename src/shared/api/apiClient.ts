@@ -52,10 +52,58 @@ apiClient.interceptors.response.use(
 );
 
 /** Extracts a human-friendly message from an axios error. */
+/** Field name out of a zod path: ["body","lines",0,"batchNumber"] -> "Line 1 batchNumber". */
+function fieldLabel(path: (string | number)[]) {
+  const parts = path.filter(
+    (p) => p !== "body" && p !== "query" && p !== "params",
+  );
+  const idx = parts.findIndex((p) => typeof p === "number");
+  const name = parts.filter((p) => typeof p === "string").pop();
+  if (!name) return "";
+  return idx >= 0 ? `Line ${Number(parts[idx]) + 1} ${name}` : String(name);
+}
+
 export function apiErrorMessage(
   err: unknown,
   fallback = "Something went wrong",
 ) {
-  const e = err as { response?: { data?: { error?: { message?: string } } } };
-  return e?.response?.data?.error?.message || fallback;
+  const e = err as {
+    response?: {
+      data?: {
+        error?: {
+          message?: string;
+          details?: {
+            issues?: { path: (string | number)[]; message: string }[];
+          };
+        };
+      };
+    };
+  };
+  const error = e?.response?.data?.error;
+  const message = error?.message || fallback;
+
+  /**
+   * Validation failures already name the offending field on the wire — this
+   * used to drop it and show only "Validation error", which told the user
+   * nothing and left the developer reading server logs to find out which field
+   * a 25-line goods-received note was unhappy about.
+   */
+  const issues = error?.details?.issues;
+  if (issues?.length) {
+    const seen = new Set<string>();
+    const detail = issues
+      .map((i) => {
+        const label = fieldLabel(i.path || []);
+        return label ? `${label}: ${i.message}` : i.message;
+      })
+      .filter((d) => !seen.has(d) && seen.add(d))
+      // More than a handful is noise; the first few are what gets fixed first.
+      .slice(0, 4)
+      .join(" · ");
+    if (detail) {
+      const more = issues.length > 4 ? ` (+${issues.length - 4} more)` : "";
+      return `${message} — ${detail}${more}`;
+    }
+  }
+  return message;
 }
