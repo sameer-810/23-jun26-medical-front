@@ -20,6 +20,9 @@ import {
 import RootNavigator from "@navigation/RootNavigator";
 import { palette } from "@shared/designSystem";
 
+/** Browser tab and desktop window title before a screen names itself. */
+const APP_TITLE = "Plusveda — Inventory & Sales";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: false, refetchOnWindowFocus: false },
@@ -169,7 +172,7 @@ export default function App() {
 
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
-      document.title = "Plusveda — Inventory & Sales";
+      document.title = APP_TITLE;
     }
   }, []);
 
@@ -184,7 +187,22 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
           <StatusBar style="dark" />
-          <NavigationContainer linking={linking as never}>
+          <NavigationContainer
+            linking={linking as never}
+            /**
+             * Without this, the container overwrites the title set above with
+             * the active screen's `options.title` — which most screens don't
+             * declare, leaving the browser tab (and the desktop window's title
+             * bar) reading the literal word "undefined".
+             *
+             * Deliberately constant rather than per-screen: the formatter is
+             * handed the previous route's options on a nested navigator, so
+             * naming the screen labelled the tab "Products" while the dashboard
+             * was open. A title that is one screen behind is worse than one
+             * that never changes.
+             */
+            documentTitle={{ formatter: () => APP_TITLE }}
+          >
             <RootNavigator />
           </NavigationContainer>
         </SafeAreaProvider>
