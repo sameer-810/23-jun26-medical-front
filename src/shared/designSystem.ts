@@ -89,11 +89,16 @@ export const palette = {
   text: {
     primary: "#17242D",
     secondary: "#425059",
-    tertiary: "#788690",
+    // 5.05:1 on white. Was #788690 at 3.74:1 — below the 4.5:1 WCAG AA floor,
+    // and this token carries every section label, hint and timestamp in the
+    // app, so one wrong value failed on every screen at once.
+    tertiary: "#667079",
     disabled: "#A9B4BC",
     inverse: "#FFFFFF",
     accent: "#0C7942", // brand green 700 — passes AA on white
-    link: "#1E8FE6",
+    // 5.87:1 on white. #1E8FE6 was 3.43:1 — links are body-size text,
+    // so they need the full 4.5:1, not the 3:1 allowed for large text.
+    link: "#1568A8",
   },
 
   border: {
@@ -105,10 +110,10 @@ export const palette = {
   },
 
   // Semantic — stock / expiry / billing states
-  success: { bg: "#E4F5EE", text: "#17976A", border: "#B7E6D3" },
-  warning: { bg: "#FBF1DC", text: "#B6791A", border: "#F3DCA6" },
-  danger: { bg: "#FCEAE7", text: "#D6412F", border: "#F6C9C1" },
-  info: { bg: "#E7F1FC", text: "#1E7FD6", border: "#BFDDF8" },
+  success: { bg: "#E4F5EE", text: "#0F7A54", border: "#B7E6D3" }, // 4.73:1 (was 3.28)
+  warning: { bg: "#FBF1DC", text: "#8A5A11", border: "#F3DCA6" }, // 5.27:1 (was 3.26)
+  danger: { bg: "#FCEAE7", text: "#B32D1D", border: "#F6C9C1" }, // 5.46:1 (was 3.88)
+  info: { bg: "#E7F1FC", text: "#1467AE", border: "#BFDDF8" }, // 5.13:1 (was 3.63)
 } as const;
 
 /**
@@ -273,7 +278,9 @@ export const typography = {
     },
     small: {
       fontFamily: fonts.semibold,
-      fontSize: 11,
+      // 12px is the floor for text that carries meaning; 11px reads as noise
+      // on a phone and trips "text too small" audits.
+      fontSize: 12,
       lineHeight: 16,
       fontWeight: "600" as const,
       letterSpacing: 0.2,
@@ -288,7 +295,7 @@ export const typography = {
   },
   overline: {
     fontFamily: fonts.semibold,
-    fontSize: 11,
+    fontSize: 12,
     lineHeight: 16,
     fontWeight: "700" as const,
     letterSpacing: 1,

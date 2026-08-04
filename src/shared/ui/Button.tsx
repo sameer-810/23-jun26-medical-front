@@ -38,7 +38,10 @@ interface Props {
 }
 
 const SIZES = {
-  sm: { height: 38, px: 16, fontSize: 13 as const },
+  // 44 is the Apple HIG / WCAG-AAA touch floor. At 38 these were reachable
+  // with a mouse and fiddly with a thumb, and "sm" is what every row action
+  // and toolbar button uses.
+  sm: { height: 44, px: 16, fontSize: 13 as const },
   md: { height: 48, px: 18, fontSize: 15 as const },
   lg: { height: 54, px: 22, fontSize: 16 as const },
 };
@@ -120,10 +123,13 @@ function getVariantColors(v: Variant) {
         borderWidth: 0,
       };
     case "accent":
+      // 700, not 600 — same reasoning as primary. White on cobalt[600] is
+      // 3.43:1, and these labels ("New sale", "Receive stock") are 15px, so
+      // they need 4.5:1, not the 3:1 allowed for large text. 700 gives 4.94.
       return {
-        bg: palette.cobalt[600],
+        bg: palette.cobalt[700],
         text: "#FFFFFF",
-        border: palette.cobalt[600],
+        border: palette.cobalt[700],
         borderWidth: 0,
       };
     case "secondary":

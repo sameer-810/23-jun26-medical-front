@@ -801,6 +801,10 @@ export default function ReceiveStockScreen() {
                         setPickingFor(i);
                         setRowQuery(p ? "" : line.fromBill?.productName || "");
                       }}
+                      // The whole cell is the target, not just the text — this
+                      // is the most-tapped control on the goods-received grid.
+                      hitSlop={8}
+                      style={{ minHeight: 34, justifyContent: "center" }}
                     >
                       <Text
                         variant="body-sm"
@@ -886,7 +890,15 @@ export default function ReceiveStockScreen() {
                   </Text>
                   <Pressable
                     onPress={() => lines.length > 1 && removeLine(i)}
-                    style={{ width: COL.rm, alignItems: "center" }}
+                    // 30x15 before — under the 24px WCAG 2.2 floor, and a
+                    // delete control is the worst one to have to aim at.
+                    hitSlop={10}
+                    style={{
+                      width: COL.rm,
+                      minHeight: 32,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
                     accessibilityRole="button"
                     accessibilityLabel="Remove line"
                   >

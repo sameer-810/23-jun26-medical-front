@@ -56,6 +56,10 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    // Fill the 48px box. At paddingVertical:0 the input itself was only 20px
+    // tall, so taps landing in the surrounding padding hit nothing — the field
+    // looked 48px and behaved like 20px.
+    alignSelf: "stretch",
     fontSize: 15,
     color: palette.text.primary,
     paddingVertical: 0,
