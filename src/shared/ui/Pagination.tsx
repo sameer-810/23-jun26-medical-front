@@ -77,6 +77,7 @@ export function Pagination({
               <Pressable
                 key={size}
                 onPress={() => onLimitChange(size)}
+                accessibilityRole="button"
                 accessibilityLabel={`${size} rows per page`}
                 style={[styles.size, active && styles.sizeActive]}
               >
@@ -140,6 +141,7 @@ export function Pagination({
               <Pressable
                 key={p}
                 onPress={() => onPageChange(p)}
+                accessibilityRole="button"
                 accessibilityLabel={`Page ${p}`}
                 style={[styles.num, p === page && styles.numActive]}
               >

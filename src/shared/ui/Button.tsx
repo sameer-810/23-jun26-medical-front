@@ -64,9 +64,19 @@ export function Button({
   const s = SIZES[size];
   const flat = variant === "ghost";
 
+  /**
+   * The disabled dimming lives IN here, not in the style array.
+   *
+   * Reanimated writes animated styles straight onto the node, so they beat
+   * anything passed through the style prop no matter where it sits in the
+   * array — this worklet's resting `opacity: 1` was silently cancelling the
+   * disabled state, and every disabled button in the app rendered at full
+   * strength. "Process return" with nothing to return looked perfectly
+   * clickable and did nothing when pressed.
+   */
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 - press.get() * 0.03 }],
-    opacity: 1 - press.get() * 0.12,
+    opacity: (isDisabled ? 0.5 : 1) - press.get() * 0.12,
   }));
 
   return (
@@ -74,6 +84,15 @@ export function Button({
       <AnimatedPressable
         onPress={onPress}
         disabled={isDisabled}
+        /**
+         * Without a role this renders as an anonymous div: a screen reader
+         * announces "Return" as plain text with no hint it does anything, and
+         * the whole invoice page exposed exactly one real control (the back
+         * link, which happened to set its own). It is also why nothing in the
+         * app could be found by role in testing.
+         */
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isDisabled, busy: loading }}
         onPressIn={() => press.set(withTiming(1, { duration: 90 }))}
         onPressOut={() => press.set(withTiming(0, { duration: 140 }))}
         style={[
@@ -86,7 +105,6 @@ export function Button({
             borderWidth: c.borderWidth,
           },
           !flat && variant !== "secondary" && shadows.sm,
-          isDisabled && { opacity: 0.5 },
           animStyle,
         ]}
       >

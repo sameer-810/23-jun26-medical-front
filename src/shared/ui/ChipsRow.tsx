@@ -32,6 +32,10 @@ export function ChipsRow({ chips, active, onChange }: Props) {
             <Pressable
               key={c.key}
               onPress={() => onChange(c.key)}
+              // A filter chip is a radio in everything but looks — announcing
+              // which one is currently applied is the whole point.
+              accessibilityRole="radio"
+              accessibilityState={{ selected: isActive, checked: isActive }}
               style={({ pressed }) => [
                 styles.chip,
                 isActive && styles.chipActive,

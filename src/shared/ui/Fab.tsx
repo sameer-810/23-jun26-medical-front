@@ -12,10 +12,12 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 interface Props {
   onPress: () => void;
   icon: React.ReactNode;
+  /** Spoken name — an icon-only control has no text for a screen reader. */
+  label?: string;
 }
 
 /** Fab — clinical floating action button: teal circle, soft elevation. */
-export function Fab({ onPress, icon }: Props) {
+export function Fab({ onPress, icon, label }: Props) {
   const press = useSharedValue(0);
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 - press.get() * 0.06 }],
@@ -25,6 +27,8 @@ export function Fab({ onPress, icon }: Props) {
     <View style={styles.wrap} pointerEvents="box-none">
       <AnimatedPressable
         onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
         onPressIn={() => press.set(withTiming(1, { duration: 80 }))}
         onPressOut={() => press.set(withTiming(0, { duration: 140 }))}
         style={[styles.fab, animStyle]}

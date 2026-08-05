@@ -142,6 +142,8 @@ export function Select({
       )}
       <Pressable
         onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={label ? `${label}: ${shownLabel || "not set"}` : undefined}
         style={[styles.field, error ? styles.fieldError : null]}
       >
         <Text
