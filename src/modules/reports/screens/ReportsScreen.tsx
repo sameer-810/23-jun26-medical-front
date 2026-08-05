@@ -15,7 +15,7 @@ import {
   HStack,
   Card,
   Button,
-  TextField,
+  DateField,
   ChipsRow,
   EmptyState,
   DataTable,
@@ -83,21 +83,19 @@ export default function ReportsScreen() {
           {meta.timed && (
             <HStack gap={12}>
               <View style={{ flex: 1 }}>
-                <TextField
+                <DateField
                   label="From"
                   value={from}
-                  onChangeText={setFrom}
-                  placeholder="YYYY-MM-DD"
-                  autoCapitalize="none"
+                  onChange={setFrom}
+                  maximumDate={new Date()}
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <TextField
+                <DateField
                   label="To"
                   value={to}
-                  onChangeText={setTo}
-                  placeholder="YYYY-MM-DD"
-                  autoCapitalize="none"
+                  onChange={setTo}
+                  maximumDate={new Date()}
                 />
               </View>
             </HStack>

@@ -37,6 +37,7 @@ import {
   StatusChip,
   Select,
   TextField,
+  DateField,
   ChipsRow,
   EmptyState,
   ConfirmDialog,
@@ -368,11 +369,10 @@ export default function PdcScreen() {
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <TextField
+                <DateField
                   label="Cheque date"
                   value={form.chequeDate}
-                  onChangeText={(v) => set("chequeDate", v)}
-                  placeholder="YYYY-MM-DD"
+                  onChange={(v) => set("chequeDate", v)}
                 />
               </View>
             </HStack>

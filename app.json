@@ -24,7 +24,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.medstock.app"
+      "package": "com.medstock.app",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -39,7 +40,8 @@
         {
           "cameraPermission": "Allow Plusveda to use the camera to scan barcodes on medicine packs."
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "extra": {
       "eas": {

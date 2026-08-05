@@ -73,6 +73,7 @@ import {
   Select,
   Combobox,
   Banner,
+  DateField,
 } from "@shared/ui";
 import { useAuthStore } from "@shared/store/useAuthStore";
 
@@ -823,19 +824,27 @@ export default function ReceiveStockScreen() {
                     onChangeText={(v) => setLine(i, { batchNumber: v })}
                     error={started && !line.batchNumber.trim()}
                   />
-                  <GrnCell
-                    w={COL.mfg}
+                  <DateField
+                    compact
+                    width={COL.mfg}
+                    mode="month"
                     value={line.mfgDate}
-                    onChangeText={(v) => setLine(i, { mfgDate: v })}
-                    placeholder="YYYY-MM"
+                    onChange={(v) => setLine(i, { mfgDate: v })}
+                    maximumDate={new Date()}
                   />
-                  <GrnCell
-                    w={COL.expiry}
+                  <DateField
+                    compact
+                    width={COL.expiry}
+                    mode="month"
                     value={line.expiryDate}
-                    onChangeText={(v) => setLine(i, { expiryDate: v })}
-                    placeholder="YYYY-MM"
-                    error={started && expFlags[i].state === "expired"}
-                    warn={started && expFlags[i].state === "soon"}
+                    onChange={(v) => setLine(i, { expiryDate: v })}
+                    tone={
+                      started && expFlags[i].state === "expired"
+                        ? "error"
+                        : started && expFlags[i].state === "soon"
+                          ? "warn"
+                          : "default"
+                    }
                   />
                   <GrnCell
                     w={COL.qty}
@@ -1041,8 +1050,10 @@ const COL = {
   idx: 26,
   product: 180,
   batch: 88,
-  mfg: 80,
-  expiry: 80,
+  // Wide enough for a real month control ("mm/yyyy" plus its picker glyph);
+  // at 80 the browser clipped the value.
+  mfg: 104,
+  expiry: 104,
   qty: 50,
   free: 46,
   unit: 88,

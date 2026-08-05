@@ -2,6 +2,8 @@ export { Text } from "./Text";
 export { Button } from "./Button";
 export { Stack, VStack, HStack } from "./Stack";
 export { TextField } from "./TextField";
+export { DateField, formatDateDisplay } from "./DateField";
+export type { DateMode } from "./DateField";
 export { Card } from "./Card";
 export { GradientHero } from "./GradientHero";
 export { StatTile } from "./StatTile";

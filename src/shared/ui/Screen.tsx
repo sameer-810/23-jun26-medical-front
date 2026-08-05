@@ -6,6 +6,8 @@ import {
   StyleProp,
   ViewStyle,
   useWindowDimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { palette, layout } from "../designSystem";
 import { useBottomPadding } from "./useBottomPadding";
@@ -94,25 +96,28 @@ export function Screen({
     </View>
   );
 
-  if (!scroll) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: palette.surface.secondary,
-          padding: 24,
-        }}
-      >
-        {inner}
-      </View>
-    );
-  }
-
-  return (
+  const body = !scroll ? (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: palette.surface.secondary,
+        padding: 24,
+      }}
+    >
+      {inner}
+    </View>
+  ) : (
     <ScrollView
       style={{ flex: 1, backgroundColor: palette.surface.secondary }}
       contentContainerStyle={{ padding: 24, paddingBottom: bottom }}
       showsVerticalScrollIndicator={false}
+      /**
+       * Without this, the first tap while the keyboard is open only dismisses
+       * it — every button below a text field needed tapping twice.
+       */
+      keyboardShouldPersistTaps="handled"
+      // iOS: keep the focused field above the keyboard as it opens.
+      automaticallyAdjustKeyboardInsets
       refreshControl={
         onRefresh ? (
           <RefreshControl
@@ -125,5 +130,25 @@ export function Screen({
     >
       {inner}
     </ScrollView>
+  );
+
+  /**
+   * Keyboard handling lived only in the login screen, so on every other form —
+   * Receive Stock, billing, customer details — the on-screen keyboard sat over
+   * the fields being typed into and users had to dismiss it between entries.
+   *
+   * Screen wraps all 53 pages, so this is the one place it belongs. On web the
+   * wrapper is skipped: there is no soft keyboard, and the extra flex container
+   * would only complicate the desktop layout. Behaviour matches AuthLayout —
+   * Android resizes the window on its own, iOS needs the padding.
+   */
+  if (Platform.OS === "web") return body;
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      {body}
+    </KeyboardAvoidingView>
   );
 }

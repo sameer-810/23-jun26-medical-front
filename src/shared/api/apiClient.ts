@@ -80,7 +80,14 @@ export function apiErrorMessage(
     };
   };
   const error = e?.response?.data?.error;
-  const message = error?.message || fallback;
+  /**
+   * Not everything reaching here is an axios failure. The native report export
+   * inspects the response itself and throws a plain Error; without this its
+   * message was thrown away and the user saw only the generic fallback.
+   */
+  const plain =
+    !error && err instanceof Error && err.message ? err.message : "";
+  const message = error?.message || plain || fallback;
 
   /**
    * Validation failures already name the offending field on the wire — this

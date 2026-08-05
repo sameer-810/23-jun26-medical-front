@@ -68,16 +68,56 @@ export const reportsApi = {
     }
 
     const token = useAuthStore.getState().token;
-    const qs = new URLSearchParams({ ...params, format } as Record<
-      string,
-      string
-    >).toString();
-    const uri = `${environment.apiUrl}/reports/${type}/export?${qs}`;
+    /**
+     * Build the query by hand, skipping blanks.
+     *
+     * `new URLSearchParams({ from: undefined })` does not drop the key — it
+     * writes the literal text "from=undefined", which the server rejects with
+     * "Use YYYY-MM-DD". Four report types never render date inputs at all, so
+     * every export of those failed on native while the web path (axios, which
+     * omits undefined) worked. That is the whole reason this only broke on
+     * phones.
+     */
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries({ ...params, format })) {
+      if (value != null && String(value).trim() !== "")
+        qs.set(key, String(value));
+    }
+    const uri = `${environment.apiUrl}/reports/${type}/export?${qs.toString()}`;
     const target =
       (FileSystem.documentDirectory || FileSystem.cacheDirectory) + filename;
     const dl = await FileSystem.downloadAsync(uri, target, {
       headers: { Authorization: `Bearer ${token}` },
     });
+
+    /**
+     * downloadAsync writes whatever came back, status and all. Without this
+     * check a 400 JSON body was saved as "inventory-report.xlsx" and handed to
+     * the share sheet — the file opened as one row of raw JSON, which reads as
+     * a broken spreadsheet rather than a failed request.
+     */
+    if (dl.status < 200 || dl.status >= 300) {
+      let message = `Export failed (${dl.status})`;
+      try {
+        const body = await FileSystem.readAsStringAsync(dl.uri);
+        const parsed = JSON.parse(body) as {
+          error?: {
+            message?: string;
+            details?: { issues?: { message: string }[] };
+          };
+        };
+        const issues = parsed.error?.details?.issues;
+        message =
+          [parsed.error?.message, issues?.map((i) => i.message).join(", ")]
+            .filter(Boolean)
+            .join(" — ") || message;
+      } catch {
+        // Not JSON — keep the status-code message.
+      }
+      await FileSystem.deleteAsync(dl.uri, { idempotent: true });
+      throw new Error(message);
+    }
+
     if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(dl.uri);
   },
 };

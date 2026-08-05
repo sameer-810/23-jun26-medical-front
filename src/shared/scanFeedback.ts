@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 /**
  * Audible/tactile confirmation for scans.
@@ -14,8 +15,11 @@ import { Platform } from "react-native";
  * looking: a short high blip for accepted, a low double buzz for rejected, and
  * a mid tone for "read it, but you need to check something".
  *
- * Synthesised rather than bundled as audio files: no assets to ship, no
- * licensing, no decode latency, and nothing to rebuild the APK for.
+ * Web synthesises them through an oscillator; native plays .wav files generated
+ * from the SAME frequencies, durations and envelope, so a counter can't tell
+ * which platform the till is running. The tones were originally web-only on the
+ * theory that synthesis avoided shipping assets — which quietly meant a phone
+ * produced no sound at all, only a vibration.
  */
 export type ScanTone = "ok" | "error" | "warn";
 
@@ -25,28 +29,43 @@ const TONES: Record<ScanTone, { freq: number; ms: number; repeat: number }> = {
   warn: { freq: 660, ms: 130, repeat: 1 },
 };
 
+const MUTE_KEY = "scanMuted";
 let ctx: AudioContext | null = null;
 let muted = false;
 
-/** Counters get loud; some want it off. Persisted so it survives a reload. */
+async function readMutePref(): Promise<boolean> {
+  try {
+    if (Platform.OS === "web") return localStorage.getItem(MUTE_KEY) === "1";
+    return (await AsyncStorage.getItem(MUTE_KEY)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Hydrates the in-memory flag once, at import.
+ *
+ * The reader below is synchronous because callers use it for a toggle's initial
+ * state, but native storage is async — so on a phone the preference used to
+ * reset to "unmuted" on every launch while the comment claimed it persisted.
+ */
+export const scanSoundReady: Promise<void> = readMutePref().then((v) => {
+  muted = v;
+});
+
+/** Counters get loud; some want it off. Persisted so it survives a restart. */
 export function setScanSoundMuted(next: boolean) {
   muted = next;
+  const value = next ? "1" : "0";
   try {
-    if (Platform.OS === "web")
-      localStorage.setItem("scanMuted", next ? "1" : "0");
+    if (Platform.OS === "web") localStorage.setItem(MUTE_KEY, value);
+    else void AsyncStorage.setItem(MUTE_KEY, value).catch(() => {});
   } catch {
     // Private-mode browsers throw on localStorage; muting just won't persist.
   }
 }
 
 export function isScanSoundMuted() {
-  if (Platform.OS === "web") {
-    try {
-      return localStorage.getItem("scanMuted") === "1";
-    } catch {
-      return muted;
-    }
-  }
   return muted;
 }
 
@@ -84,7 +103,51 @@ function webBeep(tone: ScanTone) {
   }
 }
 
+/** One reusable player per tone; scans come in bursts, so re-creating is waste. */
+type NativePlayer = { play: () => void; seekTo: (seconds: number) => void };
+const players: Partial<Record<ScanTone, NativePlayer>> = {};
+let audioModeReady = false;
+
+async function nativeBeep(tone: ScanTone) {
+  const audio = await import("expo-audio");
+
+  if (!audioModeReady) {
+    audioModeReady = true;
+    // A pharmacy phone lives on silent. Without this the confirmation tone —
+    // the entire point of the feature — is inaudible on iOS.
+    await audio
+      .setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: false,
+      })
+      .catch(() => {});
+  }
+
+  let player = players[tone];
+  if (!player) {
+    const source =
+      tone === "ok"
+        ? require("../../assets/sounds/scan-ok.wav")
+        : tone === "error"
+          ? require("../../assets/sounds/scan-error.wav")
+          : require("../../assets/sounds/scan-warn.wav");
+    player = audio.createAudioPlayer(source) as unknown as NativePlayer;
+    players[tone] = player;
+  }
+  // Rewind first: scanning five packs in a row must beep five times, and a
+  // finished player sits at the end of the clip.
+  player.seekTo(0);
+  player.play();
+}
+
 async function nativeFeedback(tone: ScanTone) {
+  // Sound and vibration are independent — a failure in one must not mute the
+  // other, which is why these are two separate try blocks rather than one.
+  try {
+    await nativeBeep(tone);
+  } catch {
+    // No audio engine available — the haptic below still lands.
+  }
   try {
     const Haptics = await import("expo-haptics");
     const style =

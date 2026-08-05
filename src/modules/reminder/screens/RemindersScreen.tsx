@@ -26,6 +26,7 @@ import {
   Card,
   Button,
   TextField,
+  DateField,
   ChipsRow,
   StatusChip,
   EmptyState,
@@ -158,13 +159,9 @@ export default function RemindersScreen() {
           />
           <HStack gap={12}>
             <View style={{ flex: 1 }}>
-              <TextField
-                label="Due date"
-                value={date}
-                onChangeText={setDate}
-                placeholder="YYYY-MM-DD"
-                error={date && !dateOk ? "Use YYYY-MM-DD" : undefined}
-              />
+              {/* A picker can't produce an invalid date, so the format error
+                  that used to live here has nothing left to catch. */}
+              <DateField label="Due date" value={date} onChange={setDate} />
             </View>
             <View style={{ width: 120 }}>
               <TextField

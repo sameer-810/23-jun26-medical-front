@@ -11,7 +11,15 @@ import {
   LineTone,
 } from "@modules/inventory/receiveDraft";
 import { palette, radius } from "@shared/designSystem";
-import { Text, VStack, HStack, Card, TextField, Select } from "@shared/ui";
+import {
+  Text,
+  VStack,
+  HStack,
+  Card,
+  TextField,
+  Select,
+  DateField,
+} from "@shared/ui";
 
 interface Props {
   index: number;
@@ -158,21 +166,26 @@ export function ReceiveLineRow({
             <>
               <HStack gap={10}>
                 <View style={{ flex: 1 }}>
-                  <TextField
+                  {/* A month, not a day — packs print "EXP 08/2026" and the
+                      lot is good to the end of that month. */}
+                  <DateField
                     label="Expiry date"
+                    mode="month"
                     value={line.expiryDate}
-                    onChangeText={(v) => onChange({ expiryDate: v })}
-                    placeholder="YYYY-MM-DD"
-                    autoCapitalize="none"
+                    onChange={(v) => onChange({ expiryDate: v })}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <TextField
+                  {/* Month, like expiry — a pack prints "MFG 03/2026", and the
+                      grid layout of this same field has always taken YYYY-MM.
+                      One field must not behave differently in two layouts. */}
+                  <DateField
                     label="Mfg date"
+                    mode="month"
                     value={line.mfgDate}
-                    onChangeText={(v) => onChange({ mfgDate: v })}
+                    onChange={(v) => onChange({ mfgDate: v })}
                     placeholder="optional"
-                    autoCapitalize="none"
+                    maximumDate={new Date()}
                   />
                 </View>
               </HStack>
@@ -201,21 +214,26 @@ export function ReceiveLineRow({
             <>
               <HStack gap={10}>
                 <View style={{ flex: 1 }}>
-                  <TextField
+                  {/* A month, not a day — packs print "EXP 08/2026" and the
+                      lot is good to the end of that month. */}
+                  <DateField
                     label="Expiry date"
+                    mode="month"
                     value={line.expiryDate}
-                    onChangeText={(v) => onChange({ expiryDate: v })}
-                    placeholder="YYYY-MM-DD"
-                    autoCapitalize="none"
+                    onChange={(v) => onChange({ expiryDate: v })}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <TextField
+                  {/* Month, like expiry — a pack prints "MFG 03/2026", and the
+                      grid layout of this same field has always taken YYYY-MM.
+                      One field must not behave differently in two layouts. */}
+                  <DateField
                     label="Mfg date"
+                    mode="month"
                     value={line.mfgDate}
-                    onChangeText={(v) => onChange({ mfgDate: v })}
+                    onChange={(v) => onChange({ mfgDate: v })}
                     placeholder="optional"
-                    autoCapitalize="none"
+                    maximumDate={new Date()}
                   />
                 </View>
               </HStack>
