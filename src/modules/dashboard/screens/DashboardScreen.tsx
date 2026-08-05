@@ -37,6 +37,7 @@ import {
   StatTile,
   GradientHero,
   Button,
+  Banner,
 } from "@shared/ui";
 
 const money = fmtMoney;
@@ -62,10 +63,28 @@ export default function DashboardScreen() {
   const go = useSectionNav();
   const navigation = useNavigation<any>();
   const { data, isLoading, refetch, isRefetching } = useDashboardSummary();
-  const { data: fin } = useQuery({
+  const {
+    data: fin,
+    isError: finError,
+    isLoading: finLoading,
+    refetch: refetchFin,
+  } = useQuery({
     queryKey: ["dashboard", "finance"],
     queryFn: dashboardApi.finance,
   });
+
+  /**
+   * Money that failed to load must never render as zero.
+   *
+   * Every finance tile used to read `fin?.x ?? 0`, so one failed request — a
+   * cold backend, a timeout, a dropped connection — painted the whole panel
+   * "Need to collect ₹0 / Need to pay ₹0 / Sales ₹0" with no error anywhere on
+   * screen. A pharmacy reads that as "nobody owes me anything" and stops
+   * chasing it. An em dash says "not loaded"; ₹0 makes a false claim.
+   */
+  const finMissing = finError || (!fin && !finLoading);
+  const fmtFin = (value: number | undefined, format: (n: number) => string) =>
+    finMissing ? "—" : format(value ?? 0);
 
   const tileWidth = `${100 / cols}%` as const;
 
@@ -335,11 +354,29 @@ export default function DashboardScreen() {
       <Text variant="h3" tone="primary" style={styles.sectionH}>
         Finance
       </Text>
+      {/* Say it out loud, not just with a dash — these are the tiles someone
+          acts on, and silence looks identical to "nothing is owed". */}
+      {finMissing ? (
+        <Banner
+          tone="danger"
+          title="Couldn't load your finance figures"
+          message="These totals are not zero — they haven't loaded. Check your connection and try again."
+          style={{ marginBottom: 12 }}
+        >
+          <Button
+            label="Retry"
+            variant="secondary"
+            size="sm"
+            fullWidth={false}
+            onPress={() => refetchFin()}
+          />
+        </Banner>
+      ) : null}
       <View style={[styles.grid, { marginHorizontal: -6 }]}>
         <FinTile
           w={tileWidth}
           label="Need to collect"
-          value={money(fin?.receivables.total ?? 0)}
+          value={fmtFin(fin?.receivables.total, money)}
           icon={Wallet}
           accent={accents.red}
           onPress={() => go("Customers")}
@@ -347,7 +384,7 @@ export default function DashboardScreen() {
         <FinTile
           w={tileWidth}
           label="Need to pay"
-          value={money(fin?.needToPay.total ?? 0)}
+          value={fmtFin(fin?.needToPay.total, money)}
           icon={BadgeIndianRupee}
           accent={accents.amber}
           onPress={() => go("Suppliers")}
@@ -355,7 +392,7 @@ export default function DashboardScreen() {
         <FinTile
           w={tileWidth}
           label="Upcoming PDC (out)"
-          value={money(fin?.upcomingPDC.payable.total ?? 0)}
+          value={fmtFin(fin?.upcomingPDC.payable.total, money)}
           hint={`${fin?.upcomingPDC.payable.count ?? 0} cheque${(fin?.upcomingPDC.payable.count ?? 0) === 1 ? "" : "s"}`}
           icon={CalendarClock}
           accent={accents.blue}
@@ -364,21 +401,21 @@ export default function DashboardScreen() {
         <FinTile
           w={tileWidth}
           label="Stock at cost (PTR)"
-          value={money(fin?.stock.cost ?? 0)}
+          value={fmtFin(fin?.stock.cost, money)}
           icon={Landmark}
           accent={accents.teal}
         />
         <FinTile
           w={tileWidth}
           label="Stock at MRP"
-          value={money(fin?.stock.mrp ?? 0)}
+          value={fmtFin(fin?.stock.mrp, money)}
           icon={Boxes}
           accent={accents.blue}
         />
         <FinTile
           w={tileWidth}
           label="Margin (30d)"
-          value={`${fin?.margin.marginPct ?? 0}%`}
+          value={fmtFin(fin?.margin.marginPct, (n) => `${n}%`)}
           icon={Percent}
           accent={accents.amber}
         />
@@ -395,16 +432,24 @@ export default function DashboardScreen() {
           <HStack gap={20} style={{ flexWrap: "wrap" }}>
             <Metric
               label="Sales (7d / 30d)"
-              value={`${money(fin?.sales.last7 ?? 0)} / ${money(fin?.sales.last30 ?? 0)}`}
+              value={
+                finMissing
+                  ? "—"
+                  : `${money(fin?.sales.last7 ?? 0)} / ${money(fin?.sales.last30 ?? 0)}`
+              }
               trend={fin?.sales.trend7Pct}
             />
             <Metric
               label="Purchases (30d)"
-              value={money(fin?.purchases.last30 ?? 0)}
+              value={fmtFin(fin?.purchases.last30, money)}
             />
             <Metric
               label="Gross margin (30d)"
-              value={`${money(fin?.margin.grossMargin ?? 0)} · ${fin?.margin.marginPct ?? 0}%`}
+              value={
+                finMissing
+                  ? "—"
+                  : `${money(fin?.margin.grossMargin ?? 0)} · ${fin?.margin.marginPct ?? 0}%`
+              }
             />
           </HStack>
         </VStack>
