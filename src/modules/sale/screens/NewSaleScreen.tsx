@@ -89,7 +89,28 @@ const money = (n: number) =>
 export default function NewSaleScreen() {
   const navigation = useNavigation<any>();
   const { width } = useWindowDimensions();
-  const wide = width >= 1200;
+  /**
+   * Only use the column grid when the medicine name actually has room.
+   *
+   * At `wide` the row competes with the sidebar (240), page padding (48) and
+   * the 344px totals rail, leaving `width - 648` for the table — and the fixed
+   * columns take 552 of that. At the old 1200 threshold the name column was
+   * computed at MINUS 36px, so the product name, its salt line and the FEFO
+   * badge piled on top of the quantity box. It only became legible around
+   * 1440, which is the width this was checked at — one step past the damage,
+   * while 1366 (the commonest laptop here) sat squarely inside it.
+   *
+   * 1400 is the first width that leaves the name ~200px.
+   *
+   * Two separate questions, deliberately split. Whether the TOTALS sit beside
+   * the cart is about page shape; whether the LINE ITEMS use a column grid is
+   * about how much room the medicine name has. Tying both to one flag meant
+   * fixing the cramped row would also push "Grand total" and "Complete sale"
+   * below the fold on a 1366 counter PC — trading a layout bug for a slower
+   * sale.
+   */
+  const railSide = width >= 1200;
+  const wide = width >= 1400;
 
   // What's typed vs what's actually searched. The counter search is the busiest
   // input in the product — undebounced it fired one request per keystroke, and
@@ -952,7 +973,7 @@ export default function NewSaleScreen() {
   );
 
   const rail = (
-    <View style={wide ? [styles.rail, stickyStyle] : undefined}>
+    <View style={railSide ? [styles.rail, stickyStyle] : undefined}>
       {configCard}
       {totalsCard}
       {scanError ? (
@@ -1074,7 +1095,7 @@ export default function NewSaleScreen() {
     >
       <View
         style={{
-          flexDirection: wide ? "row" : "column",
+          flexDirection: railSide ? "row" : "column",
           gap: 16,
           alignItems: "flex-start",
         }}
@@ -1096,7 +1117,7 @@ export default function NewSaleScreen() {
             </HStack>
           ) : null}
         </View>
-        <View style={{ width: wide ? 344 : "100%" }}>{rail}</View>
+        <View style={{ width: railSide ? 344 : "100%" }}>{rail}</View>
       </View>
 
       <CameraScanner
@@ -1213,13 +1234,18 @@ function SubstitutePanel({
   );
 }
 
+/**
+ * Fixed widths for everything except the medicine name, which takes the rest.
+ * Trimmed from 588 to 552 total so the name keeps a workable share on a 1400px
+ * laptop — the columns below hold short numbers and were sized generously.
+ */
 const COL = {
   qty: 60,
-  unit: 96,
+  unit: 84,
   price: 82,
-  disc: 124,
+  disc: 104,
   gst: 52,
-  amount: 88,
+  amount: 84,
   rm: 30,
 };
 
