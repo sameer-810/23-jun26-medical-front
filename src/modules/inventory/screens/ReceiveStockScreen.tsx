@@ -57,6 +57,7 @@ import {
   scanSummary,
   duplicateWarning,
   toReceiptLines,
+  lineAmount,
   totalBaseUnits,
 } from "@modules/inventory/receiveDraft";
 import { apiErrorMessage } from "@api/apiClient";
@@ -424,21 +425,13 @@ export default function ReceiveStockScreen() {
       cur.length === 1 ? cur : cur.filter((_, idx) => idx !== i),
     );
 
-  const validLines = toReceiptLines(lines);
+  // The rate cell holds the rate for ONE of the line's units — exactly what the
+  // distributor printed — so the payable is qty × rate, with no pack arithmetic
+  // in between. toReceiptLines divides by the pack factor on the way out, which
+  // is where the server's per-base-unit purchasePrice comes from.
+  const validLines = toReceiptLines(lines, productsById);
   const totalBase = totalBaseUnits(lines, productsById);
-  // Rate is per BASE unit, so the payable for a line received in a pack unit is
-  // qty × pack-factor × rate — matching the lineValue the server stores.
-  const factorOf = (l: DraftLine) => {
-    const p = l.productId ? productsById[l.productId] : null;
-    if (!p || !l.unit || l.unit === p.baseUnit) return 1;
-    return (p.packs || []).find((x) => x.unit === l.unit)?.factor || 1;
-  };
-  const totalValue = lines.reduce(
-    (s, l) =>
-      s +
-      (Number(l.quantity) || 0) * factorOf(l) * (Number(l.purchasePrice) || 0),
-    0,
-  );
+  const totalValue = lines.reduce((s, l) => s + lineAmount(l), 0);
   const freeUnits = lines.reduce(
     (s, l) => s + (Number(l.freeQuantity) || 0),
     0,
@@ -751,13 +744,12 @@ export default function ReceiveStockScreen() {
               <GrnHead w={COL.qty} label="QTY" />
               <GrnHead w={COL.free} label="FREE" />
               <GrnHead w={COL.unit} label="UNIT" />
-              {/* Not "RATE": this cell holds cost per BASE unit, while the UNIT
-                  column beside it says "pack". A bill printing a trade price of
-                  64.46 for a 15-tab pack lands here as 4.2973, so a pharmacist
-                  checking the screen against the bill reads it as wrong. The
-                  stacked layout has always called it "Cost / base" — the grid
-                  was the odd one out. */}
-              <GrnHead w={COL.rate} label="COST/BASE" right />
+              {/* RATE, and it means what the bill means by it: the price of one
+                  of the units in the column to the left. It used to hold cost
+                  per BASE unit, so a bill printing a trade price of 241.39 for
+                  a 15-cap pack showed 16.0927 — a figure that appears nowhere
+                  on the paper being checked against. Same for MRP. */}
+              <GrnHead w={COL.rate} label="RATE" right />
               <GrnHead w={COL.mrp} label="MRP" right />
               <GrnHead w={COL.loc} label="LOCATION" />
               <GrnHead w={COL.amount} label="AMOUNT" right />
@@ -766,8 +758,7 @@ export default function ReceiveStockScreen() {
             {lines.map((line, i) => {
               const p = line.productId ? productsById[line.productId] : null;
               const qtyN = Number(line.quantity) || 0;
-              const rateN = Number(line.purchasePrice) || 0;
-              const amount = qtyN * factorOf(line) * rateN;
+              const amount = lineAmount(line);
               const started = Boolean(line.productId);
               const units = p
                 ? [
@@ -822,6 +813,20 @@ export default function ReceiveStockScreen() {
                           line.fromBill?.productName ||
                           "Set product…"}
                       </Text>
+                      {/* The bill's own PACK string, kept visible. QTY, RATE and
+                          MRP are all per ONE of these, so it is what the UNIT
+                          column has to be set to — and when the scan couldn't
+                          resolve it, this is the only place the pharmacist can
+                          read it without going back to the paper. */}
+                      {line.fromBill?.pack ? (
+                        <Text
+                          variant="caption"
+                          tone="tertiary"
+                          numberOfLines={1}
+                        >
+                          Pack {line.fromBill.pack}
+                        </Text>
+                      ) : null}
                     </Pressable>
                   </View>
                   <GrnCell

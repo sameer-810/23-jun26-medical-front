@@ -13,9 +13,10 @@ import {
   Text,
   Card,
   Button,
-  TextField,
   Banner,
   BackLink,
+  ReasonSelect,
+  reasonValue,
 } from "@shared/ui";
 
 export default function PurchaseReturnScreen() {
@@ -26,6 +27,8 @@ export default function PurchaseReturnScreen() {
 
   const [qty, setQty] = useState<Record<number, string>>({});
   const [reason, setReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
+  const finalReason = reasonValue(reason, customReason);
   const [serverError, setServerError] = useState<string | null>(null);
 
   const mut = useMutation({
@@ -58,10 +61,16 @@ export default function PurchaseReturnScreen() {
       setServerError("Enter a return quantity for at least one line.");
       return;
     }
+    // A return with no reason is a hole in the purchase history — the supplier
+    // credit note has to say what it is for.
+    if (!finalReason) {
+      setServerError("Pick a reason for the return.");
+      return;
+    }
     mut.mutate({
       receiptId,
       supplierName: receipt.supplierName,
-      reason,
+      reason: finalReason,
       lines,
     });
   };
@@ -168,11 +177,13 @@ export default function PurchaseReturnScreen() {
       </Card>
 
       <Card style={{ marginTop: 12 }}>
-        <TextField
-          label="Reason (optional)"
+        <ReasonSelect
+          label="Reason"
+          placeholder="Why is this going back to the supplier?"
           value={reason}
-          onChangeText={setReason}
-          placeholder="Damaged / expired / wrong item…"
+          onChange={setReason}
+          custom={customReason}
+          onCustomChange={setCustomReason}
         />
       </Card>
 

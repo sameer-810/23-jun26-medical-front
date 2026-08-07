@@ -24,6 +24,9 @@ import {
   StatusChip,
   EmptyState,
   Banner,
+  ReasonSelect,
+  reasonValue,
+  WRITE_OFF_REASONS,
 } from "@shared/ui";
 
 const TYPES = [
@@ -48,6 +51,8 @@ export default function DamagedScreen() {
   const [cell, setCell] = useState<CellSelection>(emptyCell());
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
+  const finalReason = reasonValue(reason, customReason);
   const [done, setDone] = useState<string | null>(null);
 
   const qty = Number(quantity) || 0;
@@ -66,7 +71,7 @@ export default function DamagedScreen() {
         batchId: cell.batchId!,
         locationId: cell.locationId!,
         quantity: qty,
-        reason: reason.trim() || undefined,
+        reason: finalReason || undefined,
       },
       {
         onSuccess: (a) => {
@@ -74,6 +79,7 @@ export default function DamagedScreen() {
           setCell(emptyCell());
           setQuantity("");
           setReason("");
+          setCustomReason("");
         },
       },
     );
@@ -150,11 +156,14 @@ export default function DamagedScreen() {
               />
             </View>
           </HStack>
-          <TextField
-            label="Reason / note"
+          <ReasonSelect
+            label="Reason"
+            placeholder="Why is this stock being written off?"
+            options={WRITE_OFF_REASONS}
             value={reason}
-            onChangeText={setReason}
-            placeholder="e.g. broken seal, store damage"
+            onChange={setReason}
+            custom={customReason}
+            onCustomChange={setCustomReason}
           />
         </VStack>
       </Card>

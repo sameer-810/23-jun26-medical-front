@@ -67,15 +67,37 @@ export function unitOptions(
 }
 
 /**
+ * How many base units one of this line's units is worth. A line received in
+ * "cap (×15 tablet)" has a factor of 15; base units and unknown packs are 1.
+ */
+export function unitFactor(
+  line: DraftLine,
+  product?: ProductLite | null,
+): number {
+  if (!product || !line.unit || line.unit === product.baseUnit) return 1;
+  return (product.packs || []).find((p) => p.unit === line.unit)?.factor || 1;
+}
+
+/**
  * Quantity converted into base units — a pack of 15 tablets is 15, not 1. Free
  * (scheme) units are received too, so they count toward what's put on the shelf.
  */
 export function baseQty(line: DraftLine, product?: ProductLite | null): number {
   const qty = (Number(line.quantity) || 0) + (Number(line.freeQuantity) || 0);
   if (!product) return 0;
-  if (!line.unit || line.unit === product.baseUnit) return qty;
-  const pack = (product.packs || []).find((p) => p.unit === line.unit);
-  return pack ? qty * pack.factor : qty;
+  return qty * unitFactor(line, product);
+}
+
+/**
+ * The line's payable as the BILL states it: qty × the printed rate.
+ *
+ * The rate cell holds the rate for ONE of the line's units — the same figure
+ * the distributor printed — so this multiplies out to the bill's AMOUNT column
+ * with no pack arithmetic in between. That is the number the pharmacist is
+ * checking against the paper, so it is the number we compute.
+ */
+export function lineAmount(line: DraftLine): number {
+  return (Number(line.quantity) || 0) * (Number(line.purchasePrice) || 0);
 }
 
 export function totalBaseUnits(
@@ -137,10 +159,16 @@ export function summaryLine(line: DraftLine, product?: ProductLite | null) {
  * Two deliberate rules:
  *  1. Only values both OCR passes AGREED on are pre-filled — anything disputed
  *     is left BLANK so it must be typed rather than rubber-stamped.
- *  2. The bill's QTY counts PACKS and its RATE is per PACK. The unit is only
- *     pre-filled when the server proved which pack it is, and the cost is the
- *     converted per-base-unit figure. Defaulting to base units silently booked
- *     "1 ml" for a 60ml bottle — never again.
+ *  2. The bill's QTY counts PACKS and its RATE is the price of one PACK. Both
+ *     are carried across EXACTLY as printed — the rate cell is per the line's
+ *     unit, so qty × rate reproduces the bill's AMOUNT column and the screen
+ *     can be read against the paper. The conversion to our per-base-unit cost
+ *     happens once, on save (see toReceiptLines).
+ *
+ *     This used to divide the rate by the pack size before showing it, and
+ *     blank it entirely whenever the pack couldn't be resolved. A bill printing
+ *     ₹241.39 for a 15-cap pack showed ₹16.09 — or, more often, nothing at all.
+ *     The rate is printed on the bill; there is no reason to compute it.
  */
 export function linesFromScan(bill: ScannedBill): DraftLine[] {
   return bill.lines.map((l) => {
@@ -150,13 +178,14 @@ export function linesFromScan(bill: ScannedBill): DraftLine[] {
     const batch = trust(l.fields.batchNo);
     const qty = trust(l.fields.quantity);
     const expiryOk = l.fields.expiry.confidence === "high";
-    const rateOk = l.fields.rate.confidence === "high";
     const unit = l.unitResolution?.resolved ? l.unitResolution.unit : null;
-    // Cost only means anything once the pack is known AND the rate was agreed.
-    const cost = unit && rateOk ? l.costPerBaseUnit : null;
 
-    // MRP comes straight off the bill when the read was confident — it prints on
-    // the label, so a wrong one is worse than a blank the pharmacist fills in.
+    // Rate and MRP come straight off the bill. Both are printed in plain figures
+    // in their own columns, so a disputed read is worth showing and flagging —
+    // a pharmacist can correct a digit against the paper in front of them, but
+    // cannot recover a value we chose to blank.
+    const rate = l.fields.rate.value;
+    const rateOk = l.fields.rate.confidence === "high";
     const mrpOk = l.fields.mrp.confidence === "high";
 
     return {
@@ -167,10 +196,10 @@ export function linesFromScan(bill: ScannedBill): DraftLine[] {
       unit,
       quantity: qty != null ? String(qty) : "",
       freeQuantity: "",
-      purchasePrice: cost != null ? String(cost) : "",
-      mrp: mrpOk && l.mrp != null ? String(l.mrp) : "",
+      purchasePrice: rate != null ? String(rate) : "",
+      mrp: l.mrp != null ? String(l.mrp) : "",
       locationId: null,
-      flagged: l.needsReview || !l.match,
+      flagged: l.needsReview || !l.match || !rateOk || !mrpOk,
       // Kept regardless of whether we matched: it names the row for a human,
       // and it's what fills the form if this product has to be created.
       fromBill: {
@@ -218,8 +247,25 @@ export function duplicateWarning(bill: ScannedBill): string | null {
   return `Invoice ${bill.duplicate.referenceNo} was already received as ${bill.duplicate.receiptNo} on ${when}. Saving again will DOUBLE this stock.`;
 }
 
-/** Only complete lines are sent; the rest are still being worked on. */
-export function toReceiptLines(lines: DraftLine[]): ReceiptLineInput[] {
+/** Pharma unit prices run to paise once divided by a pack of 15 or 200. */
+const round4 = (n: number) =>
+  Number.isFinite(n) ? Math.round(n * 10000) / 10000 : 0;
+
+/**
+ * Only complete lines are sent; the rest are still being worked on.
+ *
+ * This is the one place the bill's per-PACK figures become the per-BASE-unit
+ * `purchasePrice` and `mrp` the server stores — stock valuation multiplies both
+ * by a base-unit quantity, so a per-pack MRP inflated stock-at-MRP 15-fold the
+ * same way a per-pack rate inflated stock value. Keeping the conversion here —
+ * rather than at scan time — means the grid always shows the figures the
+ * distributor printed, and the arithmetic happens once, against the unit the
+ * pharmacist actually chose.
+ */
+export function toReceiptLines(
+  lines: DraftLine[],
+  byId: Record<string, ProductLite> = {},
+): ReceiptLineInput[] {
   return lines
     .filter(
       (l) =>
@@ -228,20 +274,25 @@ export function toReceiptLines(lines: DraftLine[]): ReceiptLineInput[] {
         Number(l.quantity) > 0 &&
         l.locationId,
     )
-    .map((l) => ({
-      productId: l.productId!,
-      batchNumber: l.batchNumber.trim(),
-      mfgDate: normalizeDateInput(l.mfgDate, "mfg"),
-      expiryDate: normalizeDateInput(l.expiryDate, "expiry"),
-      purchasePrice:
-        l.purchasePrice === "" ? undefined : Number(l.purchasePrice),
-      mrp: l.mrp === "" ? undefined : Number(l.mrp),
-      unit: l.unit || undefined,
-      quantity: Number(l.quantity),
-      freeQuantity:
-        l.freeQuantity === "" || Number(l.freeQuantity) <= 0
-          ? undefined
-          : Number(l.freeQuantity),
-      locationId: l.locationId!,
-    }));
+    .map((l) => {
+      const factor = unitFactor(l, l.productId ? byId[l.productId] : null);
+      return {
+        productId: l.productId!,
+        batchNumber: l.batchNumber.trim(),
+        mfgDate: normalizeDateInput(l.mfgDate, "mfg"),
+        expiryDate: normalizeDateInput(l.expiryDate, "expiry"),
+        purchasePrice:
+          l.purchasePrice === ""
+            ? undefined
+            : round4(Number(l.purchasePrice) / factor),
+        mrp: l.mrp === "" ? undefined : round4(Number(l.mrp) / factor),
+        unit: l.unit || undefined,
+        quantity: Number(l.quantity),
+        freeQuantity:
+          l.freeQuantity === "" || Number(l.freeQuantity) <= 0
+            ? undefined
+            : Number(l.freeQuantity),
+        locationId: l.locationId!,
+      };
+    });
 }

@@ -23,6 +23,7 @@ import {
   ScanText,
   Volume2,
   VolumeX,
+  ListPlus,
 } from "lucide-react-native";
 import { CameraScanner } from "@shared/CameraScanner";
 import { PackTextScanner } from "@shared/PackTextScanner";
@@ -242,6 +243,38 @@ export default function NewSaleScreen() {
   };
   const removeLine = (i: number) =>
     setLines((cur) => cur.filter((_, idx) => idx !== i));
+
+  /**
+   * Note a medicine that couldn't be sold, from the till.
+   *
+   * This is where a short is actually discovered: the customer is standing
+   * there, the line says "Out of stock", and the choice is a substitute or a
+   * note to buy it. Sending them to MedGuide to search the same medicine a
+   * second time is how a short becomes a lost sale nobody records.
+   *
+   * The quantity sent is the SHORTFALL, not 1 — someone asking for 20 and
+   * getting 6 is a different reorder signal from someone asking for one.
+   * ShortBook only ever raises an existing reorder level, never lowers it.
+   */
+  const [shortbookBusy, setShortbookBusy] = useState<string | null>(null);
+  const [shortbookNote, setShortbookNote] = useState<string | null>(null);
+  const addToShortbook = async (line: DraftLine, need: number) => {
+    setShortbookBusy(line.productId);
+    setShortbookNote(null);
+    try {
+      const r = await inventoryApi.addToShortbook({
+        productId: line.productId,
+        quantity: Math.max(1, Math.ceil(need)),
+      });
+      setShortbookNote(
+        `${r.product.name} is on the ShortBook — need ${r.need} ${line.baseUnit}.`,
+      );
+    } catch (e) {
+      setShortbookNote(apiErrorMessage(e));
+    } finally {
+      setShortbookBusy(null);
+    }
+  };
 
   // ---- Salt-based substitution (eVitalRx-style) --------------------------
   // When a line can't be filled, offer in-stock medicines of the SAME salt and
@@ -631,7 +664,17 @@ export default function NewSaleScreen() {
                         <Text variant="label" tone="primary" numberOfLines={1}>
                           {line.productName}
                         </Text>
-                        <HStack gap={6} align="center" style={{ marginTop: 2 }}>
+                        {/* Wraps on purpose. Salt · lot · stock · Substitute ·
+                            ShortBook is more than fits beside a 74px QTY box on
+                            a 1280 laptop, and squeezing them shrank "Out of
+                            stock" to three stacked words running under the
+                            quantity input. A second line is the honest answer. */}
+                        <HStack
+                          gap={6}
+                          align="center"
+                          wrap
+                          style={{ marginTop: 2 }}
+                        >
                           {line.salt ? (
                             <Text
                               variant="caption"
@@ -664,11 +707,19 @@ export default function NewSaleScreen() {
                             </View>
                           )}
                           {issue ? (
-                            <Text variant="caption" tone="danger">
+                            <Text
+                              variant="caption"
+                              tone="danger"
+                              numberOfLines={1}
+                            >
                               {issue.message}
                             </Text>
                           ) : line.available != null ? (
-                            <Text variant="caption" tone="success">
+                            <Text
+                              variant="caption"
+                              tone="success"
+                              numberOfLines={1}
+                            >
                               {line.available} in stock
                             </Text>
                           ) : null}
@@ -693,6 +744,17 @@ export default function NewSaleScreen() {
                                 </Text>
                               </HStack>
                             </Pressable>
+                          ) : null}
+                          {issue ? (
+                            <ShortbookChip
+                              busy={shortbookBusy === line.productId}
+                              onPress={() =>
+                                void addToShortbook(
+                                  line,
+                                  issue.needBase - Math.max(issue.available, 0),
+                                )
+                              }
+                            />
                           ) : null}
                         </HStack>
                       </View>
@@ -836,6 +898,17 @@ export default function NewSaleScreen() {
                             </Text>
                           </HStack>
                         </Pressable>
+                      ) : null}
+                      {issue ? (
+                        <ShortbookChip
+                          busy={shortbookBusy === line.productId}
+                          onPress={() =>
+                            void addToShortbook(
+                              line,
+                              issue.needBase - Math.max(issue.available, 0),
+                            )
+                          }
+                        />
                       ) : null}
                     </HStack>
                     <HStack
@@ -1022,6 +1095,13 @@ export default function NewSaleScreen() {
         <Banner
           tone="warning"
           message={scanError}
+          style={{ marginBottom: 12 }}
+        />
+      ) : null}
+      {shortbookNote ? (
+        <Banner
+          tone="info"
+          message={shortbookNote}
           style={{ marginBottom: 12 }}
         />
       ) : null}
@@ -1236,6 +1316,36 @@ export default function NewSaleScreen() {
 }
 
 // ---- small building blocks -------------------------------------------------
+
+/**
+ * "Note it to buy" — the other half of what you do with a line you can't fill.
+ * Sits beside Substitute, in the same chip row, because they are the two ways
+ * out of the same dead end and the cashier picks between them.
+ */
+function ShortbookChip({
+  busy,
+  onPress,
+}: {
+  busy: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={busy}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel="Add to ShortBook"
+    >
+      <HStack gap={3} align="center">
+        <ListPlus size={12} color={palette.teal[700]} strokeWidth={2} />
+        <Text variant="caption" style={{ color: palette.teal[700] }}>
+          {busy ? "Adding…" : "ShortBook"}
+        </Text>
+      </HStack>
+    </Pressable>
+  );
+}
 
 /** Same-salt, in-stock substitutes for a line that can't be filled (eVitalRx). */
 function SubstitutePanel({
