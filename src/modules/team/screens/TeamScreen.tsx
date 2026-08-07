@@ -2,8 +2,14 @@ import React, { useState } from "react";
 import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Plus, ChevronRight, ShieldCheck, Users } from "lucide-react-native";
-import { useTeamUsers } from "@modules/team/hooks/useTeam";
+import {
+  useTeamUsers,
+  useTeamLimits,
+  useUpdateTeamLimits,
+} from "@modules/team/hooks/useTeam";
 import { TeamUser } from "@modules/team/types";
+import { useAuthStore } from "@shared/store/useAuthStore";
+import { apiErrorMessage } from "@api/apiClient";
 import { palette } from "@shared/designSystem";
 import {
   Screen,
@@ -18,6 +24,7 @@ import {
   DataTable,
   Column,
   Skeleton,
+  TextField,
 } from "@shared/ui";
 
 export default function TeamScreen() {
@@ -108,6 +115,8 @@ export default function TeamScreen() {
         />
       }
     >
+      <LimitsCard />
+
       <SearchInput
         value={search}
         onChangeText={setSearch}
@@ -195,6 +204,106 @@ function UserRow({ user, onPress }: { user: TeamUser; onPress: () => void }) {
         </VStack>
         <ChevronRight size={18} color={palette.text.tertiary} strokeWidth={2} />
       </HStack>
+    </Card>
+  );
+}
+
+/**
+ * The two limits this pharmacy controls.
+ *
+ * Kept on Team & Access rather than Settings because this is where an admin is
+ * standing when they wonder why they can't add another member. Both numbers
+ * show the plan's ceiling beside them, so "why can't I set 10?" is answered on
+ * the screen instead of by a support message.
+ */
+function LimitsCard() {
+  const { data, isLoading } = useTeamLimits();
+  const mut = useUpdateTeamLimits();
+  const [users, setUsers] = useState<string | null>(null);
+  const [devices, setDevices] = useState<string | null>(null);
+  const isAdmin = useAuthStore((s) => s.isAdmin);
+
+  if (!isAdmin || isLoading || !data) return null;
+
+  // Unedited fields show the saved value; a typed one wins until saved.
+  const userVal = users ?? String(data.users.current || "");
+  const deviceVal = devices ?? String(data.devices.current || "");
+  const cap = (n: number) =>
+    n > 0 ? `plan allows up to ${n}` : "no plan limit";
+
+  const save = () => {
+    const payload: { maxUsers?: number; maxDevicesPerUser?: number } = {};
+    if (users !== null) payload.maxUsers = Number(users) || 0;
+    if (devices !== null) payload.maxDevicesPerUser = Number(devices) || 0;
+    if (!Object.keys(payload).length) return;
+    mut.mutate(payload, {
+      onSuccess: () => {
+        setUsers(null);
+        setDevices(null);
+      },
+    });
+  };
+
+  return (
+    <Card style={{ marginBottom: 16 }}>
+      <VStack gap={14}>
+        <HStack justify="space-between" align="center" wrap gap={8}>
+          <VStack gap={2}>
+            <Text variant="label-lg" tone="primary">
+              Limits for this pharmacy
+            </Text>
+            <Text variant="caption" tone="tertiary">
+              {data.usersInUse} member{data.usersInUse === 1 ? "" : "s"} in use
+              {data.users.current > 0
+                ? ` of ${data.users.current} allowed`
+                : ""}
+            </Text>
+          </VStack>
+          <Button
+            label="Save limits"
+            variant="secondary"
+            size="sm"
+            fullWidth={false}
+            loading={mut.isPending}
+            disabled={users === null && devices === null}
+            onPress={save}
+          />
+        </HStack>
+
+        <HStack gap={12} wrap>
+          <View style={{ flex: 1, minWidth: 200 }}>
+            <TextField
+              label="Total members"
+              value={userVal}
+              onChangeText={setUsers}
+              keyboardType="number-pad"
+              placeholder="0"
+              hint={`0 = follow the plan · ${cap(data.users.ceiling)}`}
+            />
+          </View>
+          <View style={{ flex: 1, minWidth: 200 }}>
+            <TextField
+              label="Devices each member may sign in on"
+              value={deviceVal}
+              onChangeText={setDevices}
+              keyboardType="number-pad"
+              placeholder="0"
+              hint={`0 = follow the plan · ${cap(data.devices.ceiling)}`}
+            />
+          </View>
+        </HStack>
+
+        {mut.isError ? (
+          <Text variant="caption" tone="danger">
+            {apiErrorMessage(mut.error)}
+          </Text>
+        ) : null}
+        {mut.isSuccess && users === null && devices === null ? (
+          <Text variant="caption" tone="success">
+            Limits saved.
+          </Text>
+        ) : null}
+      </VStack>
     </Card>
   );
 }

@@ -7,7 +7,7 @@ import {
   Platform,
   useWindowDimensions,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import {
   History,
@@ -40,6 +40,7 @@ import {
   useCreateCustomer,
 } from "@modules/customer/hooks/useCustomers";
 import { useCreateSale, useInvoiceProfile } from "@modules/sale/hooks/useSales";
+import { useCreateReminder } from "@modules/reminder/hooks/useReminders";
 import { SaleLineInput } from "@modules/sale/types";
 import { apiErrorMessage } from "@api/apiClient";
 import { palette, radius } from "@shared/designSystem";
@@ -55,6 +56,7 @@ import {
   Combobox,
   Banner,
   EmptyState,
+  ConfirmDialog,
 } from "@shared/ui";
 
 interface DraftLine {
@@ -152,10 +154,27 @@ export default function NewSaleScreen() {
   const [paymentMode, setPaymentMode] = useState("cash");
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [scanError, setScanError] = useState<string | null>(null);
-  const [scanOpen, setScanOpen] = useState(false);
+  /**
+   * Opened straight from the phone's scan button, so the camera is already up
+   * by the time the screen paints — the whole point of that button is to skip
+   * a tap, and landing on a screen that then needs one gives it back.
+   */
+  const route = useRoute();
+  const autoScan = Boolean(
+    (route.params as { autoScan?: boolean } | undefined)?.autoScan,
+  );
+  const [scanOpen, setScanOpen] = useState(autoScan);
   const [soundOff, setSoundOff] = useState(isScanSoundMuted());
   /** Camera OCR for packs whose batch number is printed as text, not a barcode. */
   const [packOpen, setPackOpen] = useState(false);
+  /** Refill follow-up offered right after a sale completes. */
+  const [followUp, setFollowUp] = useState<{
+    saleId: string;
+    days: number;
+    customerName: string;
+    medicine: string;
+  } | null>(null);
+  const createReminder = useCreateReminder();
   const scanBusy = useRef(false);
   type ProductRow = NonNullable<typeof products>["data"][number];
   type CustomerRow = NonNullable<typeof customers>["data"][number];
@@ -503,7 +522,30 @@ export default function NewSaleScreen() {
         lines: validLines,
       },
       {
-        onSuccess: (sale) => navigation.navigate("SaleDetail", { id: sale.id }),
+        onSuccess: (sale) => {
+          /**
+           * Offer a refill call before leaving the screen.
+           *
+           * A 20-day course runs out on a knowable date, and the pharmacy that
+           * rings first keeps the repeat. The days come from the base units
+           * sold — one unit a day is the ordinary dosing assumption — and the
+           * pharmacist can change the date before saving, because plenty of
+           * medicines aren't once-daily.
+           */
+          const days = Math.round(
+            validLines.reduce((t, l) => t + (Number(l.quantity) || 0), 0),
+          );
+          if (customerId && days >= 3) {
+            setFollowUp({
+              saleId: sale.id,
+              days,
+              customerName: selectedCustomer?.name || "the customer",
+              medicine: lines[0]?.productName || "",
+            });
+            return;
+          }
+          navigation.navigate("SaleDetail", { id: sale.id });
+        },
       },
     );
   };
@@ -1119,6 +1161,52 @@ export default function NewSaleScreen() {
         </View>
         <View style={{ width: railSide ? 344 : "100%" }}>{rail}</View>
       </View>
+
+      {/*
+        Refill follow-up. Offered, never automatic: a reminder the pharmacist
+        didn't ask for is noise, and noise is how a reminders list stops being
+        read at all.
+      */}
+      <ConfirmDialog
+        visible={Boolean(followUp)}
+        title="Set a refill reminder?"
+        message={
+          followUp
+            ? `${followUp.customerName} bought ${followUp.days} ${followUp.days === 1 ? "unit" : "units"}${followUp.medicine ? ` of ${followUp.medicine}` : ""}. Remind you to call them in ${followUp.days} days, when the course runs out?`
+            : ""
+        }
+        confirmLabel={`Remind me in ${followUp?.days ?? 0} days`}
+        cancelLabel="No thanks"
+        loading={createReminder.isPending}
+        onConfirm={() => {
+          if (!followUp) return;
+          const due = new Date();
+          due.setDate(due.getDate() + followUp.days);
+          due.setHours(10, 0, 0, 0);
+          createReminder.mutate(
+            {
+              title: `Refill call — ${followUp.customerName}${followUp.medicine ? ` · ${followUp.medicine}` : ""}`,
+              notes: `Course of ${followUp.days} units sold on ${new Date().toLocaleDateString("en-IN")}.`,
+              dueAt: due.toISOString(),
+              priority: "normal",
+            },
+            {
+              // The sale is already saved; a failed reminder must not strand
+              // the pharmacist on the billing screen.
+              onSettled: () => {
+                const id = followUp.saleId;
+                setFollowUp(null);
+                navigation.navigate("SaleDetail", { id });
+              },
+            },
+          );
+        }}
+        onCancel={() => {
+          const id = followUp?.saleId;
+          setFollowUp(null);
+          if (id) navigation.navigate("SaleDetail", { id });
+        }}
+      />
 
       <CameraScanner
         visible={scanOpen}

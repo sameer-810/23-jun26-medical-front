@@ -24,14 +24,19 @@ import {
 
 type ReportRow = Record<string, unknown>;
 
+/**
+ * Inventory, Batch, Stock movement and Purchase are deliberately absent.
+ *
+ * Each of them exports the pharmacy's full stock or purchase list, which a
+ * member can download and carry into another system. The owner asked for them
+ * to go for exactly that reason. The endpoints still exist and are still
+ * permission-checked — this removes the one-click export from the workbench,
+ * not the data model.
+ */
 const TYPES: { key: ReportType; label: string; timed: boolean }[] = [
-  { key: "inventory", label: "Inventory", timed: false },
   { key: "sales", label: "Sales", timed: true },
   { key: "expiry", label: "Expiry", timed: false },
-  { key: "batch", label: "Batch", timed: false },
-  { key: "stock-movement", label: "Stock movement", timed: true },
   { key: "warehouse", label: "Warehouse", timed: false },
-  { key: "purchase", label: "Purchase", timed: true },
   { key: "user-activity", label: "User activity", timed: true },
 ];
 
@@ -48,7 +53,9 @@ function fmt(value: unknown, col: ReportColumn) {
 }
 
 export default function ReportsScreen() {
-  const [type, setType] = useState<ReportType>("inventory");
+  // Must be one of TYPES above — "inventory" was removed, and defaulting to a
+  // type with no chip left the screen loading a report nothing could select.
+  const [type, setType] = useState<ReportType>("sales");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 

@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { View, Switch } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { View, Switch, Image, Platform } from "react-native";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Building2, Receipt, BellRing } from "lucide-react-native";
@@ -20,6 +20,7 @@ import {
   Card,
   Button,
   StatusChip,
+  ConfirmDialog,
 } from "@shared/ui";
 
 /** A themed on/off row bound to a react-hook-form boolean field. */
@@ -58,6 +59,7 @@ export default function SettingsScreen() {
       email: "",
       drugLicenseNo: "",
       gstin: "",
+      signatureLabel: "",
       taxEnabled: true,
       defaultRatePct: "12",
       invoicePrefix: "INV",
@@ -67,6 +69,47 @@ export default function SettingsScreen() {
       alertSms: false,
     },
   });
+
+  /**
+   * The signature lives outside react-hook-form.
+   *
+   * It is a ~100 KB data URI, and threading that through form state re-runs
+   * validation on every keystroke elsewhere in the form. It is set once and
+   * read once, so a plain state value is the honest shape for it.
+   */
+  /**
+   * Derived, not synced. Holding it in state and copying the loaded value in
+   * with an effect meant a setState during render — cascading renders, and the
+   * linter rightly refuses it. The saved value is the base; an edit overrides
+   * it until the next save.
+   */
+  const [sigOverride, setSigOverride] = useState<string | null>(null);
+  const signature = sigOverride ?? data?.company.signatureImage ?? "";
+  const [sigError, setSigError] = useState<string | null>(null);
+  const sigInputRef = useRef<HTMLInputElement | null>(null);
+
+  const pickSignature = () => {
+    setSigError(null);
+    if (Platform.OS === "web") sigInputRef.current?.click();
+    else setSigError("Signature upload is available on the web app.");
+  };
+
+  const onSignatureFile = (e: { target: { files: FileList | null } }) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // 1 MB of image is ~1.37 MB of base64; the API caps the field at 1.4 MB.
+    if (file.size > 1_000_000) {
+      setSigError(
+        "That image is over 1 MB. Use a smaller crop of the signature.",
+      );
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setSigOverride(String(reader.result || ""));
+    reader.onerror = () =>
+      setSigError("Couldn't read that file. Try another image.");
+    reader.readAsDataURL(file);
+  };
 
   // Populate the whole form once settings load — a single reset(), no side sync.
   useEffect(() => {
@@ -81,6 +124,7 @@ export default function SettingsScreen() {
         email: data.company.email,
         drugLicenseNo: data.company.drugLicenseNo,
         gstin: data.company.gstin,
+        signatureLabel: data.company.signatureLabel || "",
         taxEnabled: data.tax.enabled,
         defaultRatePct: String(data.tax.defaultRatePct),
         invoicePrefix: data.tax.invoicePrefix,
@@ -104,6 +148,8 @@ export default function SettingsScreen() {
         email: f.email,
         drugLicenseNo: f.drugLicenseNo,
         gstin: f.gstin,
+        signatureLabel: f.signatureLabel,
+        signatureImage: signature,
       },
       tax: {
         enabled: f.taxEnabled,
@@ -231,6 +277,77 @@ export default function SettingsScreen() {
               />
             </View>
           </HStack>
+
+          {/*
+            Owner signature / shop stamp for the invoice footer.
+
+            Held as a data URI rather than an uploaded file: the invoice is
+            printed from an offline HTML document, and a print dialog that has
+            to fetch an image over the network prints an empty box often enough
+            to be worse than no signature at all.
+          */}
+          <VStack gap={8}>
+            <Text variant="label" tone="secondary">
+              Signature / stamp on invoice
+            </Text>
+            <HStack gap={12} align="center" wrap>
+              <View style={sigPreview}>
+                {signature ? (
+                  <Image
+                    source={{ uri: signature }}
+                    style={{ width: 150, height: 52 }}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Text variant="caption" tone="tertiary">
+                    No signature yet
+                  </Text>
+                )}
+              </View>
+              <VStack gap={8}>
+                <Button
+                  label={signature ? "Replace image" : "Upload image"}
+                  variant="secondary"
+                  size="sm"
+                  fullWidth={false}
+                  onPress={pickSignature}
+                />
+                {signature ? (
+                  <Button
+                    label="Remove"
+                    variant="ghost"
+                    size="sm"
+                    fullWidth={false}
+                    onPress={() => setSigOverride("")}
+                  />
+                ) : null}
+              </VStack>
+            </HStack>
+            <ControlledTextField
+              control={control}
+              name="signatureLabel"
+              label="Caption under the signature (optional)"
+              placeholder="For Ismail Medical & General Stores"
+            />
+            <Text variant="caption" tone="tertiary">
+              PNG or JPG, under 1 MB. Leave empty to print a blank ruled line to
+              sign by hand.
+            </Text>
+            {sigError ? (
+              <Text variant="caption" tone="danger">
+                {sigError}
+              </Text>
+            ) : null}
+            {Platform.OS === "web" ? (
+              <input
+                ref={sigInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                style={{ display: "none" }}
+                onChange={onSignatureFile}
+              />
+            ) : null}
+          </VStack>
         </VStack>
       </Card>
 
@@ -293,20 +410,32 @@ export default function SettingsScreen() {
               <StatusChip key={d} label={`${d} days`} tone="info" />
             ))}
           </HStack>
-          {(
-            [
-              ["alertInApp", "In-app alerts"],
-              ["alertEmail", "Email alerts"],
-              ["alertSms", "SMS alerts"],
-            ] as const
-          ).map(([name, label]) => (
-            <HStack key={name} align="center" justify="space-between">
-              <Text variant="label-lg" tone="primary">
-                {label}
-              </Text>
-              <SwitchRow control={control} name={name} />
-            </HStack>
-          ))}
+          {/*
+            In-app alerts are free and behave like any other switch. Email and
+            SMS cost the platform real money per message, so turning one on is a
+            commercial decision — the price is stated before it flips, and the
+            price is per pharmacy because that is how it is actually sold.
+          */}
+          <HStack align="center" justify="space-between">
+            <Text variant="label-lg" tone="primary">
+              In-app alerts
+            </Text>
+            <SwitchRow control={control} name="alertInApp" />
+          </HStack>
+          <PaidAlertRow
+            control={control}
+            name="alertEmail"
+            label="Email alerts"
+            price={data?.alertPricing?.emailMonthly ?? 0}
+            currency={data?.alertPricing?.currency || "INR"}
+          />
+          <PaidAlertRow
+            control={control}
+            name="alertSms"
+            label="SMS alerts"
+            price={data?.alertPricing?.smsMonthly ?? 0}
+            currency={data?.alertPricing?.currency || "INR"}
+          />
         </VStack>
       </Card>
 
@@ -355,6 +484,18 @@ function SectionHeader({
   );
 }
 
+/** Fixed-size well so the row doesn't jump when a signature is chosen. */
+const sigPreview = {
+  width: 170,
+  height: 64,
+  borderRadius: radius.md,
+  borderWidth: 1,
+  borderColor: palette.border.default,
+  backgroundColor: palette.surface.secondary,
+  alignItems: "center",
+  justifyContent: "center",
+} as const;
+
 const errorBox = {
   padding: 14,
   borderRadius: radius.md,
@@ -371,3 +512,91 @@ const okBox = {
   borderColor: palette.success.border,
   marginBottom: 16,
 } as const;
+
+/**
+ * A metered alert channel: states the price before it switches on.
+ *
+ * Turning email or SMS alerts on costs the pharmacy money, so it must not
+ * behave like the free in-app toggle. The price shown is the one the platform
+ * set for THIS pharmacy — quoted per customer, which is why it comes from the
+ * organisation rather than a global rate.
+ *
+ * Where no price has been quoted yet, we ask them to request the service
+ * instead of inventing a number: showing "₹0" would read as free.
+ */
+function PaidAlertRow({
+  control,
+  name,
+  label,
+  price,
+  currency,
+}: {
+  control: any;
+  name: string;
+  label: string;
+  price: number;
+  currency: string;
+}) {
+  const [asking, setAsking] = React.useState<null | (() => void)>(null);
+  const money = (n: number) =>
+    `${currency === "INR" ? "₹" : currency + " "}${n.toLocaleString("en-IN")}`;
+
+  return (
+    <Controller
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <>
+          <HStack align="center" justify="space-between">
+            <VStack gap={2} flex={1}>
+              <HStack gap={8} align="center" wrap>
+                <Text variant="label-lg" tone="primary">
+                  {label}
+                </Text>
+                <StatusChip
+                  label={
+                    price > 0 ? `${money(price)}/month` : "Price on request"
+                  }
+                  tone={price > 0 ? "warning" : "neutral"}
+                />
+              </HStack>
+              <Text variant="caption" tone="tertiary">
+                {field.value
+                  ? "Chargeable service — billed by the platform team."
+                  : "Paid add-on. You'll be shown the price before it's enabled."}
+              </Text>
+            </VStack>
+            <Switch
+              value={field.value}
+              onValueChange={(next) => {
+                // Only switching ON needs consent; switching off is free.
+                if (!next) return field.onChange(false);
+                setAsking(() => () => field.onChange(true));
+              }}
+              trackColor={{ true: palette.teal[500], false: palette.ink[200] }}
+              thumbColor="#FFFFFF"
+            />
+          </HStack>
+
+          <ConfirmDialog
+            visible={Boolean(asking)}
+            title={`Turn on ${label.toLowerCase()}?`}
+            message={
+              price > 0
+                ? `${label} are charged at ${money(price)} per month, set by the platform team for this pharmacy. Turning this on requests the service — you will be billed from activation.`
+                : `${label} are a paid add-on and no price has been set for this pharmacy yet. Turning this on sends a request to the platform team, who will confirm the price before the service starts.`
+            }
+            confirmLabel={
+              price > 0 ? "Turn on and accept charge" : "Request service"
+            }
+            onConfirm={() => {
+              asking?.();
+              setAsking(null);
+            }}
+            onCancel={() => setAsking(null)}
+          />
+        </>
+      )}
+    />
+  );
+}

@@ -130,7 +130,16 @@ export function DateField({
       <View style={shell}>
         <input
           type={mode === "month" ? "month" : "date"}
-          value={value || ""}
+          /**
+           * Trim to the precision the control accepts.
+           *
+           * `<input type="month">` requires exactly "YYYY-MM" — handed a full
+           * "YYYY-MM-DD" it silently renders BLANK rather than complaining. A
+           * scanned purchase bill supplies full dates, so every expiry read off
+           * a bill vanished from the form, and because expiry is mandatory the
+           * goods-received note could not be submitted at all.
+           */
+          value={value ? value.slice(0, mode === "month" ? 7 : 10) : ""}
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}

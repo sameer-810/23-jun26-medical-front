@@ -5,7 +5,7 @@ import { useCreateReturn } from "@modules/sale/hooks/useSales";
 import { Sale } from "@modules/sale/types";
 import { apiErrorMessage } from "@api/apiClient";
 import { palette, radius, shadows } from "@shared/designSystem";
-import { Text, VStack, HStack, Button, TextField } from "@shared/ui";
+import { Text, VStack, HStack, Button, TextField, Select } from "@shared/ui";
 
 interface Props {
   visible: boolean;
@@ -13,10 +13,25 @@ interface Props {
   onClose: () => void;
 }
 
+/**
+ * The reasons a pharmacy actually records against a return.
+ *
+ * Free text produced "damaged", "Damaged", "dmg" and "" for the same event, so
+ * nothing could be counted — and a return reason is exactly the sort of thing an
+ * owner wants to total at month end. Fixed options plus "Other…" keeps it
+ * countable without blocking the case nobody predicted.
+ */
+const REASONS = ["Damaged", "Wrong item", "Sales return", "Expired"];
+const OTHER = "__other__";
+
 export function ReturnModal({ visible, sale, onClose }: Props) {
   const mut = useCreateReturn();
   const [qty, setQty] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
+  const isOther = reason === OTHER;
+  /** What actually gets saved — the picked option, or the typed one. */
+  const finalReason = isOther ? customReason.trim() : reason;
 
   const returnableOf = (lineId: string) => {
     const l = sale.lines.find((x) => x.id === lineId)!;
@@ -33,9 +48,9 @@ export function ReturnModal({ visible, sale, onClose }: Props) {
     const lines = sale.lines
       .map((l) => ({ lineId: l.id, baseQty: Number(qty[l.id]) || 0 }))
       .filter((l) => l.baseQty > 0);
-    if (!lines.length || anyOver) return;
+    if (!lines.length || anyOver || !finalReason) return;
     mut.mutate(
-      { saleId: sale.id, reason: reason.trim() || undefined, lines },
+      { saleId: sale.id, reason: finalReason, lines },
       { onSuccess: onClose },
     );
   };
@@ -102,12 +117,27 @@ export function ReturnModal({ visible, sale, onClose }: Props) {
           </ScrollView>
 
           <View style={{ marginTop: 12 }}>
-            <TextField
-              label="Reason (optional)"
+            <Select
+              label="Reason"
               value={reason}
-              onChangeText={setReason}
-              placeholder="Damaged, wrong item…"
+              placeholder="Why is this coming back?"
+              options={[
+                ...REASONS.map((r) => ({ value: r, label: r })),
+                { value: OTHER, label: "Other…" },
+              ]}
+              onChange={(v) => setReason(v ?? "")}
             />
+            {isOther ? (
+              <View style={{ marginTop: 10 }}>
+                <TextField
+                  label="Describe the reason"
+                  value={customReason}
+                  onChangeText={setCustomReason}
+                  placeholder="e.g. Wrong strength supplied"
+                  autoFocus
+                />
+              </View>
+            ) : null}
           </View>
 
           {anyOver && (
@@ -119,7 +149,7 @@ export function ReturnModal({ visible, sale, onClose }: Props) {
             label="Process return"
             style={{ marginTop: 16 }}
             loading={mut.isPending}
-            disabled={!anyQty || anyOver}
+            disabled={!anyQty || anyOver || !finalReason}
             onPress={submit}
           />
         </Pressable>

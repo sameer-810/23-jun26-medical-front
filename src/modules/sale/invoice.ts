@@ -49,7 +49,13 @@ export function invoiceHtml(sale: Sale, profile?: InvoiceProfile): string {
     .totals { width:280px; margin-left:auto; margin-top:14px; }
     .totals td { border:none; padding:4px 8px; }
     .grand { font-size:15px; font-weight:700; border-top:2px solid #0F172A; }
-    .foot { margin-top:30px; color:#64748B; font-size:10px; }
+    .foot { margin-top:16px; color:#64748B; font-size:10px; }
+    /* Signature sits right, the way a shop stamps the bottom of a bill. */
+    .sign { margin-top:28px; text-align:right; page-break-inside:avoid; }
+    .sign img { max-height:56px; max-width:200px; object-fit:contain; }
+    .signline { width:200px; height:40px; margin-left:auto; border-bottom:1px solid #94A3B8; }
+    .signcap { margin-top:4px; font-size:11px; font-weight:600; color:#0F172A; }
+    .signsub { font-size:10px; color:#64748B; }
   </style></head><body>
     <div class="head">
       <div>
@@ -85,9 +91,28 @@ export function invoiceHtml(sale: Sale, profile?: InvoiceProfile): string {
     </table>
 
     <div class="foot">
-      Payment: ${esc(sale.paymentMode || "-")} · Served by ${esc(sale.createdByName || "-")}<br/>
-      This is a computer-generated invoice.
+      Payment: ${esc(sale.paymentMode || "-")} · Served by ${esc(sale.createdByName || "-")}
     </div>
+
+    ${
+      /**
+       * Signature block. A pharmacy invoice is a document a customer may take
+       * to an insurer or bring back with a return, and a line naming the staff
+       * member who served them is not what makes it look issued by the shop.
+       *
+       * When no signature has been uploaded we still print the ruled line and
+       * the caption, so the owner can sign the printed copy by hand — an
+       * invoice with nowhere to sign is worse than one with a blank space.
+       */
+      ""
+    }
+    <div class="sign">
+      ${c?.signatureImage ? `<img src="${esc(c.signatureImage)}" alt="" />` : `<div class="signline"></div>`}
+      <div class="signcap">${esc(c?.signatureLabel || `For ${c?.legalName || "the pharmacy"}`)}</div>
+      <div class="signsub">Authorised signatory</div>
+    </div>
+
+    <div class="foot">This is a computer-generated invoice.</div>
   </body></html>`;
 }
 

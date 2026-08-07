@@ -48,3 +48,16 @@ export interface Paginated<T> {
   data: T[];
   meta: { total: number; pages: number; page: number };
 }
+
+/**
+ * The two limits a pharmacy controls, and what its plan allows.
+ *
+ * Deliberately separate numbers: how many staff accounts exist is a different
+ * commercial question from how many screens one of them may be signed in on.
+ * A ceiling of 0 means the plan sets none, so the admin may choose freely.
+ */
+export interface TeamLimits {
+  users: { current: number; ceiling: number };
+  devices: { current: number; ceiling: number };
+  usersInUse: number;
+}

@@ -13,6 +13,9 @@ export interface Settings {
     logoUrl: string;
     drugLicenseNo: string;
     gstin: string;
+    /** Owner signature / shop stamp printed on the invoice, as a data URI. */
+    signatureImage?: string;
+    signatureLabel?: string;
   };
   tax: {
     enabled: boolean;
@@ -23,6 +26,15 @@ export interface Settings {
   currency: string;
   expiryAlertDays: number[];
   alertChannels: { inApp: boolean; email: boolean; sms: boolean };
+  /**
+   * What the platform quotes THIS pharmacy for the metered channels. Read-only
+   * to the pharmacy; 0 means not quoted yet.
+   */
+  alertPricing?: {
+    emailMonthly: number;
+    smsMonthly: number;
+    currency: string;
+  };
   units: string[];
   defaultReorderLevel: number;
   updatedAt: string;

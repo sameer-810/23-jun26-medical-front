@@ -21,6 +21,7 @@ export const settingsSchema = z.object({
   email: optionalEmail,
   drugLicenseNo: freeText,
   gstin: optionalGstin,
+  signatureLabel: freeText,
   taxEnabled: z.boolean(),
   defaultRatePct: optionalPercent,
   invoicePrefix: freeText,

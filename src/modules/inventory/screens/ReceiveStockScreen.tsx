@@ -751,7 +751,13 @@ export default function ReceiveStockScreen() {
               <GrnHead w={COL.qty} label="QTY" />
               <GrnHead w={COL.free} label="FREE" />
               <GrnHead w={COL.unit} label="UNIT" />
-              <GrnHead w={COL.rate} label="RATE" right />
+              {/* Not "RATE": this cell holds cost per BASE unit, while the UNIT
+                  column beside it says "pack". A bill printing a trade price of
+                  64.46 for a 15-tab pack lands here as 4.2973, so a pharmacist
+                  checking the screen against the bill reads it as wrong. The
+                  stacked layout has always called it "Cost / base" — the grid
+                  was the odd one out. */}
+              <GrnHead w={COL.rate} label="COST/BASE" right />
               <GrnHead w={COL.mrp} label="MRP" right />
               <GrnHead w={COL.loc} label="LOCATION" />
               <GrnHead w={COL.amount} label="AMOUNT" right />

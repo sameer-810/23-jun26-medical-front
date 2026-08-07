@@ -137,6 +137,9 @@ export interface InvoiceProfile {
     email: string;
     drugLicenseNo: string;
     gstin: string;
+    /** Data URI of the owner signature / shop stamp, printed on the invoice. */
+    signatureImage?: string;
+    signatureLabel?: string;
   };
   tax: {
     defaultRatePct: number;
