@@ -13,7 +13,6 @@ import {
   Card,
   Button,
   StatusChip,
-  BackLink,
   Skeleton,
 } from "@shared/ui";
 
@@ -47,6 +46,7 @@ export default function ReceiptDetailScreen() {
 
   return (
     <Screen
+      back="Back to history"
       overline="Stock Inward"
       title={r?.receiptNo || "Receipt"}
       subtitle={r ? new Date(r.receivedAt).toLocaleString() : ""}
@@ -66,8 +66,6 @@ export default function ReceiptDetailScreen() {
         ) : undefined
       }
     >
-      <BackLink label="Back to history" onPress={() => navigation.goBack()} />
-
       {isLoading || !r ? (
         <VStack gap={16}>
           <Card>

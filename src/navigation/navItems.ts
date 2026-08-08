@@ -260,3 +260,32 @@ export function useVisibleNavItems(): NavItem[] {
 export function useSidebarNavItems(): NavItem[] {
   return useVisibleNavItems().filter((it) => !it.hidden);
 }
+
+/**
+ * The screens the navigation itself lands on — a destination, not somewhere you
+ * were sent. `Screen` reads this to decide whether to offer a way back: if you
+ * are on one of these you arrived by choosing it, and there is nothing behind
+ * you; anything else was opened on top of something and must offer a way out.
+ *
+ * Most NAV_ITEMS are a single screen, so their name is the landing screen. The
+ * ones wrapping a stack land on the inner screen listed here — which is the one
+ * mapped to the section's bare path in App.tsx's `linking`, NOT necessarily the
+ * first `<Stack.Screen>` declared (Sales, for one, declares NewSale first).
+ *
+ * Kept beside NAV_ITEMS on purpose: a new section is added in both places at
+ * once, and a name missing from here fails safe — the screen shows a back link
+ * it does not strictly need, rather than trapping someone on it.
+ */
+export const LANDING_SCREENS = new Set<string>([
+  ...NAV_ITEMS.map((it) => it.name),
+  // Sections whose nav item is a stack: the screen its bare path resolves to.
+  "ProductsList",
+  "InventoryList",
+  "MedGuideSearch",
+  "OrdersList",
+  "ReceiveStock",
+  "SalesList",
+  "CustomersList",
+  "SuppliersList",
+  "TeamList",
+]);

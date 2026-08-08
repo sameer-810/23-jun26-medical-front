@@ -40,7 +40,6 @@ import {
   Select,
   ConfirmDialog,
   Skeleton,
-  BackLink,
 } from "@shared/ui";
 
 export default function PharmacyDetailScreen() {
@@ -67,12 +66,11 @@ export default function PharmacyDetailScreen() {
   }));
 
   return (
-    <Screen overline="Pharmacy" title={org?.name || "Pharmacy"}>
-      <BackLink
-        label="Back to pharmacies"
-        onPress={() => navigation.goBack()}
-      />
-
+    <Screen
+      back="Back to pharmacies"
+      overline="Pharmacy"
+      title={org?.name || "Pharmacy"}
+    >
       <AdminNav active="pharmacies" />
 
       {!org ? (

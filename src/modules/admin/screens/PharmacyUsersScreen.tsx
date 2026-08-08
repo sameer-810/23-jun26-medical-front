@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useRoute } from "@react-navigation/native";
 import { UserRound, KeyRound } from "lucide-react-native";
 import {
   useOrgUsers,
@@ -19,11 +19,9 @@ import {
   StatusChip,
   EmptyState,
   PromptDialog,
-  BackLink,
 } from "@shared/ui";
 
 export default function PharmacyUsersScreen() {
-  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const id = route.params?.id as string;
 
@@ -37,9 +35,7 @@ export default function PharmacyUsersScreen() {
   } | null>(null);
 
   return (
-    <Screen overline="Pharmacy" title="Users">
-      <BackLink label="Back to pharmacy" onPress={() => navigation.goBack()} />
-
+    <Screen back="Back to pharmacy" overline="Pharmacy" title="Users">
       <AdminNav active="pharmacies" />
 
       {msg ? (

@@ -14,7 +14,6 @@ import {
   Card,
   Button,
   Banner,
-  BackLink,
   ReasonSelect,
   reasonValue,
 } from "@shared/ui";
@@ -77,12 +76,11 @@ export default function PurchaseReturnScreen() {
 
   return (
     <Screen
+      back="Back to receipt"
       overline="Purchase return"
       title={receipt?.receiptNo ? `Return · ${receipt.receiptNo}` : "Return"}
       subtitle={receipt?.supplierName || ""}
     >
-      <BackLink label="Back to receipt" onPress={() => navigation.goBack()} />
-
       {serverError ? (
         <Banner
           tone="danger"

@@ -12,15 +12,7 @@ import {
 import { apiErrorMessage } from "@shared/api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import {
-  Screen,
-  Text,
-  VStack,
-  Card,
-  Button,
-  ConfirmDialog,
-  BackLink,
-} from "@shared/ui";
+import { Screen, Text, VStack, Card, Button, ConfirmDialog } from "@shared/ui";
 
 export default function PlanFormScreen() {
   const navigation = useNavigation<any>();
@@ -91,9 +83,11 @@ export default function PlanFormScreen() {
   };
 
   return (
-    <Screen overline="Plans" title={editing ? "Edit plan" : "Add plan"}>
-      <BackLink label="Back to plans" onPress={() => navigation.goBack()} />
-
+    <Screen
+      back="Back to plans"
+      overline="Plans"
+      title={editing ? "Edit plan" : "Add plan"}
+    >
       {serverError ? (
         <View style={styles.errorBox}>
           <Text variant="body-sm" tone="danger">

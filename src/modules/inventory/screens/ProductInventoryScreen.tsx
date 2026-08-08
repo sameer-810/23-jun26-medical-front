@@ -19,7 +19,6 @@ import {
   Button,
   StatTile,
   StatusChip,
-  BackLink,
   Skeleton,
 } from "@shared/ui";
 
@@ -53,7 +52,7 @@ export default function ProductInventoryScreen() {
 
   if (isLoading || !data) {
     return (
-      <Screen overline="Inventory" title="Product">
+      <Screen back="Back to inventory" overline="Inventory" title="Product">
         <VStack gap={16}>
           <HStack gap={12} wrap>
             {[0, 1, 2, 3].map((i) => (
@@ -81,6 +80,7 @@ export default function ProductInventoryScreen() {
 
   return (
     <Screen
+      back="Back to inventory"
       overline="Inventory"
       title={data?.product.name || "Product"}
       subtitle={data?.product.sku}
@@ -122,8 +122,6 @@ export default function ProductInventoryScreen() {
         </HStack>
       }
     >
-      <BackLink label="Back to inventory" onPress={() => navigation.goBack()} />
-
       <View
         style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 }}
       >

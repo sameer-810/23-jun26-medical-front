@@ -13,15 +13,7 @@ import { customerSchema } from "@modules/customer/customer.validation";
 import { apiErrorMessage } from "@api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import {
-  Screen,
-  Text,
-  VStack,
-  HStack,
-  Card,
-  Button,
-  BackLink,
-} from "@shared/ui";
+import { Screen, Text, VStack, HStack, Card, Button } from "@shared/ui";
 
 export default function CustomerFormScreen() {
   const navigation = useNavigation<any>();
@@ -67,11 +59,10 @@ export default function CustomerFormScreen() {
 
   return (
     <Screen
+      back="Back to customers"
       overline="Customers"
       title={editing ? "Edit customer" : "Add customer"}
     >
-      <BackLink label="Back to customers" onPress={() => navigation.goBack()} />
-
       {mut.isError && (
         <View style={errorBox}>
           <Text variant="body-sm" tone="danger">

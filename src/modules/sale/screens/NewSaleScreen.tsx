@@ -1145,6 +1145,7 @@ export default function NewSaleScreen() {
 
   return (
     <Screen
+      back="Back to sales"
       overline="Sales"
       title="New sale"
       subtitle="Scan or search · FEFO auto-picks nearest-expiry batches"

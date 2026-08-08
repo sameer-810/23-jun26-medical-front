@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useRoute } from "@react-navigation/native";
 import { Printer, Undo2, MapPin, MessageCircle } from "lucide-react-native";
 import { useSale, useInvoiceProfile } from "@modules/sale/hooks/useSales";
 import { useAuthStore } from "@shared/store/useAuthStore";
@@ -17,7 +17,6 @@ import {
   Button,
   StatusChip,
   Skeleton,
-  BackLink,
 } from "@shared/ui";
 import { ReturnModal } from "@modules/sale/components/ReturnModal";
 
@@ -30,7 +29,6 @@ const STATUS_TONE = {
 } as const;
 
 export default function SaleDetailScreen() {
-  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const id = route.params?.id as string;
   const { data: sale, isLoading } = useSale(id);
@@ -42,7 +40,7 @@ export default function SaleDetailScreen() {
 
   if (isLoading || !sale) {
     return (
-      <Screen overline="Sales" title="Invoice">
+      <Screen back="Back to sales" overline="Sales" title="Invoice">
         <VStack gap={12}>
           <Skeleton width={180} height={28} />
           <Card>
@@ -89,6 +87,7 @@ export default function SaleDetailScreen() {
 
   return (
     <Screen
+      back="Back to sales"
       overline={`Invoice · ${sale.status.replace("_", " ")}`}
       title={sale.invoiceNo}
       subtitle={new Date(sale.saleDate).toLocaleString()}
@@ -99,7 +98,6 @@ export default function SaleDetailScreen() {
         style={{ marginBottom: 16 }}
         wrap
       >
-        <BackLink label="Back to sales" onPress={() => navigation.goBack()} />
         <HStack gap={10}>
           {sale.customerMobile ? (
             <Button

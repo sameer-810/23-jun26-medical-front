@@ -8,7 +8,7 @@ import { useCreatePharmacy } from "@modules/admin/hooks/useAdmin";
 import { apiErrorMessage } from "@shared/api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Screen, Text, VStack, Card, Button, BackLink } from "@shared/ui";
+import { Screen, Text, VStack, Card, Button } from "@shared/ui";
 import { createPharmacySchema } from "@modules/admin/admin.validation";
 
 export default function CreatePharmacyScreen() {
@@ -55,12 +55,7 @@ export default function CreatePharmacyScreen() {
   });
 
   return (
-    <Screen overline="Platform" title="Add pharmacy">
-      <BackLink
-        label="Back to pharmacies"
-        onPress={() => navigation.goBack()}
-      />
-
+    <Screen back="Back to pharmacies" overline="Platform" title="Add pharmacy">
       {serverError ? (
         <View style={styles.errorBox}>
           <Text variant="body-sm" tone="danger">

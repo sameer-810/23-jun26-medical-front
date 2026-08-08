@@ -13,15 +13,7 @@ import { supplierSchema } from "@modules/supplier/supplier.validation";
 import { apiErrorMessage } from "@api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import {
-  Screen,
-  Text,
-  VStack,
-  HStack,
-  Card,
-  Button,
-  BackLink,
-} from "@shared/ui";
+import { Screen, Text, VStack, HStack, Card, Button } from "@shared/ui";
 
 export default function SupplierFormScreen() {
   const navigation = useNavigation<any>();
@@ -73,10 +65,10 @@ export default function SupplierFormScreen() {
 
   return (
     <Screen
+      back="Back to suppliers"
       overline="Suppliers"
       title={editing ? "Edit supplier" : "Add supplier"}
     >
-      <BackLink label="Back to suppliers" onPress={() => navigation.goBack()} />
       {mut.isError && (
         <View style={errorBox}>
           <Text variant="body-sm" tone="danger">

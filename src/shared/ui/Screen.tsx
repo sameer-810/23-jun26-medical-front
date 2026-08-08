@@ -9,21 +9,82 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { useNavigation, useNavigationState } from "@react-navigation/native";
+import { LANDING_SCREENS } from "@navigation/navItems";
 import { palette, layout } from "../designSystem";
 import { useBottomPadding } from "./useBottomPadding";
 import { Text } from "./Text";
 import { VStack } from "./Stack";
+import { BackLink } from "./BackLink";
 
 interface Props {
   title?: string;
   subtitle?: string;
   overline?: string;
   right?: React.ReactNode;
+  /**
+   * The "← Back" affordance.
+   *
+   *  - omitted  → decided automatically (see `useAutoBack`): shown on any screen
+   *               opened on top of another, hidden on the ones the sidebar goes
+   *               straight to.
+   *  - a string → shown with that wording ("Back to receipt"), which is kinder
+   *               than a bare "Back" when the screen has several ways in.
+   *  - false    → suppressed, for the rare screen that must not be left this way.
+   */
+  back?: string | false;
   scroll?: boolean;
   refreshing?: boolean;
   onRefresh?: () => void;
   contentStyle?: StyleProp<ViewStyle>;
   children: React.ReactNode;
+}
+
+/**
+ * Should this screen offer a way back, and where to?
+ *
+ * Decided from WHERE THE SCREEN SITS, not from navigation history. A screen the
+ * sidebar lands on (Dashboard, Receive Stock, Sales…) has nothing behind it and
+ * gets no link; anything else was opened on top of something and gets one.
+ *
+ * History is deliberately not the test. A page reload has none — so on the web
+ * and desktop builds, refreshing while on Scan a bill left the link out and the
+ * pharmacist genuinely stuck. When there is no history to pop, this walks to the
+ * section's own landing screen instead, which is where "back" meant anyway.
+ *
+ * This lives in Screen because the alternative — asking all 58 screens to
+ * remember — is exactly what produced the complaint: Scan a bill, New sale and
+ * six others had no way out but the browser's own back button, which neither
+ * the desktop app nor the APK has.
+ */
+function useAutoBack(): (() => void) | null {
+  const navigation = useNavigation();
+  const routeName = useNavigationState((s) =>
+    s ? s.routes[s.index]?.name : undefined,
+  );
+  // How deep we are in our OWN stack. Zero means we were opened cold — by URL,
+  // by a reload, or from the ⌘K palette — so there is nothing of ours to pop.
+  const depth = useNavigationState((s) =>
+    s?.type === "stack" ? (s.index ?? 0) : 0,
+  );
+  // The landing screen of that stack: where "back" means, when popping can't.
+  const parent = useNavigationState((s) =>
+    s?.type === "stack"
+      ? s.routeNames.find((n: string) => LANDING_SCREENS.has(n))
+      : undefined,
+  );
+
+  if (!routeName || LANDING_SCREENS.has(routeName)) return null;
+  return () => {
+    // Popping is only right while there is something of ours underneath —
+    // "Back to receipt" from a purchase return must land on the receipt.
+    if (depth > 0 && navigation.canGoBack()) navigation.goBack();
+    // Otherwise go where the label says. Popping here would leave the section
+    // altogether and drop the pharmacist on the dashboard, which is not what
+    // "Back to receive" promises.
+    else if (parent) navigation.navigate(parent as never);
+    else if (navigation.canGoBack()) navigation.goBack();
+  };
 }
 
 /**
@@ -37,6 +98,7 @@ export function Screen({
   subtitle,
   overline,
   right,
+  back,
   scroll = true,
   refreshing,
   onRefresh,
@@ -48,6 +110,13 @@ export function Screen({
   // On a phone, actions sitting beside the title squeeze the subtitle into a
   // ragged column — drop them onto their own line instead.
   const stackHeader = width < 700;
+
+  const goBack = useAutoBack();
+  // Sits above the title, so it lands in the same place on every screen.
+  const backLink =
+    back === false || !goBack ? null : (
+      <BackLink label={back || "Back"} onPress={goBack} />
+    );
 
   const header = (title || right) && (
     <View
@@ -91,6 +160,7 @@ export function Screen({
         contentStyle,
       ]}
     >
+      {backLink}
       {header}
       {children}
     </View>

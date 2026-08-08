@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Pressable, StyleSheet } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useRoute } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { Repeat2 } from "lucide-react-native";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
@@ -14,7 +14,6 @@ import {
   StatusChip,
   EmptyState,
   Skeleton,
-  BackLink,
 } from "@shared/ui";
 
 type Sort = "expiry" | "price" | "margin";
@@ -25,7 +24,6 @@ const TABS: { key: Sort; label: string }[] = [
 ];
 
 export default function AlternativesScreen() {
-  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const id = route.params?.id as string;
   const name = route.params?.name as string | undefined;
@@ -41,7 +39,11 @@ export default function AlternativesScreen() {
 
   if (isLoading || !data) {
     return (
-      <Screen overline="Alternatives" title={name || "Alternatives"}>
+      <Screen
+        back="Back to product"
+        overline="Alternatives"
+        title={name || "Alternatives"}
+      >
         <HStack gap={8} style={{ marginBottom: 14 }}>
           {[0, 1, 2].map((i) => (
             <Skeleton key={i} width={110} height={34} rounded="full" />
@@ -66,12 +68,11 @@ export default function AlternativesScreen() {
 
   return (
     <Screen
+      back="Back to product"
       overline="Alternatives"
       title={name || "Alternatives"}
       subtitle={data?.molecule ? `Same as ${data.molecule}` : undefined}
     >
-      <BackLink label="Back to product" onPress={() => navigation.goBack()} />
-
       <HStack gap={8} style={{ marginBottom: 14 }}>
         {TABS.map((t) => {
           const on = t.key === sort;

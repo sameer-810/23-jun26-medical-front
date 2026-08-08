@@ -30,7 +30,6 @@ import {
   Button,
   Banner,
   ConfirmDialog,
-  BackLink,
 } from "@shared/ui";
 import { PacksEditor } from "@modules/product/components/PacksEditor";
 
@@ -153,12 +152,11 @@ export default function ProductFormScreen() {
 
   return (
     <Screen
+      back="Back to products"
       overline="Catalogue"
       title={editing ? "Edit product" : "Add product"}
       subtitle={editing ? product?.sku : "Define a catalogue item"}
     >
-      <BackLink label="Back to products" onPress={() => navigation.goBack()} />
-
       {mut.isError && (
         <Banner
           tone="danger"

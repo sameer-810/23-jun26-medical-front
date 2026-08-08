@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useRoute } from "@react-navigation/native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Send, CheckCircle2, Ban, MessageCircle } from "lucide-react-native";
 import { purchaseOrderApi } from "@modules/purchaseOrder/api/purchaseOrderApi";
@@ -18,7 +18,6 @@ import {
   Button,
   StatusChip,
   Skeleton,
-  BackLink,
   ConfirmDialog,
 } from "@shared/ui";
 
@@ -28,7 +27,6 @@ export default function OrderDetailScreen() {
   // Cancelling a placed order is not a style choice — it ends a commitment to a
   // distributor. It gets a confirm like every other destructive action.
   const [cancelOpen, setCancelOpen] = useState(false);
-  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const id = route.params?.id as string;
   const qc = useQueryClient();
@@ -64,12 +62,11 @@ export default function OrderDetailScreen() {
 
   return (
     <Screen
+      back="Back to orders"
       overline="Purchase order"
       title={order?.orderNo || "Order"}
       subtitle={order?.supplierName || ""}
     >
-      <BackLink label="Back to orders" onPress={() => navigation.goBack()} />
-
       {!order ? (
         isLoading ? (
           <VStack gap={16}>

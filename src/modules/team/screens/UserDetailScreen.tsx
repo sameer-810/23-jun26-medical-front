@@ -25,7 +25,6 @@ import {
   StatusChip,
   ConfirmDialog,
   Skeleton,
-  BackLink,
 } from "@shared/ui";
 import { PermissionEditor } from "@modules/team/components/PermissionEditor";
 
@@ -60,7 +59,7 @@ export default function UserDetailScreen() {
 
   if (!user) {
     return (
-      <Screen overline="Team" title="Member">
+      <Screen back="Back to team" overline="Team" title="Member">
         <VStack gap={12}>
           <Card>
             <HStack gap={14} align="center">
@@ -94,9 +93,12 @@ export default function UserDetailScreen() {
     );
 
   return (
-    <Screen overline="Team member" title={user.fullName} subtitle={user.email}>
-      <BackLink label="Back to team" onPress={() => navigation.goBack()} />
-
+    <Screen
+      back="Back to team"
+      overline="Team member"
+      title={user.fullName}
+      subtitle={user.email}
+    >
       <Card style={{ marginBottom: 16 }}>
         <HStack gap={14} align="center">
           <Avatar

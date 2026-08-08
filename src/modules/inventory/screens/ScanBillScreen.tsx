@@ -187,6 +187,7 @@ export default function ScanBillScreen() {
 
   return (
     <Screen
+      back="Back to receive"
       overline="Stock Inward"
       title="Scan a bill"
       subtitle="Photo, gallery or PDF — we read it, you confirm"

@@ -20,7 +20,6 @@ import {
   Card,
   Button,
   ConfirmDialog,
-  BackLink,
 } from "@shared/ui";
 
 export default function AdminFormScreen() {
@@ -87,11 +86,10 @@ export default function AdminFormScreen() {
 
   return (
     <Screen
+      back="Back to admins"
       overline="Platform admins"
       title={editing ? "Edit admin" : "Add admin"}
     >
-      <BackLink label="Back to admins" onPress={() => navigation.goBack()} />
-
       {serverError ? (
         <View style={styles.errorBox}>
           <Text variant="body-sm" tone="danger">

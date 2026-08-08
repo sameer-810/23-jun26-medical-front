@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, Image, StyleSheet } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useRoute } from "@react-navigation/native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { PlusCircle, CheckCircle2 } from "lucide-react-native";
 import { medguideApi } from "@modules/medguide/api/medguideApi";
@@ -18,7 +18,6 @@ import {
   Button,
   StatusChip,
   Skeleton,
-  BackLink,
 } from "@shared/ui";
 
 // Some source fields carry inline HTML (<p>, <br>) — flatten to plain text.
@@ -64,7 +63,6 @@ function Chips({ title, items }: { title: string; items: string[] }) {
 }
 
 export default function MedicineDetailScreen() {
-  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const id = route.params?.id as string;
 
@@ -98,9 +96,11 @@ export default function MedicineDetailScreen() {
     : [];
 
   return (
-    <Screen overline="MedGuide" title={m?.name || "Medicine"}>
-      <BackLink label="Back to MedGuide" onPress={() => navigation.goBack()} />
-
+    <Screen
+      back="Back to MedGuide"
+      overline="MedGuide"
+      title={m?.name || "Medicine"}
+    >
       {!m ? (
         isLoading ? (
           <VStack gap={12}>

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useRoute } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { ScrollText } from "lucide-react-native";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
@@ -15,11 +15,9 @@ import {
   Pagination,
   EmptyState,
   Skeleton,
-  BackLink,
 } from "@shared/ui";
 
 export default function ProductLedgerScreen() {
-  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const id = route.params?.id as string;
   const [page, setPage] = useState(1);
@@ -37,7 +35,7 @@ export default function ProductLedgerScreen() {
 
   if (isLoading || !data) {
     return (
-      <Screen overline="Inventory" title="Ledger">
+      <Screen back="Back to product" overline="Inventory" title="Ledger">
         <VStack gap={16}>
           <HStack gap={12} wrap>
             {[0, 1, 2, 3].map((i) => (
@@ -62,9 +60,11 @@ export default function ProductLedgerScreen() {
   }
 
   return (
-    <Screen overline="Inventory" title={product?.name || "Ledger"}>
-      <BackLink label="Back to product" onPress={() => navigation.goBack()} />
-
+    <Screen
+      back="Back to product"
+      overline="Inventory"
+      title={product?.name || "Ledger"}
+    >
       {product ? (
         <VStack gap={12} style={{ marginBottom: 16 }}>
           <Text variant="body-sm" tone="tertiary">

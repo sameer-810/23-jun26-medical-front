@@ -1,12 +1,7 @@
 import React, { useState } from "react";
-import { View, Pressable } from "react-native";
+import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import {
-  ArrowLeft,
-  ChevronRight,
-  PackageCheck,
-  ScrollText,
-} from "lucide-react-native";
+import { ChevronRight, PackageCheck, ScrollText } from "lucide-react-native";
 import { useReceipts } from "@modules/inventory/hooks/useInventory";
 import { ReceiptListItem } from "@modules/inventory/types";
 import { palette } from "@shared/designSystem";
@@ -123,25 +118,13 @@ export default function ReceiptsScreen() {
 
   return (
     <Screen
+      back="Back to receive"
       overline="Stock Inward"
       title="Receipt history"
       subtitle={`${total.toLocaleString("en-IN")} goods-received notes`}
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
     >
-      <Pressable
-        onPress={() => navigation.goBack()}
-        hitSlop={6}
-        style={{ marginBottom: 16 }}
-      >
-        <HStack gap={6} align="center">
-          <ArrowLeft size={18} color={palette.text.link} strokeWidth={2} />
-          <Text variant="label" tone="link">
-            Back to receive
-          </Text>
-        </HStack>
-      </Pressable>
-
       {isLoading && receipts.length === 0 ? (
         <ListSkeleton />
       ) : (

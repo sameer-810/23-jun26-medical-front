@@ -25,7 +25,6 @@ import {
   Combobox,
   Banner,
   EmptyState,
-  BackLink,
 } from "@shared/ui";
 
 interface Line {
@@ -132,9 +131,7 @@ export default function OrderFormScreen() {
   };
 
   return (
-    <Screen overline="eOrders" title="New purchase order">
-      <BackLink label="Back to orders" onPress={() => navigation.goBack()} />
-
+    <Screen back="Back to orders" overline="eOrders" title="New purchase order">
       {serverError ? (
         <Banner
           tone="danger"

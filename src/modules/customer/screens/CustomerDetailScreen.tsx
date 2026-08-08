@@ -35,7 +35,6 @@ import {
   EmptyState,
   ConfirmDialog,
   PromptDialog,
-  BackLink,
   Skeleton,
 } from "@shared/ui";
 
@@ -87,7 +86,7 @@ export default function CustomerDetailScreen() {
 
   if (!customer) {
     return (
-      <Screen overline="Customer" title="Customer">
+      <Screen back="Back to customers" overline="Customer" title="Customer">
         <VStack gap={16}>
           <Card>
             <HStack gap={14} align="center">
@@ -119,12 +118,11 @@ export default function CustomerDetailScreen() {
 
   return (
     <Screen
+      back="Back to customers"
       overline="Customer"
       title={customer?.name || "Customer"}
       subtitle={customer?.mobile || ""}
     >
-      <BackLink label="Back to customers" onPress={() => navigation.goBack()} />
-
       <Card style={{ marginBottom: 16 }}>
         <HStack gap={14} align="center">
           <Avatar name={customer?.name || "?"} size={54} />

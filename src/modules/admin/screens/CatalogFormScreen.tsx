@@ -20,7 +20,6 @@ import {
   Card,
   Button,
   ConfirmDialog,
-  BackLink,
 } from "@shared/ui";
 
 export default function CatalogFormScreen() {
@@ -91,11 +90,10 @@ export default function CatalogFormScreen() {
 
   return (
     <Screen
+      back="Back to catalogue"
       overline="Catalogue"
       title={editing ? "Edit product" : "Add product"}
     >
-      <BackLink label="Back to catalogue" onPress={() => navigation.goBack()} />
-
       {serverError ? (
         <View style={styles.errorBox}>
           <Text variant="body-sm" tone="danger">

@@ -21,7 +21,6 @@ import {
   Card,
   Button,
   ChipsRow,
-  BackLink,
 } from "@shared/ui";
 import { PermissionEditor } from "@modules/team/components/PermissionEditor";
 
@@ -73,12 +72,11 @@ export default function AddUserScreen() {
 
   return (
     <Screen
+      back="Back to team"
       overline="Team"
       title="Add member"
       subtitle="Create a staff account and grant permissions"
     >
-      <BackLink label="Back to team" onPress={() => navigation.goBack()} />
-
       {mut.isError && (
         <View style={errorBox}>
           <Text variant="body-sm" tone="danger">

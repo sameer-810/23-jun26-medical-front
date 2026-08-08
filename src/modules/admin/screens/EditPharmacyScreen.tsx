@@ -9,7 +9,7 @@ import {
 import { apiErrorMessage } from "@shared/api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Screen, Text, VStack, Card, Button, BackLink } from "@shared/ui";
+import { Screen, Text, VStack, Card, Button } from "@shared/ui";
 import type { UpdatePharmacyInput } from "@modules/admin/types";
 
 export default function EditPharmacyScreen() {
@@ -87,9 +87,7 @@ export default function EditPharmacyScreen() {
   };
 
   return (
-    <Screen overline="Pharmacy" title="Edit pharmacy">
-      <BackLink label="Back to pharmacy" onPress={() => navigation.goBack()} />
-
+    <Screen back="Back to pharmacy" overline="Pharmacy" title="Edit pharmacy">
       {serverError ? (
         <View style={styles.errorBox}>
           <Text variant="body-sm" tone="danger">
