@@ -1,16 +1,31 @@
-name: Build Android (.apk)
+name: Build Android (.aab)
 
-# Run it manually from the GitHub "Actions" tab → "Build Android (.apk)" →
-# "Run workflow". Builds an installable .apk with `eas build --local` on
-# GitHub's free Ubuntu runner (no EAS build credits used) and uploads it as a
-# download. The .apk can be sideloaded onto any Android device for testing.
+# Run it manually from the GitHub "Actions" tab → "Build Android (.aab)" →
+# "Run workflow". Builds with `eas build --local` on GitHub's free Ubuntu runner
+# (no EAS build credits used) and publishes the result as a download.
+#
+# Pick a profile when you run it:
+#   • production → signed .aab for the Play Store (default)
+#   • preview    → installable .apk you can sideload straight onto a test phone
+#                  (much faster to iterate than uploading an .aab to Play)
 on:
   workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile"
+        type: choice
+        options:
+          - production
+          - preview
+        default: production
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Needed so the workflow can publish the build as a GitHub Release asset.
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,8 +51,10 @@ jobs:
           java-version: "17"
 
       - name: Raise Gradle memory (fix KSP Metaspace OOM)
-        # Written to the global Gradle home so it survives `expo prebuild`
+        # Written to the GLOBAL Gradle home so it survives `expo prebuild`
         # regenerating android/gradle.properties during `eas build --local`.
+        # The withAndroidBuildTuning plugin sets the same values inside the
+        # generated project; this covers the window before it is applied.
         run: |
           mkdir -p ~/.gradle
           echo 'org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8' >> ~/.gradle/gradle.properties
@@ -66,20 +83,37 @@ jobs:
       - name: Install required Android SDK packages
         run: sdkmanager "platforms;android-36" "build-tools;34.0.0" "ndk;27.3.13750724" "cmake;3.22.1"
 
-      - name: Build .apk (local — free, no EAS credits)
+      - name: Pick output extension for the profile
+        id: out
+        run: |
+          if [ "${{ inputs.profile }}" = "preview" ]; then
+            echo "ext=apk" >> "$GITHUB_OUTPUT"
+          else
+            echo "ext=aab" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build (local — free, no EAS credits)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           eas build --local \
             --platform android \
-            --profile preview \
+            --profile "${{ inputs.profile }}" \
             --non-interactive \
-            --output "${{ github.workspace }}/app-release.apk"
+            --output "${{ github.workspace }}/app-release.${{ steps.out.outputs.ext }}"
 
-      - name: Upload .apk
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-apk
-          path: app-release.apk
-          if-no-files-found: error
-          retention-days: 14
+      # Publish to a GitHub RELEASE, not an artifact. Release assets do NOT count
+      # against the 500 MB Actions artifact quota (they allow up to 2 GB), so this
+      # works even when that quota is full — no more "storage quota hit" errors and
+      # no 6-12h recalculation wait. Each build gets its own pre-release you can
+      # download from the repo's "Releases" page.
+      - name: Publish build to a GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="android-${{ inputs.profile }}-${{ github.run_number }}"
+          gh release create "$TAG" \
+            "app-release.${{ steps.out.outputs.ext }}" \
+            --title "Android ${{ inputs.profile }} build #${{ github.run_number }}" \
+            --notes "Automated \`eas build --local\` output. Download the .${{ steps.out.outputs.ext }} file below." \
+            --prerelease

@@ -19,3 +19,11 @@ npm-debug.*
 # Build artifacts
 *.aab
 *.apk
+
+# Android signing. The upload key is what proves a Play Store update really
+# came from you — committing it hands anyone with repo access the ability to
+# publish as this app, and Google cannot revoke or reissue it.
+credentials/
+*.keystore
+*.jks
+keystore.properties

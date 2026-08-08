@@ -41,7 +41,9 @@
           "cameraPermission": "Allow Plusveda to use the camera to scan barcodes on medicine packs."
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      "./plugins/withReleaseSigning",
+      "./plugins/withAndroidBuildTuning"
     ],
     "extra": {
       "eas": {
