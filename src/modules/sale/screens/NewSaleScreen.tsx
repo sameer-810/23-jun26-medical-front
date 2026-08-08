@@ -247,33 +247,45 @@ export default function NewSaleScreen() {
   /**
    * Note a medicine that couldn't be sold, from the till.
    *
-   * This is where a short is actually discovered: the customer is standing
-   * there, the line says "Out of stock", and the choice is a substitute or a
-   * note to buy it. Sending them to MedGuide to search the same medicine a
-   * second time is how a short becomes a lost sale nobody records.
+   * Offered on EVERY line, not only the ones that can't be filled. A short is
+   * the loudest reason to note something down, but it is not the only one: the
+   * pharmacist selling the last two strips of a fast mover knows it needs
+   * reordering before the system does, and that judgement is worth one tap
+   * while the pack is in their hand. Restricting it to out-of-stock lines meant
+   * the moment to record it had already passed.
    *
-   * The quantity sent is the SHORTFALL, not 1 — someone asking for 20 and
-   * getting 6 is a different reorder signal from someone asking for one.
-   * ShortBook only ever raises an existing reorder level, never lowers it.
+   * The quantity sent is the SHORTFALL where there is one — asking for 20 and
+   * getting 6 is a different signal from asking for one — and otherwise the
+   * quantity being sold. ShortBook only ever raises an existing reorder level,
+   * never lowers it, so a tap can't undo a level someone set deliberately.
    */
   const [shortbookBusy, setShortbookBusy] = useState<string | null>(null);
   const [shortbookNote, setShortbookNote] = useState<string | null>(null);
-  const addToShortbook = async (line: DraftLine, need: number) => {
+  const addToShortbook = async (line: DraftLine, want: number) => {
     setShortbookBusy(line.productId);
     setShortbookNote(null);
     try {
       const r = await inventoryApi.addToShortbook({
         productId: line.productId,
-        quantity: Math.max(1, Math.ceil(need)),
+        quantity: Math.max(1, Math.ceil(want)),
       });
       setShortbookNote(
-        `${r.product.name} is on the ShortBook — need ${r.need} ${line.baseUnit}.`,
+        r.need > 0
+          ? `${r.product.name} is on the ShortBook — need ${r.need} ${line.baseUnit}.`
+          : `${r.product.name} is on the ShortBook — keep ${r.reorderLevel} ${line.baseUnit}, ${r.onHand} in stock.`,
       );
     } catch (e) {
       setShortbookNote(apiErrorMessage(e));
     } finally {
       setShortbookBusy(null);
     }
+  };
+
+  /** What a ShortBook tap on this line should ask for. */
+  const shortbookQty = (l: DraftLine) => {
+    const issue = stockIssue(l);
+    if (issue) return issue.needBase - Math.max(issue.available, 0);
+    return Number(l.quantity) || 1;
   };
 
   // ---- Salt-based substitution (eVitalRx-style) --------------------------
@@ -745,17 +757,12 @@ export default function NewSaleScreen() {
                               </HStack>
                             </Pressable>
                           ) : null}
-                          {issue ? (
-                            <ShortbookChip
-                              busy={shortbookBusy === line.productId}
-                              onPress={() =>
-                                void addToShortbook(
-                                  line,
-                                  issue.needBase - Math.max(issue.available, 0),
-                                )
-                              }
-                            />
-                          ) : null}
+                          <ShortbookChip
+                            busy={shortbookBusy === line.productId}
+                            onPress={() =>
+                              void addToShortbook(line, shortbookQty(line))
+                            }
+                          />
                         </HStack>
                       </View>
                       <Cell
@@ -899,17 +906,12 @@ export default function NewSaleScreen() {
                           </HStack>
                         </Pressable>
                       ) : null}
-                      {issue ? (
-                        <ShortbookChip
-                          busy={shortbookBusy === line.productId}
-                          onPress={() =>
-                            void addToShortbook(
-                              line,
-                              issue.needBase - Math.max(issue.available, 0),
-                            )
-                          }
-                        />
-                      ) : null}
+                      <ShortbookChip
+                        busy={shortbookBusy === line.productId}
+                        onPress={() =>
+                          void addToShortbook(line, shortbookQty(line))
+                        }
+                      />
                     </HStack>
                     <HStack
                       gap={8}

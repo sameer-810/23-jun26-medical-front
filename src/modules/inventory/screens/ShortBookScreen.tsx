@@ -1,10 +1,19 @@
 import React, { useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, Pressable, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { useQuery } from "@tanstack/react-query";
-import { ListChecks, Search, ShoppingBag } from "lucide-react-native";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ListChecks,
+  Search,
+  ShoppingBag,
+  Pencil,
+  Trash2,
+} from "lucide-react-native";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { ShortbookItem } from "@modules/inventory/types";
+import { apiErrorMessage } from "@api/apiClient";
+import { useAuthStore } from "@shared/store/useAuthStore";
+import { PERMISSIONS } from "@shared/permissions";
 import { palette } from "@shared/designSystem";
 import {
   Screen,
@@ -19,10 +28,14 @@ import {
   DataTable,
   Column,
   Skeleton,
+  Banner,
+  PromptDialog,
+  ConfirmDialog,
 } from "@shared/ui";
 
 export default function ShortBookScreen() {
   const navigation = useNavigation<any>();
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -34,6 +47,65 @@ export default function ShortBookScreen() {
 
   const items = data?.data ?? [];
   const meta = data?.meta;
+
+  /**
+   * Editing and removing rows.
+   *
+   * A ShortBook row IS the reorder level — the list is every product whose
+   * level is set and whose stock has fallen to it. So "edit" changes that
+   * number, and "remove" clears it to zero. Neither deletes the medicine or
+   * moves a single unit of stock, which is worth saying plainly on the
+   * confirmation: the icon looks destructive and the action is not.
+   */
+  const canManage = useAuthStore((s) => s.hasPermission)(
+    PERMISSIONS.PRODUCTS_MANAGE,
+  );
+  const [editing, setEditing] = useState<ShortbookItem | null>(null);
+  const [removing, setRemoving] = useState<ShortbookItem | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  const refresh = () =>
+    qc.invalidateQueries({ queryKey: ["inventory", "shortbook"] });
+
+  const saveLevel = async (value: string) => {
+    if (!editing) return;
+    setBusy(true);
+    try {
+      const r = await inventoryApi.setShortbookLevel(
+        editing.productId,
+        Math.max(0, Math.floor(Number(value) || 0)),
+      );
+      setNote(
+        r.listed
+          ? `${editing.name} — keep ${r.reorderLevel}, ${r.onHand} on hand, need ${r.need}.`
+          : `${editing.name} is off the ShortBook. Its stock and history are unchanged.`,
+      );
+      setEditing(null);
+      await refresh();
+    } catch (e) {
+      setNote(apiErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmRemove = async () => {
+    if (!removing) return;
+    setBusy(true);
+    try {
+      await inventoryApi.removeFromShortbook(removing.productId);
+      setNote(
+        `${removing.name} removed from the ShortBook. The medicine, its batches and its stock are untouched.`,
+      );
+      setRemoving(null);
+      await refresh();
+    } catch (e) {
+      setNote(apiErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const createOrder = () =>
     navigation.navigate("Orders", {
@@ -138,6 +210,22 @@ export default function ShortBookScreen() {
     },
   ];
 
+  if (canManage) {
+    columns.push({
+      key: "actions",
+      header: "",
+      width: 76,
+      align: "center",
+      render: (it) => (
+        <RowActions
+          onEdit={() => setEditing(it)}
+          onRemove={() => setRemoving(it)}
+          name={it.name}
+        />
+      ),
+    });
+  }
+
   return (
     <Screen
       overline="Inventory"
@@ -169,6 +257,10 @@ export default function ShortBookScreen() {
         />
       </View>
 
+      {note ? (
+        <Banner tone="info" message={note} style={{ marginBottom: 12 }} />
+      ) : null}
+
       {isLoading && items.length === 0 ? (
         <ListSkeleton />
       ) : (
@@ -177,7 +269,14 @@ export default function ShortBookScreen() {
             columns={columns}
             rows={items}
             keyExtractor={(it) => it.productId}
-            mobileCard={(it) => <ShortBookRow item={it} />}
+            mobileCard={(it) => (
+              <ShortBookRow
+                item={it}
+                canManage={canManage}
+                onEdit={() => setEditing(it)}
+                onRemove={() => setRemoving(it)}
+              />
+            )}
             emptyIcon={ListChecks}
             emptyTitle="Nothing to reorder"
           />
@@ -199,11 +298,89 @@ export default function ShortBookScreen() {
           ) : null}
         </>
       )}
+
+      {/* Edit = change how many to keep. Zero is spelled out as the way off the
+          list, so nobody has to guess whether it's allowed. */}
+      <PromptDialog
+        visible={!!editing}
+        title={editing ? `Keep how many of ${editing.name}?` : ""}
+        message={
+          editing
+            ? `${editing.onHand} on hand now. Set 0 to take it off the ShortBook — nothing else changes.`
+            : undefined
+        }
+        label="Minimum to keep"
+        initialValue={editing ? String(editing.reorderLevel) : ""}
+        placeholder="e.g. 20"
+        keyboardType="number-pad"
+        confirmLabel="Save"
+        loading={busy}
+        validate={(v) =>
+          /^\d+$/.test(v.trim()) ? null : "Enter a whole number, 0 or more"
+        }
+        onSubmit={saveLevel}
+        onCancel={() => setEditing(null)}
+      />
+
+      <ConfirmDialog
+        visible={!!removing}
+        title={removing ? `Remove ${removing.name}?` : ""}
+        message="It comes off the reorder list. The medicine, its batches and its stock all stay as they are — add it again any time."
+        confirmLabel="Remove"
+        destructive
+        loading={busy}
+        onConfirm={confirmRemove}
+        onCancel={() => setRemoving(null)}
+      />
     </Screen>
   );
 }
 
-function ShortBookRow({ item }: { item: ShortbookItem }) {
+/** Edit / remove, as icon buttons — the row is already dense with numbers. */
+function RowActions({
+  name,
+  onEdit,
+  onRemove,
+}: {
+  name: string;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <HStack gap={4} align="center" justify="center">
+      <Pressable
+        onPress={onEdit}
+        hitSlop={8}
+        style={styles.iconBtn}
+        accessibilityRole="button"
+        accessibilityLabel={`Edit how many ${name} to keep`}
+      >
+        <Pencil size={16} color={palette.text.secondary} strokeWidth={2} />
+      </Pressable>
+      <Pressable
+        onPress={onRemove}
+        hitSlop={8}
+        style={styles.iconBtn}
+        accessibilityRole="button"
+        accessibilityLabel={`Remove ${name} from ShortBook`}
+      >
+        <Trash2 size={16} color={palette.danger.text} strokeWidth={2} />
+      </Pressable>
+    </HStack>
+  );
+}
+
+function ShortBookRow({
+  item,
+  canManage,
+  onEdit,
+  onRemove,
+}: {
+  item: ShortbookItem;
+  canManage: boolean;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
   return (
     <Card>
       <HStack gap={10} align="center" justify="space-between">
@@ -247,6 +424,9 @@ function ShortBookRow({ item }: { item: ShortbookItem }) {
               </Text>
             ) : null}
           </VStack>
+          {canManage ? (
+            <RowActions name={item.name} onEdit={onEdit} onRemove={onRemove} />
+          ) : null}
         </HStack>
       </HStack>
     </Card>
@@ -272,6 +452,13 @@ function ListSkeleton() {
 }
 
 const styles = StyleSheet.create({
+  // 32px square — a tap target on a phone, not a 16px glyph.
+  iconBtn: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   orderCell: {
     minWidth: 44,
     paddingLeft: 8,

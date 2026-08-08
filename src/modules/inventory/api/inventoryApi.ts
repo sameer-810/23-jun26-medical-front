@@ -131,6 +131,35 @@ export const inventoryApi = {
     return res.data.data;
   },
 
+  /**
+   * Change how many of a medicine to keep — the ShortBook row's "min".
+   *
+   * ShortBook lists products whose reorder level is set and whose stock has
+   * fallen to it, so this level IS the row. Setting it to 0 takes the medicine
+   * off the list; nothing else about the product or its stock changes.
+   */
+  setShortbookLevel: async (productId: string, reorderLevel: number) => {
+    const res = await apiClient.patch<{
+      success: boolean;
+      data: {
+        reorderLevel: number;
+        onHand: number;
+        need: number;
+        listed: boolean;
+      };
+    }>(`/inventory/shortbook/${productId}`, { reorderLevel });
+    return res.data.data;
+  },
+
+  /** Take a medicine off the ShortBook. Stock and history are untouched. */
+  removeFromShortbook: async (productId: string) => {
+    const res = await apiClient.delete<{
+      success: boolean;
+      data: { reorderLevel: number; onHand: number };
+    }>(`/inventory/shortbook/${productId}`);
+    return res.data.data;
+  },
+
   /** Alternative medicines (same molecule, in stock). */
   alternatives: async (
     productId: string,
