@@ -58,10 +58,11 @@ import {
   duplicateWarning,
   toReceiptLines,
   lineAmount,
+  billTotals,
   totalBaseUnits,
 } from "@modules/inventory/receiveDraft";
 import { apiErrorMessage } from "@api/apiClient";
-import { fmtMoney } from "@shared/format";
+import { fmtMoneyExact, fmtAmountExact } from "@shared/format";
 import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
@@ -73,6 +74,7 @@ import {
   TextField,
   Select,
   Combobox,
+  ChipsRow,
   Banner,
   DateField,
 } from "@shared/ui";
@@ -112,8 +114,10 @@ function expiryInfo(s: string): { state: ExpiryState; days: number } {
 
 /**
  * Receive Stock — goods-received note, entered as a dense spreadsheet-style grid
- * (one row per medicine: Batch · Expiry · Qty · Free · Unit · Rate · MRP · Loc),
- * the way Marg / eVitalRx / GoFrugal do it. Draft rules live in `receiveDraft.ts`.
+ * laid out column-for-column like the distributor invoice it is keyed from:
+ * Pack · Batch · Expiry · Qty · Free · MRP · Rate · Dis% · Gst% · Location ·
+ * Amount, closing on the bill's own totals block. Draft rules and the invoice
+ * arithmetic live in `receiveDraft.ts`.
  */
 export default function ReceiveStockScreen() {
   const navigation = useNavigation<any>();
@@ -157,6 +161,13 @@ export default function ReceiveStockScreen() {
     return () => clearTimeout(t);
   }, [activeQuery]);
   const [lines, setLines] = useState<DraftLine[]>([emptyLine()]);
+  /**
+   * Which way the supplier charged GST. A Maharashtra pharmacy buying from a
+   * Maharashtra distributor gets CGST+SGST; the same goods from out of state
+   * arrive as a single IGST line. Every invoice reviewed prints one or the
+   * other in its totals block, so the note has to be able to show either.
+   */
+  const [taxType, setTaxType] = useState<"intra" | "inter">("intra");
   // The whole receipt, not just its number — its lines carry the label codes
   // the "Print labels" step needs.
   const [done, setDone] = useState<ReceiptDetail | null>(null);
@@ -425,13 +436,13 @@ export default function ReceiveStockScreen() {
       cur.length === 1 ? cur : cur.filter((_, idx) => idx !== i),
     );
 
-  // The rate cell holds the rate for ONE of the line's units — exactly what the
+  // The rate cell holds the rate for ONE of the line's packs — exactly what the
   // distributor printed — so the payable is qty × rate, with no pack arithmetic
   // in between. toReceiptLines divides by the pack factor on the way out, which
   // is where the server's per-base-unit purchasePrice comes from.
   const validLines = toReceiptLines(lines, productsById);
   const totalBase = totalBaseUnits(lines, productsById);
-  const totalValue = lines.reduce((s, l) => s + lineAmount(l), 0);
+  const bill = billTotals(lines, taxType);
   const freeUnits = lines.reduce(
     (s, l) => s + (Number(l.freeQuantity) || 0),
     0,
@@ -478,6 +489,7 @@ export default function ReceiveStockScreen() {
       {
         supplierId,
         referenceNo: referenceNo.trim() || undefined,
+        taxType,
         lines: validLines,
       },
       {
@@ -738,19 +750,22 @@ export default function ReceiveStockScreen() {
             <View style={grn.head}>
               <GrnHead w={COL.idx} label="#" />
               <GrnHead w={COL.product} label="PRODUCT" left />
+              {/* PACK, because that is the word on the paper. Across the 26
+                  invoices reviewed it appears as PACK, PACKING or Pkg. — never
+                  UNIT, which is what this column used to say. */}
+              <GrnHead w={COL.pack} label="PACK" />
               <GrnHead w={COL.batch} label="BATCH" />
-              <GrnHead w={COL.mfg} label="MFG" />
               <GrnHead w={COL.expiry} label="EXPIRY" />
               <GrnHead w={COL.qty} label="QTY" />
               <GrnHead w={COL.free} label="FREE" />
-              <GrnHead w={COL.unit} label="UNIT" />
-              {/* RATE, and it means what the bill means by it: the price of one
-                  of the units in the column to the left. It used to hold cost
-                  per BASE unit, so a bill printing a trade price of 241.39 for
-                  a 15-cap pack showed 16.0927 — a figure that appears nowhere
-                  on the paper being checked against. Same for MRP. */}
-              <GrnHead w={COL.rate} label="RATE" right />
               <GrnHead w={COL.mrp} label="MRP" right />
+              {/* RATE, and it means what the bill means by it: the price of one
+                  PACK. It used to hold cost per BASE unit, so a bill printing a
+                  trade price of 241.39 for a 15-cap pack showed 16.0927 — a
+                  figure that appears nowhere on the paper. Same for MRP. */}
+              <GrnHead w={COL.rate} label="RATE" right />
+              <GrnHead w={COL.disc} label="DIS%" right />
+              <GrnHead w={COL.gst} label="GST%" right />
               <GrnHead w={COL.loc} label="LOCATION" />
               <GrnHead w={COL.amount} label="AMOUNT" right />
               <View style={{ width: COL.rm }} />
@@ -760,12 +775,15 @@ export default function ReceiveStockScreen() {
               const qtyN = Number(line.quantity) || 0;
               const amount = lineAmount(line);
               const started = Boolean(line.productId);
+              // Pack options read the way the bill writes them — "15 tablet",
+              // not a bare unit name — so the cell can be matched against the
+              // PACK column on the paper without doing arithmetic in your head.
               const units = p
                 ? [
-                    { value: p.baseUnit, label: p.baseUnit },
+                    { value: p.baseUnit, label: `${p.baseUnit} (loose)` },
                     ...(p.packs || []).map((pk) => ({
                       value: pk.unit,
-                      label: pk.unit,
+                      label: `${pk.factor} ${p.baseUnit}`,
                     })),
                   ]
                 : line.unit
@@ -813,35 +831,34 @@ export default function ReceiveStockScreen() {
                           line.fromBill?.productName ||
                           "Set product…"}
                       </Text>
-                      {/* The bill's own PACK string, kept visible. QTY, RATE and
-                          MRP are all per ONE of these, so it is what the UNIT
-                          column has to be set to — and when the scan couldn't
-                          resolve it, this is the only place the pharmacist can
-                          read it without going back to the paper. */}
-                      {line.fromBill?.pack ? (
-                        <Text
-                          variant="caption"
-                          tone="tertiary"
-                          numberOfLines={1}
-                        >
-                          Pack {line.fromBill.pack}
-                        </Text>
-                      ) : null}
                     </Pressable>
+                  </View>
+                  {/* PACK. The select is what the maths runs on (it carries the
+                      pack factor); the caption under it is the bill's own PACK
+                      string, so the two can be read against each other without
+                      going back to the paper. */}
+                  <View style={{ width: COL.pack }}>
+                    <Select
+                      value={line.unit}
+                      options={units}
+                      onChange={(v) => setLine(i, { unit: v })}
+                    />
+                    {line.fromBill?.pack ? (
+                      <Text
+                        variant="caption"
+                        tone="tertiary"
+                        numberOfLines={1}
+                        style={{ marginTop: 2 }}
+                      >
+                        Bill: {line.fromBill.pack}
+                      </Text>
+                    ) : null}
                   </View>
                   <GrnCell
                     w={COL.batch}
                     value={line.batchNumber}
                     onChangeText={(v) => setLine(i, { batchNumber: v })}
                     error={started && !line.batchNumber.trim()}
-                  />
-                  <DateField
-                    compact
-                    width={COL.mfg}
-                    mode="month"
-                    value={line.mfgDate}
-                    onChange={(v) => setLine(i, { mfgDate: v })}
-                    maximumDate={new Date()}
                   />
                   <DateField
                     compact
@@ -873,13 +890,13 @@ export default function ReceiveStockScreen() {
                     align="center"
                     placeholder="0"
                   />
-                  <View style={{ width: COL.unit }}>
-                    <Select
-                      value={line.unit}
-                      options={units}
-                      onChange={(v) => setLine(i, { unit: v })}
-                    />
-                  </View>
+                  <GrnCell
+                    w={COL.mrp}
+                    value={line.mrp}
+                    onChangeText={(v) => setLine(i, { mrp: v })}
+                    numeric
+                    align="right"
+                  />
                   <GrnCell
                     w={COL.rate}
                     value={line.purchasePrice}
@@ -888,11 +905,20 @@ export default function ReceiveStockScreen() {
                     align="right"
                   />
                   <GrnCell
-                    w={COL.mrp}
-                    value={line.mrp}
-                    onChangeText={(v) => setLine(i, { mrp: v })}
+                    w={COL.disc}
+                    value={line.discountPct}
+                    onChangeText={(v) => setLine(i, { discountPct: v })}
                     numeric
                     align="right"
+                    placeholder="0"
+                  />
+                  <GrnCell
+                    w={COL.gst}
+                    value={line.gstPct}
+                    onChangeText={(v) => setLine(i, { gstPct: v })}
+                    numeric
+                    align="right"
+                    placeholder="0"
                   />
                   <View style={{ width: COL.loc }}>
                     <Select
@@ -901,12 +927,15 @@ export default function ReceiveStockScreen() {
                       onChange={(v) => setLine(i, { locationId: v })}
                     />
                   </View>
+                  {/* To the paisa. This column is read against the bill's own
+                      AMOUNT column, and 2 × 64.46 is 128.92 there — showing
+                      "₹129" here makes the two impossible to reconcile. */}
                   <Text
                     style={{ width: COL.amount, textAlign: "right" }}
                     variant="label-sm"
                     tone="primary"
                   >
-                    {amount > 0 ? fmtMoney(amount) : "—"}
+                    {amount > 0 ? fmtAmountExact(amount) : "—"}
                   </Text>
                   <Pressable
                     onPress={() => lines.length > 1 && removeLine(i)}
@@ -972,24 +1001,74 @@ export default function ReceiveStockScreen() {
         </Text>
       </Pressable>
 
+      {/* The foot of the bill, in the bill's own words and its own order:
+          AMOUNT · DISC AMT · TAXABLE · CGST/SGST (or IGST) · TOTAL AMT ·
+          Round Off · TO PAY. Every invoice reviewed prints this block, and
+          prints the exact total AND the round-off separately — so a payment
+          can be reconciled against either. */}
       <Card style={{ marginTop: 8, marginBottom: 16 }}>
-        <HStack align="center" justify="space-between">
+        <HStack align="center" justify="space-between" wrap gap={12}>
           <VStack gap={2}>
             <Text variant="label-lg" tone="primary">
               Total to receive
             </Text>
             <Text variant="caption" tone="tertiary">
-              {totalBase} base units
+              {lines.filter((l) => l.productId).length} items · {totalBase} base
+              units
               {freeUnits > 0 ? ` · ${freeUnits} free (scheme)` : ""}
             </Text>
+            <HStack gap={6} align="center" style={{ marginTop: 6 }}>
+              <Text variant="caption" tone="tertiary">
+                GST
+              </Text>
+              <ChipsRow
+                active={taxType}
+                chips={[
+                  { key: "intra", label: "Intra (CGST+SGST)" },
+                  { key: "inter", label: "Inter (IGST)" },
+                ]}
+                onChange={(v) => setTaxType(v as "intra" | "inter")}
+              />
+            </HStack>
           </VStack>
-          <VStack gap={2} align="flex-end">
-            <Text variant="caption" tone="tertiary">
-              Purchase value
-            </Text>
-            <Text variant="h3" tone="accent">
-              {fmtMoney(totalValue)}
-            </Text>
+
+          <VStack gap={3} style={{ minWidth: 240 }}>
+            <TotalRow label="Amount" value={fmtAmountExact(bill.gross)} />
+            {bill.discount > 0 ? (
+              <TotalRow
+                label="Disc amt"
+                value={`−${fmtAmountExact(bill.discount)}`}
+              />
+            ) : null}
+            <TotalRow label="Taxable" value={fmtAmountExact(bill.taxable)} />
+            {taxType === "intra" ? (
+              <>
+                <TotalRow label="CGST" value={fmtAmountExact(bill.cgst)} />
+                <TotalRow label="SGST" value={fmtAmountExact(bill.sgst)} />
+              </>
+            ) : (
+              <TotalRow label="IGST" value={fmtAmountExact(bill.igst)} />
+            )}
+            <TotalRow label="Total amt" value={fmtAmountExact(bill.total)} />
+            {bill.roundOff !== 0 ? (
+              <TotalRow
+                label="Round off"
+                value={`${bill.roundOff > 0 ? "+" : "−"}${fmtAmountExact(Math.abs(bill.roundOff))}`}
+              />
+            ) : null}
+            <View style={grn.totalRule} />
+            {/* "To pay" is the figure AFTER the round-off, the way the bills
+                print it (TOTAL AMT 572.34 · RoundOff −0.34 · TO PAY 572.00).
+                The exact total is the "Total amt" row above — both are shown,
+                because a supplier query is usually about the difference. */}
+            <HStack align="center" justify="space-between">
+              <Text variant="label-lg" tone="primary">
+                To pay
+              </Text>
+              <Text variant="h3" tone="accent">
+                {fmtMoneyExact(bill.payable)}
+              </Text>
+            </HStack>
           </VStack>
         </HStack>
       </Card>
@@ -1057,22 +1136,42 @@ const styles = StyleSheet.create({
 });
 
 // ---- GRN spreadsheet grid ----
+/**
+ * The goods-received grid, column for column as a distributor invoice prints it.
+ *
+ * Taken from the 26 invoices in `All Bills` — Kayan, Safe Life, P. Vishram,
+ * Jeevan Rekha, Shree Simba, Shree Pioneer, Healing, Dhanwantari, Kailash,
+ * Rajawat, Mohar, Sagar, Mahalaxmi, Advik, Radiant, G&K, Jagnath, Yash, G.S.,
+ * Hiren, Rajdeep, S.S. Every one of them carries this set, whatever it calls
+ * them:  PACK · BATCH · EXP · QTY · FREE · MRP · RATE · DIS% · GST% · AMOUNT.
+ *
+ * Two deliberate departures from what was here before:
+ *  - UNIT is now PACK. Not one bill says "unit"; they say PACK, PACKING or Pkg.
+ *  - The MFG *date* column is gone. "MFG" on an invoice is the manufacturer
+ *    (ABO, SUN, CIPL), never a manufacturing date — no bill prints one, and the
+ *    column sat empty after every scan while costing 104px the GST columns need.
+ */
+/**
+ * Widths are tuned so the whole row — AMOUNT included — fits a 1366/1440 laptop
+ * without sideways scrolling. AMOUNT is the column being checked against the
+ * paper; having it fall off the right edge defeats the point of the screen.
+ */
 const COL = {
-  idx: 26,
-  product: 180,
-  batch: 88,
-  // Wide enough for a real month control ("mm/yyyy" plus its picker glyph);
-  // at 80 the browser clipped the value.
-  mfg: 104,
-  expiry: 104,
-  qty: 50,
-  free: 46,
-  unit: 88,
-  rate: 74,
+  idx: 22,
+  product: 166,
+  pack: 84,
+  batch: 84,
+  expiry: 94,
+  qty: 44,
+  free: 40,
+  // Money columns hold paise now ("1,759.63"), so they need the room.
   mrp: 74,
-  loc: 126,
-  amount: 80,
-  rm: 30,
+  rate: 74,
+  disc: 48,
+  gst: 46,
+  loc: 104,
+  amount: 88,
+  rm: 26,
 };
 
 function GrnHead({
@@ -1149,12 +1248,33 @@ function GrnCell({
   );
 }
 
+/** One line of the totals block: label left, figure right-aligned. */
+function TotalRow({ label, value }: { label: string; value: string }) {
+  return (
+    <HStack align="center" justify="space-between">
+      <Text variant="body-sm" tone="secondary">
+        {label}
+      </Text>
+      <Text variant="label-sm" tone="primary">
+        {value}
+      </Text>
+    </HStack>
+  );
+}
+
 const grn = StyleSheet.create({
+  totalRule: {
+    height: 1,
+    backgroundColor: palette.border.default,
+    marginVertical: 4,
+  },
+  // 6px, not 8: thirteen columns pay the gap twelve times, and the 26px that
+  // buys is the difference between AMOUNT fitting on a 1366 laptop and not.
   head: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
+    gap: 6,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     backgroundColor: palette.neutral[50],
     borderBottomWidth: 1.5,
@@ -1163,8 +1283,8 @@ const grn = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
+    gap: 6,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: palette.border.subtle,

@@ -26,6 +26,8 @@ export const emptyLine = (): DraftLine => ({
   freeQuantity: "",
   purchasePrice: "",
   mrp: "",
+  discountPct: "",
+  gstPct: "",
   locationId: null,
 });
 
@@ -88,6 +90,10 @@ export function baseQty(line: DraftLine, product?: ProductLite | null): number {
   return qty * unitFactor(line, product);
 }
 
+/** Money to the paisa. Distributor invoices settle at 2dp; so do we. */
+const paise = (n: number) =>
+  Number.isFinite(n) ? Math.round((n + Number.EPSILON) * 100) / 100 : 0;
+
 /**
  * The line's payable as the BILL states it: qty × the printed rate.
  *
@@ -97,7 +103,98 @@ export function baseQty(line: DraftLine, product?: ProductLite | null): number {
  * checking against the paper, so it is the number we compute.
  */
 export function lineAmount(line: DraftLine): number {
-  return (Number(line.quantity) || 0) * (Number(line.purchasePrice) || 0);
+  return paise(
+    (Number(line.quantity) || 0) * (Number(line.purchasePrice) || 0),
+  );
+}
+
+export interface LineTotals {
+  /** QTY × RATE — the bill's AMOUNT / VALUE / NET AMT column. */
+  gross: number;
+  /** AMOUNT × DIS% — the bill's DISC AMT. */
+  discount: number;
+  /** AMOUNT − DISC AMT — the bill's TAXABLE. */
+  taxable: number;
+  /** TAXABLE × GST% — split CGST+SGST, or charged whole as IGST. */
+  gst: number;
+  /** TAXABLE + GST — the bill's TOTAL AMT for this line. */
+  total: number;
+}
+
+/**
+ * One line, worked the way every invoice in `All Bills` works it.
+ *
+ * The chain is the same on all of them, whatever the column headings say:
+ *
+ *   QTY × RATE = AMOUNT        (SHREE PIONEER: 5 × 111.25 = 556.25)
+ *   AMOUNT − DIS%  = TAXABLE   (556.25 − 16.69 = 539.56)
+ *   TAXABLE × GST% = GST       (539.56 × 5% = 26.98, printed as 13.49 + 13.49)
+ *
+ * Free goods are deliberately absent: they arrive and go on the shelf, but a
+ * "10 + 1" line is billed for ten. Every bill reviewed does the same.
+ */
+export function lineTotals(line: DraftLine): LineTotals {
+  const gross = lineAmount(line);
+  const discPct = Math.min(Math.max(Number(line.discountPct) || 0, 0), 100);
+  const discount = paise((gross * discPct) / 100);
+  const taxable = paise(gross - discount);
+  const gst = paise((taxable * (Number(line.gstPct) || 0)) / 100);
+  return { gross, discount, taxable, gst, total: paise(taxable + gst) };
+}
+
+export interface BillTotals extends LineTotals {
+  /** Half the GST each, the way an intra-state invoice prints it. */
+  cgst: number;
+  sgst: number;
+  /** The whole GST in one column — inter-state supply. */
+  igst: number;
+  /** What the invoice calls "Round Off" / "P. Off" — never silently applied. */
+  roundOff: number;
+  /** TOTAL AMT after the round-off. The bill's "TO PAY" / "Grand Total". */
+  payable: number;
+}
+
+/**
+ * The foot of the bill.
+ *
+ * Both halves are kept: the exact total to the paisa AND the round-off that
+ * takes it to rupees. That is not a nicety — every invoice reviewed prints the
+ * pair (SAFE LIFE: TOTAL AMT 572.34, RoundOff −0.34, TO PAY 572.00), and a
+ * pharmacist reconciling a payment needs to see which of the two we mean.
+ */
+export function billTotals(
+  lines: DraftLine[],
+  taxType: "intra" | "inter" = "intra",
+): BillTotals {
+  const sum = lines.reduce(
+    (acc, l) => {
+      const t = lineTotals(l);
+      return {
+        gross: acc.gross + t.gross,
+        discount: acc.discount + t.discount,
+        taxable: acc.taxable + t.taxable,
+        gst: acc.gst + t.gst,
+        total: acc.total + t.total,
+      };
+    },
+    { gross: 0, discount: 0, taxable: 0, gst: 0, total: 0 },
+  );
+
+  const gst = paise(sum.gst);
+  const total = paise(sum.total);
+  const payable = Math.round(total);
+  return {
+    gross: paise(sum.gross),
+    discount: paise(sum.discount),
+    taxable: paise(sum.taxable),
+    gst,
+    total,
+    cgst: taxType === "intra" ? paise(gst / 2) : 0,
+    sgst: taxType === "intra" ? paise(gst / 2) : 0,
+    igst: taxType === "inter" ? gst : 0,
+    roundOff: paise(payable - total),
+    payable,
+  };
 }
 
 export function totalBaseUnits(
@@ -195,9 +292,14 @@ export function linesFromScan(bill: ScannedBill): DraftLine[] {
       expiryDate: expiryOk ? isoToDate(l.expiryDate) : "",
       unit,
       quantity: qty != null ? String(qty) : "",
-      freeQuantity: "",
+      freeQuantity: l.freeQty > 0 ? String(l.freeQty) : "",
       purchasePrice: rate != null ? String(rate) : "",
       mrp: l.mrp != null ? String(l.mrp) : "",
+      // DIS% and GST% print on every bill and the reader already extracts them;
+      // they were simply being thrown away. Without them the goods-received
+      // note can never add up to the bill's TOTAL AMT.
+      discountPct: l.discountPct != null ? String(l.discountPct) : "",
+      gstPct: l.gstPct != null ? String(l.gstPct) : "",
       locationId: null,
       flagged: l.needsReview || !l.match || !rateOk || !mrpOk,
       // Kept regardless of whether we matched: it names the row for a human,
@@ -292,6 +394,10 @@ export function toReceiptLines(
           l.freeQuantity === "" || Number(l.freeQuantity) <= 0
             ? undefined
             : Number(l.freeQuantity),
+        // Percentages, not money — they describe the line whatever unit it was
+        // received in, so unlike rate and MRP they need no pack conversion.
+        discountPct: l.discountPct === "" ? undefined : Number(l.discountPct),
+        gstPct: l.gstPct === "" ? undefined : Number(l.gstPct),
         locationId: l.locationId!,
       };
     });

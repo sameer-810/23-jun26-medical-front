@@ -75,6 +75,13 @@ export interface ReceiptLineInput {
   /** Scheme / free goods received on top of the paid quantity (same unit). */
   freeQuantity?: number;
   locationId: string;
+  /**
+   * The two columns every distributor invoice carries beside the rate. Stored
+   * so a goods-received note can be reconciled against the paper it came from
+   * — without them the GRN total can never match the bill's TOTAL AMT.
+   */
+  discountPct?: number;
+  gstPct?: number;
 }
 
 /** The bits of a product the receive flow needs to display and do maths with. */
@@ -114,6 +121,10 @@ export interface DraftLine {
   purchasePrice: string;
   /** Selling MRP for this lot — prints on the shelf label and prices the sale. */
   mrp: string;
+  /** DIS% / TD% / CD% — every distributor invoice prints one of these. */
+  discountPct: string;
+  /** GST% for the line. Split into CGST+SGST or charged as IGST at the foot. */
+  gstPct: string;
   locationId: string | null;
   /** Came from a scanned bill and needs a human look before saving. */
   flagged?: boolean;
@@ -127,6 +138,8 @@ export interface ReceivePayload {
   referenceNo?: string;
   notes?: string;
   receivedAt?: string;
+  /** Intra-state splits GST into CGST+SGST; inter-state charges IGST. */
+  taxType?: "intra" | "inter";
   lines: ReceiptLineInput[];
 }
 
@@ -145,6 +158,17 @@ export interface ReceiptListItem {
 
 export interface ReceiptDetail extends ReceiptListItem {
   notes: string;
+  /** The foot of the supplier's bill, stored so the note can be reconciled. */
+  taxType: "intra" | "inter";
+  totalDiscount: number;
+  totalTaxable: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  totalGst: number;
+  grandTotal: number;
+  roundOff: number;
+  netPayable: number;
   lines: {
     productId: string;
     productName: string;
@@ -162,6 +186,11 @@ export interface ReceiptDetail extends ReceiptListItem {
     baseQuantity: number;
     locationCode: string;
     lineValue: number;
+    discountPct: number;
+    discountAmount: number;
+    gstPct: number;
+    taxableValue: number;
+    gstAmount: number;
   }[];
 }
 
@@ -362,6 +391,8 @@ export interface ScannedLine {
   quantity: number | null;
   mrp: number | null;
   rate: number | null;
+  /** DIS% / TD% / CD% off the bill. */
+  discountPct: number | null;
   gstPct: number | null;
   /** The bill's QTY counts PACKS — this says which pack unit that is. */
   unitResolution: UnitResolution;

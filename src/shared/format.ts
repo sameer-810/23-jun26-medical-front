@@ -10,6 +10,29 @@ export const fmtInt = (n: number | null | undefined) => inr(Number(n) || 0);
 /** Rounded quantity with separators: 5164.97 → "5,165". */
 export const fmtQty = (n: number | null | undefined) => inr(Number(n) || 0);
 
-/** Rupee amount, rounded: 81696.92 → "₹81,697". */
+/** Rupee amount, rounded: 81696.92 → "₹81,697". Headline figures only. */
 export const fmtMoney = (n: number | null | undefined) =>
   `₹${inr(Number(n) || 0)}`;
+
+/**
+ * Rupee amount to the paisa: 128.92 → "₹128.92", 5055.8 → "₹5,055.80".
+ *
+ * Anything that has to be checked line-by-line against a piece of paper uses
+ * this, never `fmtMoney`. A distributor invoice prints 2 × 64.46 = 128.92 and
+ * settles to the paisa; a goods-received note showing "₹129" beside it cannot
+ * be reconciled, and the 8 paise it hides is exactly what a supplier query is
+ * about. Rounding is a presentation choice for dashboards — on a document it
+ * is a defect.
+ */
+export const fmtMoneyExact = (n: number | null | undefined) =>
+  `₹${(Number(n) || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+/** Same, without the ₹ — for cells in a money column that already says so. */
+export const fmtAmountExact = (n: number | null | undefined) =>
+  (Number(n) || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });

@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Undo2 } from "lucide-react-native";
 import { useReceipt } from "@modules/inventory/hooks/useInventory";
+import { fmtMoneyExact } from "@shared/format";
 import { palette } from "@shared/designSystem";
 import {
   Screen,
@@ -16,7 +17,26 @@ import {
   Skeleton,
 } from "@shared/ui";
 
-const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+/**
+ * To the paisa. A goods-received note is checked against a supplier's invoice,
+ * and that invoice settles at two decimals — a rounded figure here cannot be
+ * reconciled with it, and the difference is exactly what a query is about.
+ */
+const money = fmtMoneyExact;
+
+/** One line of the invoice's totals block. */
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <HStack justify="space-between">
+      <Text variant="body-sm" tone="secondary">
+        {label}
+      </Text>
+      <Text variant="label-sm" tone="primary">
+        {value}
+      </Text>
+    </HStack>
+  );
+}
 const d = (iso: string | null) =>
   iso ? new Date(iso).toISOString().slice(0, 10) : "—";
 
@@ -99,12 +119,49 @@ export default function ReceiptDetailScreen() {
                 }}
               />
               <HStack justify="space-between">
-                <Text variant="label-lg">Total</Text>
+                <Text variant="label-lg">Amount</Text>
                 <HStack gap={8}>
                   <StatusChip label={`${r.totalQuantity} units`} tone="info" />
                   <StatusChip label={money(r.totalValue)} tone="success" />
                 </HStack>
               </HStack>
+
+              {/* The rest of the supplier's totals block, in its order and its
+                  words. Only shown once a bill's discount/GST were actually
+                  keyed — older notes have none and would just print zeros. */}
+              {r.totalGst > 0 || r.totalDiscount > 0 ? (
+                <>
+                  {r.totalDiscount > 0 ? (
+                    <Row
+                      label="Disc amt"
+                      value={`−${money(r.totalDiscount)}`}
+                    />
+                  ) : null}
+                  <Row label="Taxable" value={money(r.totalTaxable)} />
+                  {r.taxType === "inter" ? (
+                    <Row label="IGST" value={money(r.igstAmount)} />
+                  ) : (
+                    <>
+                      <Row label="CGST" value={money(r.cgstAmount)} />
+                      <Row label="SGST" value={money(r.sgstAmount)} />
+                    </>
+                  )}
+                  <Row label="Total amt" value={money(r.grandTotal)} />
+                  {r.roundOff !== 0 ? (
+                    <Row
+                      label="Round off"
+                      value={`${r.roundOff > 0 ? "+" : "−"}${money(Math.abs(r.roundOff))}`}
+                    />
+                  ) : null}
+                  {/* After the round-off, as the supplier's bill prints it. */}
+                  <HStack justify="space-between">
+                    <Text variant="label-lg">To pay</Text>
+                    <Text variant="label-lg" tone="accent">
+                      {money(r.netPayable)}
+                    </Text>
+                  </HStack>
+                </>
+              ) : null}
             </VStack>
           </Card>
 

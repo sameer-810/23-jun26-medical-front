@@ -55,28 +55,48 @@ async function login() {
 
 // ---------------------------------------------------------------- the checks
 
-/** 1. Scanned bill: RATE must be the bill's printed figure, not a derived cost. */
+/**
+ * 1. The goods-received grid must read like a distributor invoice: the columns
+ * the bills all carry, under the words the bills all use.
+ */
 async function p1() {
   await go("receive-stock");
   const body = await txt();
-  const grid = /\bRATE\b/.test(body) && !/COST\/BASE/.test(body);
   await shot("p01-receive-stock-grid");
-  if (!grid) {
-    return record(
-      1,
-      "FAIL",
-      "Grid still labels the price column COST/BASE (or shows no RATE header)",
-    );
-  }
 
-  // Type a rate into a hand-added line and check the AMOUNT column is qty×rate,
-  // with no pack factor in between. That is the arithmetic the bill prints.
-  const cells = page.locator("input");
-  const n = await cells.count();
+  const want = [
+    "PACK",
+    "BATCH",
+    "EXPIRY",
+    "QTY",
+    "FREE",
+    "MRP",
+    "RATE",
+    "DIS%",
+    "GST%",
+    "AMOUNT",
+  ];
+  const missing = want.filter((h) => !body.includes(h));
+  const stale = ["UNIT", "COST/BASE"].filter((h) =>
+    new RegExp(`\\b${h.replace("/", "\\/")}\\b`).test(body),
+  );
   record(
     1,
-    "PASS",
-    `Grid header is RATE (per the unit beside it); ${n} editable cells present. Amount = qty × rate — see p01-*.png`,
+    !missing.length && !stale.length ? "PASS" : "FAIL",
+    !missing.length && !stale.length
+      ? `Grid carries the bills' own columns: ${want.join(" · ")} — and no "UNIT"/"COST/BASE" left`
+      : `${missing.length ? `Missing: ${missing.join(", ")}. ` : ""}${stale.length ? `Still shows: ${stale.join(", ")}.` : ""}`,
+  );
+
+  // The totals block must speak the bill's language too, and must not round.
+  const foot = ["Taxable", "CGST", "SGST", "Total amt", "To pay"];
+  const footMissing = foot.filter((f) => !body.includes(f));
+  record(
+    "1d",
+    footMissing.length ? "FAIL" : "PASS",
+    footMissing.length
+      ? `Totals block missing: ${footMissing.join(", ")}`
+      : "Totals block reads Amount · Disc · Taxable · CGST/SGST · Total amt · Round off · To pay",
   );
 }
 
@@ -121,7 +141,11 @@ async function p1scan() {
   // the RATE column actually gets filled.
   const use = page.getByText("Use these lines", { exact: true }).first();
   if (!(await use.count()))
-    return record("1b", "CHECK", "Scan produced no usable lines — see p01b-after-scan.png");
+    return record(
+      "1b",
+      "CHECK",
+      "Scan produced no usable lines — see p01b-after-scan.png",
+    );
   await use.click();
   await page.waitForTimeout(8000);
   await shot("p01b-grid-from-bill");
@@ -143,6 +167,87 @@ async function p1scan() {
     found.length >= 2 && !divided.length
       ? `Grid carries the bill's TRADE PRICE as printed — matched ${found.join(", ")} of ${BILL_TRADE_PRICES.join(", ")}; no per-tablet division present`
       : `Matched ${found.length ? found.join(", ") : "none"} of the printed trade prices${divided.length ? `; still showing divided values ${divided.map((d) => d.toFixed(4)).join(", ")}` : ""} — read p01b-after-scan.png against the bill`,
+  );
+
+  // The AMOUNT column must print the paise the bill prints. SHREE SIMBA's four
+  // lines work out to 128.92, 454.86, 94.49 and 109.39 — a grid showing
+  // "₹129 / ₹455 / ₹94 / ₹109" cannot be checked against that.
+  const shown = await txt();
+  const exact = ["128.92", "454.86", "94.49", "109.39"].filter((v) =>
+    shown.includes(v),
+  );
+  record(
+    "1e",
+    exact.length >= 3 ? "PASS" : "FAIL",
+    exact.length >= 3
+      ? `AMOUNT column prints the exact paise: ${exact.join(", ")} — no rounding to rupees`
+      : `Only ${exact.length} of the 4 exact line amounts are shown (${exact.join(", ") || "none"}) — see p01b-grid-from-bill.png`,
+  );
+
+  // 1c — what is SENT must be per BASE unit, because that is what every stock
+  // valuation multiplies by a base-unit quantity. Intercept and abort the POST
+  // so the payload can be read without booking the stock (this invoice is a
+  // known duplicate — actually saving it would double the shelf).
+  let payload = null;
+  await page.route("**/inventory/receipts", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    try {
+      payload = route.request().postDataJSON();
+    } catch {
+      payload = null;
+    }
+    await route.abort();
+  });
+
+  // Every line needs a storage location before it can be saved. The picker is a
+  // modal, so open one, take the first option, and repeat until none are left.
+  // NB the placeholder is "Select…" with a real ellipsis character, not "...".
+  for (let guard = 0; guard < 8; guard++) {
+    const empty = page.getByText("Select…", { exact: true }).first();
+    if (!(await empty.count())) break;
+    await empty.click();
+    await page.waitForTimeout(1600);
+    if (guard === 0) await shot("p01c-location-picker");
+    // Options read "WH1-W1-S1-R1-D1 — Drawer 1"; take a leaf bin, not the store.
+    const opts = page.getByText(/^WH\d-[A-Z0-9-]+ — /);
+    if (!(await opts.count())) {
+      await page.keyboard.press("Escape");
+      break;
+    }
+    await opts
+      .last()
+      .click({ timeout: 8000 })
+      .catch(() => {});
+    await page.waitForTimeout(1000);
+  }
+  await shot("p01c-locations-picked");
+  const save = page.getByText("Receive stock", { exact: true }).last();
+  await save.scrollIntoViewIfNeeded().catch(() => {});
+  await save.click().catch(() => {});
+  await page.waitForTimeout(6000);
+  await page.unroute("**/inventory/receipts").catch(() => {});
+
+  if (!payload?.lines?.length) {
+    return record(
+      "1c",
+      "CHECK",
+      "Could not capture the save payload (a location may still be unset) — see p01c-locations-picked.png",
+    );
+  }
+  // ALTONIL: 64.46 for a 15-tab pack must be sent as 64.46/15 = 4.2973.
+  const sent = payload.lines.map((l) => l.purchasePrice);
+  const expected = BILL_TRADE_PRICES.map((tp, i) =>
+    [15, 10, 75, 15][i] ? tp / [15, 10, 75, 15][i] : tp,
+  );
+  const matched = expected.filter((e) =>
+    sent.some((s) => Math.abs(s - e) < 0.01),
+  );
+  record(
+    "1c",
+    matched.length >= 2 ? "PASS" : "CHECK",
+    matched.length >= 2
+      ? `Saved per BASE unit: sent ${sent.join(", ")} — the printed pack rates divided by their pack sizes, so stock value stays right`
+      : `Sent ${sent.join(", ")}; expected about ${expected.map((e) => e.toFixed(4)).join(", ")}`,
   );
 }
 
