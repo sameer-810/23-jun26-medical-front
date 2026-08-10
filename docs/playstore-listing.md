@@ -16,7 +16,7 @@ features the app lacks, and overpromising earns refunds and one-star reviews.
 | Public support email | `5fivempvt@gmail.com` | same source |
 | Privacy policy URL | `https://23-jun26-medical-front.vercel.app/privacy-policy.html` | live after the next Vercel deploy |
 | Data deletion URL | `https://23-jun26-medical-front.vercel.app/delete-account.html` | same |
-| Package name | `com.plusveda.app` | must match the app already created in Play Console |
+| Package name | `com.medstock.app` | matches the EAS keystore `99:BE:F7:38…` — create the Play app with THIS package |
 | Reviewer login | `play.reviewer@plusveda.app` / `PlusvedaReview#2026` | created and tested — see §5 |
 
 ---
