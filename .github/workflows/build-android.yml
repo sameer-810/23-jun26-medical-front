@@ -102,6 +102,41 @@ jobs:
             --non-interactive \
             --output "${{ github.workspace }}/app-release.${{ steps.out.outputs.ext }}"
 
+      # `blockedPermissions` in app.json only adds tools:node="remove" to the
+      # SOURCE manifest — the Android manifest merger is what actually drops the
+      # entry, and that only happens during the build. So the one place the
+      # result can be checked is here, on the artifact about to be uploaded.
+      #
+      # Worth failing the build over: a stray RECORD_AUDIO or SYSTEM_ALERT_WINDOW
+      # on a pharmacy app means review questions, extra Data safety declarations,
+      # and a wasted 50-minute build plus a re-upload to find out.
+      - name: Verify no blocked permission survived the merge
+        run: |
+          BT=1.17.2
+          curl -sL -o /tmp/bundletool.jar \
+            "https://github.com/google/bundletool/releases/download/$BT/bundletool-all-$BT.jar"
+          ART="app-release.${{ steps.out.outputs.ext }}"
+          if [ "${{ steps.out.outputs.ext }}" = "aab" ]; then
+            java -jar /tmp/bundletool.jar dump manifest --bundle="$ART" > /tmp/manifest.xml
+          else
+            $ANDROID_HOME/build-tools/34.0.0/aapt2 dump xmltree "$ART" \
+              --file AndroidManifest.xml > /tmp/manifest.xml
+          fi
+
+          echo "--- permissions in the shipped manifest ---"
+          grep -oE 'android\.permission\.[A-Z_]+' /tmp/manifest.xml | sort -u
+
+          BLOCKED="RECORD_AUDIO SYSTEM_ALERT_WINDOW READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE FOREGROUND_SERVICE FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+          FOUND=""
+          for p in $BLOCKED; do
+            grep -qE "android\.permission\.$p\b" /tmp/manifest.xml && FOUND="$FOUND $p"
+          done
+          if [ -n "$FOUND" ]; then
+            echo "::error::Blocked permission(s) still present:$FOUND"
+            exit 1
+          fi
+          echo "OK — none of the blocked permissions are in the build."
+
       # Publish to a GitHub RELEASE, not an artifact. Release assets do NOT count
       # against the 500 MB Actions artifact quota (they allow up to 2 GB), so this
       # works even when that quota is full — no more "storage quota hit" errors and
