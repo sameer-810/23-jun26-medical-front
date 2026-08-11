@@ -69,6 +69,8 @@ export const inventoryApi = {
     search?: string;
     page?: number;
     limit?: number;
+    from?: string;
+    to?: string;
   }) => {
     const res = await apiClient.get<Paginated<ReceiptListItem>>(
       "/inventory/receipts",
@@ -76,6 +78,25 @@ export const inventoryApi = {
     );
     return res.data;
   },
+  /**
+   * Download the purchase register for the chosen window.
+   *
+   * Fetched as a blob rather than linked, because the endpoint is behind the
+   * bearer token — a plain <a href> would arrive unauthenticated and 401.
+   */
+  exportReceipts: async (params: {
+    search?: string;
+    from?: string;
+    to?: string;
+    format?: "pdf" | "excel";
+  }) => {
+    const res = await apiClient.get("/inventory/receipts/export", {
+      params,
+      responseType: "blob",
+    });
+    return res.data as Blob;
+  },
+
   receipt: async (id: string) => {
     const res = await apiClient.get<{ success: boolean; data: ReceiptDetail }>(
       `/inventory/receipts/${id}`,

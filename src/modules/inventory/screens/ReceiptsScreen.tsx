@@ -1,9 +1,17 @@
 import React, { useState } from "react";
 import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { ChevronRight, PackageCheck, ScrollText } from "lucide-react-native";
+import {
+  ChevronRight,
+  PackageCheck,
+  ScrollText,
+  Download,
+} from "lucide-react-native";
 import { useReceipts } from "@modules/inventory/hooks/useInventory";
 import { ReceiptListItem } from "@modules/inventory/types";
+import { inventoryApi } from "@modules/inventory/api/inventoryApi";
+import { downloadBlob } from "@shared/download";
+import { apiErrorMessage } from "@api/apiClient";
 import { palette } from "@shared/designSystem";
 import {
   Screen,
@@ -16,6 +24,9 @@ import {
   DataTable,
   Column,
   Skeleton,
+  Button,
+  DateField,
+  Banner,
 } from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -24,10 +35,44 @@ export default function ReceiptsScreen() {
   const navigation = useNavigation<any>();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
+  /**
+   * The window the register covers. Blank means "everything", which is what a
+   * pharmacist wants on opening it — the filter is for answering a question
+   * ("what came in during the first fortnight of August?"), not a gate.
+   */
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
   const { data, isLoading, refetch, isRefetching } = useReceipts({
     page,
     limit,
+    from: from || undefined,
+    to: to || undefined,
   });
+
+  const download = async (format: "pdf" | "excel") => {
+    setBusy(true);
+    setNote(null);
+    try {
+      const blob = await inventoryApi.exportReceipts({
+        from: from || undefined,
+        to: to || undefined,
+        format,
+      });
+      const ext = format === "excel" ? "xlsx" : "pdf";
+      const ok = await downloadBlob(blob, `purchase-register.${ext}`);
+      setNote(
+        ok
+          ? `Downloaded ${total} receipt${total === 1 ? "" : "s"} as ${ext.toUpperCase()}.`
+          : "Downloads work in the browser and desktop app — open Plusveda there to save the file.",
+      );
+    } catch (e) {
+      setNote(apiErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   const receipts = data?.data ?? [];
   const total = data?.meta?.total ?? 0;
   const totalPages = data?.meta?.pages ?? 1;
@@ -125,6 +170,72 @@ export default function ReceiptsScreen() {
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
     >
+      {/* Filter first, then export what you filtered — the download always
+          matches the list on screen, so the two can never disagree. */}
+      <Card style={{ marginBottom: 12 }}>
+        <HStack gap={10} align="flex-end" wrap>
+          <DateField
+            label="From"
+            value={from}
+            onChange={(v) => {
+              setFrom(v);
+              setPage(1);
+            }}
+            width={150}
+          />
+          <DateField
+            label="To"
+            value={to}
+            onChange={(v) => {
+              setTo(v);
+              setPage(1);
+            }}
+            width={150}
+          />
+          {from || to ? (
+            <Button
+              label="Clear"
+              variant="ghost"
+              size="sm"
+              fullWidth={false}
+              onPress={() => {
+                setFrom("");
+                setTo("");
+                setPage(1);
+              }}
+            />
+          ) : null}
+          <View style={{ flex: 1 }} />
+          <Button
+            label="PDF"
+            size="sm"
+            variant="secondary"
+            fullWidth={false}
+            loading={busy}
+            icon={
+              <Download
+                size={15}
+                color={palette.text.secondary}
+                strokeWidth={2}
+              />
+            }
+            onPress={() => void download("pdf")}
+          />
+          <Button
+            label="Excel"
+            size="sm"
+            variant="secondary"
+            fullWidth={false}
+            loading={busy}
+            onPress={() => void download("excel")}
+          />
+        </HStack>
+      </Card>
+
+      {note ? (
+        <Banner tone="info" message={note} style={{ marginBottom: 12 }} />
+      ) : null}
+
       {isLoading && receipts.length === 0 ? (
         <ListSkeleton />
       ) : (

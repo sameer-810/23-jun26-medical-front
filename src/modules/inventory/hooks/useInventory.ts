@@ -45,6 +45,8 @@ export const useReceipts = (params?: {
   search?: string;
   page?: number;
   limit?: number;
+  from?: string;
+  to?: string;
 }) =>
   useQuery({
     queryKey: ["receipts", params],
