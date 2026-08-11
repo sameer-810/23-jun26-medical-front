@@ -156,7 +156,7 @@ export default function NewSaleScreen() {
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [scanError, setScanError] = useState<string | null>(null);
   /**
-   * Opened straight from the phone's scan button, so the camera is already up
+   * Opened straight from the phone's Scan button, so the camera is already up
    * by the time the screen paints — the whole point of that button is to skip
    * a tap, and landing on a screen that then needs one gives it back.
    */
@@ -164,7 +164,25 @@ export default function NewSaleScreen() {
   const autoScan = Boolean(
     (route.params as { autoScan?: boolean } | undefined)?.autoScan,
   );
-  const [scanOpen, setScanOpen] = useState(autoScan);
+  const [scanOpen, setScanOpen] = useState(false);
+
+  /**
+   * Consume the flag in an effect, not in `useState(autoScan)`.
+   *
+   * A state initialiser runs ONCE, at mount. The Sales stack keeps this screen
+   * alive, so every tap after the first navigated to an already-mounted screen
+   * and the camera never opened — the button appeared dead. Worst on the most
+   * common path of all: you are already on New sale when you reach for it.
+   *
+   * The param is cleared straight after. Leaving it true means the next tap
+   * sets the same value, the effect doesn't re-run, and the button dies again.
+   */
+  useEffect(() => {
+    if (!autoScan) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot nav param
+    setScanOpen(true);
+    navigation.setParams({ autoScan: false });
+  }, [autoScan, navigation]);
   const [soundOff, setSoundOff] = useState(isScanSoundMuted());
   /** Camera OCR for packs whose batch number is printed as text, not a barcode. */
   const [packOpen, setPackOpen] = useState(false);
@@ -1147,7 +1165,6 @@ export default function NewSaleScreen() {
 
   return (
     <Screen
-      back="Back to sales"
       overline="Sales"
       title="New sale"
       subtitle="Scan or search · FEFO auto-picks nearest-expiry batches"

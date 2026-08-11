@@ -154,6 +154,7 @@ export default function SalesListScreen() {
 
   return (
     <Screen
+      back="Back to billing"
       overline="Sales"
       title="Invoices"
       subtitle={`${total.toLocaleString("en-IN")} sales`}

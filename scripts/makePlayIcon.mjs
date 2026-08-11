@@ -23,7 +23,10 @@ const OUT = path.join(ROOT, "store-assets", "play-icon-512.png");
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 
 await sharp(SRC)
-  .resize(512, 512, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+  .resize(512, 512, {
+    fit: "contain",
+    background: { r: 0, g: 0, b: 0, alpha: 0 },
+  })
   .png()
   .toFile(OUT);
 

@@ -284,7 +284,7 @@ export const LANDING_SCREENS = new Set<string>([
   "MedGuideSearch",
   "OrdersList",
   "ReceiveStock",
-  "SalesList",
+  "NewSale",
   "CustomersList",
   "SuppliersList",
   "TeamList",

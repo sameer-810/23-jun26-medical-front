@@ -10,25 +10,25 @@ features the app lacks, and overpromising earns refunds and one-star reviews.
 
 ## 0. Values you must confirm first
 
-| Field | Value used here | Check |
-| --- | --- | --- |
-| Developer / company | FiveM Infotech | taken from the AshShifa launch doc |
-| Public support email | `5fivempvt@gmail.com` | same source |
-| Privacy policy URL | `https://23-jun26-medical-front.vercel.app/privacy-policy.html` | live after the next Vercel deploy |
-| Data deletion URL | `https://23-jun26-medical-front.vercel.app/delete-account.html` | same |
-| Package name | `com.medstock.app` | matches the EAS keystore `99:BE:F7:38…` — create the Play app with THIS package |
-| Reviewer login | `play.reviewer@plusveda.app` / `PlusvedaReview#2026` | created and tested — see §5 |
+| Field                | Value used here                                                 | Check                                                                           |
+| -------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Developer / company  | FiveM Infotech                                                  | taken from the AshShifa launch doc                                              |
+| Public support email | `5fivempvt@gmail.com`                                           | same source                                                                     |
+| Privacy policy URL   | `https://23-jun26-medical-front.vercel.app/privacy-policy.html` | live after the next Vercel deploy                                               |
+| Data deletion URL    | `https://23-jun26-medical-front.vercel.app/delete-account.html` | same                                                                            |
+| Package name         | `com.medstock.app`                                              | matches the EAS keystore `99:BE:F7:38…` — create the Play app with THIS package |
+| Reviewer login       | `play.reviewer@plusveda.app` / `PlusvedaReview#2026`            | created and tested — see §5                                                     |
 
 ---
 
 ## 1. Create app
 
-| Field | Paste |
-| --- | --- |
+| Field             | Paste                          |
+| ----------------- | ------------------------------ |
 | App name (max 30) | `Plusveda: Pharmacy & Billing` |
-| Default language | `English (India) – en-IN` |
-| App or game | App |
-| Free or paid | Free |
+| Default language  | `English (India) – en-IN`      |
+| App or game       | App                            |
+| Free or paid      | Free                           |
 
 ---
 
@@ -98,25 +98,25 @@ Questions or help: 5fivempvt@gmail.com
 
 **Graphics** — all in `store-assets/`
 
-| Slot | File |
-| --- | --- |
-| App icon | `play-icon-512.png` |
-| Feature graphic | `feature-graphic-1024x500.png` |
-| Phone screenshots | `screenshots/01…08` |
-| 7-inch tablet | `screenshots-tablet7/01…08` |
-| 10-inch tablet | `screenshots-tablet10/01…08` |
+| Slot              | File                           |
+| ----------------- | ------------------------------ |
+| App icon          | `play-icon-512.png`            |
+| Feature graphic   | `feature-graphic-1024x500.png` |
+| Phone screenshots | `screenshots/01…08`            |
+| 7-inch tablet     | `screenshots-tablet7/01…08`    |
+| 10-inch tablet    | `screenshots-tablet10/01…08`   |
 
 ---
 
 ## 3. Store settings
 
-| Field | Value |
-| --- | --- |
-| App category | Business |
-| Tags | Business tools, Finance & accounting |
-| Email address | `5fivempvt@gmail.com` |
+| Field              | Value                                       |
+| ------------------ | ------------------------------------------- |
+| App category       | Business                                    |
+| Tags               | Business tools, Finance & accounting        |
+| Email address      | `5fivempvt@gmail.com`                       |
 | Website (optional) | `https://23-jun26-medical-front.vercel.app` |
-| External marketing | Leave unticked unless you plan Google Ads |
+| External marketing | Leave unticked unless you plan Google Ads   |
 
 ---
 
@@ -136,12 +136,12 @@ https://23-jun26-medical-front.vercel.app/privacy-policy.html
 
 Choose **"All or some functionality is restricted"**, add one instruction set:
 
-| Field | Paste |
-| --- | --- |
-| Name | `Full app access` |
-| Username | `play.reviewer@plusveda.app` |
-| Password | `PlusvedaReview#2026` |
-| Any other instructions | see below |
+| Field                  | Paste                        |
+| ---------------------- | ---------------------------- |
+| Name                   | `Full app access`            |
+| Username               | `play.reviewer@plusveda.app` |
+| Password               | `PlusvedaReview#2026`        |
+| Any other instructions | see below                    |
 
 ```
 Plusveda is business software for pharmacies, so all functionality is behind a login.
@@ -159,7 +159,7 @@ To try the bill-scanning feature: Receive Stock > Scan bill > From gallery, and 
 
 Answer the questionnaire. For Plusveda every category is **No** — no violence,
 no sexual content, no profanity, no drugs (the questionnaire means recreational
-drug *use*, not pharmacy stock), no gambling, no user-to-user communication, no
+drug _use_, not pharmacy stock), no gambling, no user-to-user communication, no
 location sharing, no personal-information sharing between users. Expected
 result: **Everyone / PEGI 3**.
 
@@ -167,11 +167,11 @@ Email for the certificate: `5fivempvt@gmail.com`
 
 ### Target audience and content
 
-| Field | Value |
-| --- | --- |
-| Target age groups | **18 and over only** |
-| Appeal to children | No |
-| Ads/content aimed at children | No |
+| Field                         | Value                |
+| ----------------------------- | -------------------- |
+| Target age groups             | **18 and over only** |
+| Appeal to children            | No                   |
+| Ads/content aimed at children | No                   |
 
 Do not tick any under-18 band — it pulls the app into the Families policy and
 adds requirements you do not want.
@@ -192,31 +192,31 @@ Then declare these types. For every one: **Collected = Yes, Shared = No**,
 **Processed ephemerally = No**, **Required (not optional)** unless stated,
 purpose **App functionality** (plus **Account management** where noted).
 
-| Category | Type | Purpose | Note |
-| --- | --- | --- | --- |
-| Personal info | Name | App functionality, Account management | |
-| Personal info | Email address | App functionality, Account management | |
-| Personal info | Phone number | App functionality, Account management | |
-| Personal info | User IDs | App functionality, Account management | |
-| Personal info | Other info | App functionality | pharmacy GSTIN and drug licence number |
-| Financial info | Purchase history | App functionality | sales and purchase invoices |
-| Photos and videos | Photos | App functionality | bill / pack / cheque photographs — mark **Optional** |
-| App activity | Other actions | App functionality | audit trail of staff actions |
-| App info and performance | Crash logs | App functionality | only if you add crash reporting later — otherwise omit |
-| Device or other IDs | Device or other IDs | App functionality, Fraud prevention | sign-in session and device limit |
+| Category                 | Type                | Purpose                               | Note                                                   |
+| ------------------------ | ------------------- | ------------------------------------- | ------------------------------------------------------ |
+| Personal info            | Name                | App functionality, Account management |                                                        |
+| Personal info            | Email address       | App functionality, Account management |                                                        |
+| Personal info            | Phone number        | App functionality, Account management |                                                        |
+| Personal info            | User IDs            | App functionality, Account management |                                                        |
+| Personal info            | Other info          | App functionality                     | pharmacy GSTIN and drug licence number                 |
+| Financial info           | Purchase history    | App functionality                     | sales and purchase invoices                            |
+| Photos and videos        | Photos              | App functionality                     | bill / pack / cheque photographs — mark **Optional**   |
+| App activity             | Other actions       | App functionality                     | audit trail of staff actions                           |
+| App info and performance | Crash logs          | App functionality                     | only if you add crash reporting later — otherwise omit |
+| Device or other IDs      | Device or other IDs | App functionality, Fraud prevention   | sign-in session and device limit                       |
 
 > **Photographs leave your servers.** Bill, pack and cheque images are sent to
 > Google's Gemini API to read the printed text. Google acts as a service
-> provider, so under Play's definitions this is *processing*, not *sharing* —
+> provider, so under Play's definitions this is _processing_, not _sharing_ —
 > but it is disclosed in §4 of the privacy policy, and it must stay disclosed.
 
 ### Government apps / Financial features / Health
 
-| Question | Answer |
-| --- | --- |
-| Is this a government app? | No |
+| Question                            | Answer                                                                     |
+| ----------------------------------- | -------------------------------------------------------------------------- |
+| Is this a government app?           | No                                                                         |
 | Does it provide financial features? | **No** — it records invoices; it does not process payments, lend, or trade |
-| Is it a health app? | **No** — no patient records, no prescriptions, no medical advice |
+| Is it a health app?                 | **No** — no patient records, no prescriptions, no medical advice           |
 
 ---
 
@@ -246,11 +246,11 @@ Re-run the script any time to reset the password or clear its sessions.
 
 ## 6. Production release
 
-| Field | Paste |
-| --- | --- |
-| Release name | `1.0.0` |
-| Countries | India (add others later) |
-| Rollout | **20%** staged |
+| Field        | Paste                    |
+| ------------ | ------------------------ |
+| Release name | `1.0.0`                  |
+| Countries    | India (add others later) |
+| Rollout      | **20%** staged           |
 
 **Release notes** (max 500 per language)
 

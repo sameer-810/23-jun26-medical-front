@@ -12,7 +12,7 @@ import {
 import { useNavigation, useNavigationState } from "@react-navigation/native";
 import { LANDING_SCREENS } from "@navigation/navItems";
 import { palette, layout } from "../designSystem";
-import { useBottomPadding } from "./useBottomPadding";
+import { useBottomPadding, useTabBottomPadding } from "./useBottomPadding";
 import { Text } from "./Text";
 import { VStack } from "./Stack";
 import { BackLink } from "./BackLink";
@@ -105,8 +105,21 @@ export function Screen({
   contentStyle,
   children,
 }: Props) {
-  const bottom = useBottomPadding(32);
   const { width } = useWindowDimensions();
+  /**
+   * Reserve the room the phone's floating Scan button occupies.
+   *
+   * It is positioned absolutely, so it takes no layout space and simply covers
+   * whatever is beneath it — on the billing screen that was the totals card,
+   * with "Subtotal" and the grand total sitting underneath a green circle.
+   * `useTabBottomPadding` existed for exactly this and nothing was calling it.
+   *
+   * Only on narrow layouts: ScanFab hides itself at `wideBreakpoint`, and
+   * padding a desktop page for a button that isn't there leaves dead space.
+   */
+  const phoneBottom = useTabBottomPadding(16);
+  const deskBottom = useBottomPadding(32);
+  const bottom = width < layout.wideBreakpoint ? phoneBottom : deskBottom;
   // On a phone, actions sitting beside the title squeeze the subtitle into a
   // ragged column — drop them onto their own line instead.
   const stackHeader = width < 700;

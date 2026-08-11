@@ -3,13 +3,13 @@
 Everything Google Play asks for in the **Main store listing** slot, generated
 from real captures of the running app.
 
-| File / folder                | Play Console slot        | Size      | Count |
-| ---------------------------- | ------------------------ | --------- | ----- |
-| `screenshots/`               | Phone screenshots        | 1080x1920 | 8     |
-| `screenshots-tablet7/`       | 7-inch tablet            | 1200x1920 | 8     |
-| `screenshots-tablet10/`      | 10-inch tablet           | 1600x2560 | 8     |
-| `feature-graphic-1024x500.png` | Feature graphic        | 1024x500  | 1     |
-| `play-icon-512.png`          | App icon                 | 512x512   | 1     |
+| File / folder                  | Play Console slot | Size      | Count |
+| ------------------------------ | ----------------- | --------- | ----- |
+| `screenshots/`                 | Phone screenshots | 1080x1920 | 8     |
+| `screenshots-tablet7/`         | 7-inch tablet     | 1200x1920 | 8     |
+| `screenshots-tablet10/`        | 10-inch tablet    | 1600x2560 | 8     |
+| `feature-graphic-1024x500.png` | Feature graphic   | 1024x500  | 1     |
+| `play-icon-512.png`            | App icon          | 512x512   | 1     |
 
 `raw-screens/` and `raw-screens-tablet/` hold the plain device captures the
 composers draw from. They are not uploaded.
@@ -20,16 +20,16 @@ each set in order 01-08.
 
 ## Screenshots
 
-| #   | Screen        | Headline                     | Why it's here                                            |
-| --- | ------------- | ---------------------------- | -------------------------------------------------------- |
-| 01  | Dashboard     | Your pharmacy at a glance    | Most recognisable screen; also shown in search results   |
-| 02  | New sale      | Bill a customer in seconds   | The job a pharmacist does 200 times a day                |
-| 03  | Scan bill     | Scan the distributor's bill  | The differentiator — nothing in this bracket reads bills |
-| 04  | Inventory     | Know exactly what you hold   | Core utility: batch, expiry and value                    |
-| 05  | Expiry        | Never sell expired stock     | The pain that costs a pharmacy real money                |
-| 06  | ShortBook     | Never run out of a fast mover| Reorder list built from actual sales                     |
-| 07  | Receive stock | Goods received, line by line | Proof it reconciles against the supplier's bill          |
-| 08  | Reports       | GST reports, ready to file   | Breadth close — the compliance worry                     |
+| #   | Screen        | Headline                      | Why it's here                                            |
+| --- | ------------- | ----------------------------- | -------------------------------------------------------- |
+| 01  | Dashboard     | Your pharmacy at a glance     | Most recognisable screen; also shown in search results   |
+| 02  | New sale      | Bill a customer in seconds    | The job a pharmacist does 200 times a day                |
+| 03  | Scan bill     | Scan the distributor's bill   | The differentiator — nothing in this bracket reads bills |
+| 04  | Inventory     | Know exactly what you hold    | Core utility: batch, expiry and value                    |
+| 05  | Expiry        | Never sell expired stock      | The pain that costs a pharmacy real money                |
+| 06  | ShortBook     | Never run out of a fast mover | Reorder list built from actual sales                     |
+| 07  | Receive stock | Goods received, line by line  | Proof it reconciles against the supplier's bill          |
+| 08  | Reports       | GST reports, ready to file    | Breadth close — the compliance worry                     |
 
 Captured but unused, available in `raw-screens/` to swap in: `invoices`,
 `products`.
@@ -46,16 +46,16 @@ so the wider layout is genuinely what a tablet user sees.
 
 From published ASO research (AppFollow, Screenhance, TheAppLaunchpad, 2026):
 
-| Rule                                         | How it's applied                          |
-| -------------------------------------------- | ----------------------------------------- |
-| ~90% of users never scroll past screenshot 3 | Broadest-appeal screens are 01-03         |
-| Screenshot 1 appears in search results       | Dashboard — the most recognisable screen  |
-| Headline must be legible at ~200px wide      | 88px type on a 1080px canvas              |
-| Headline in the top third                    | Sits at y~180-330 of 1920                 |
-| Captions <= 6 words, one message each        | Longest is 6 words                        |
+| Rule                                         | How it's applied                            |
+| -------------------------------------------- | ------------------------------------------- |
+| ~90% of users never scroll past screenshot 3 | Broadest-appeal screens are 01-03           |
+| Screenshot 1 appears in search results       | Dashboard — the most recognisable screen    |
+| Headline must be legible at ~200px wide      | 88px type on a 1080px canvas                |
+| Headline in the top third                    | Sits at y~180-330 of 1920                   |
+| Captions <= 6 words, one message each        | Longest is 6 words                          |
 | No empty states — show realistic data        | The till is seeded with a real, priced sale |
-| Consistent background/type/palette           | Identical treatment across all eight      |
-| Portrait 9:16, 1080px+, at least 4 shots     | 1080x1920, eight shots                    |
+| Consistent background/type/palette           | Identical treatment across all eight        |
+| Portrait 9:16, 1080px+, at least 4 shots     | 1080x1920, eight shots                      |
 
 **Verify before uploading:** shrink a screenshot to 200px wide. If the headline
 isn't instantly readable, the type is too small or the copy too long.
@@ -118,7 +118,7 @@ node scripts/makePlayIcon.mjs         # 512x512 icon
 Two traps when refreshing the raw captures:
 
 1. **The phone viewport must be a real phone WIDTH scaled up** — 390x844 at
-   `deviceScaleFactor: 3` gives a 1170x2532 image of the *phone* layout.
+   `deviceScaleFactor: 3` gives a 1170x2532 image of the _phone_ layout.
    Setting the CSS viewport to 1170 renders the **desktop** layout at phone
    proportions, sidebar and all. The first run of this script did exactly that.
 2. **Seed the till.** `seedSaleLine` adds an in-stock medicine and sets a

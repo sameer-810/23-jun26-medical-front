@@ -38,7 +38,9 @@ const rec = (id, ok, detail) => {
 };
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const ctx = await browser.newContext({
+  viewport: { width: 1440, height: 900 },
+});
 ctx.setDefaultNavigationTimeout(180000);
 ctx.setDefaultTimeout(30000);
 const page = await ctx.newPage();
@@ -54,7 +56,11 @@ await page.screenshot({ path: path.join(OUT, "00-after-login.png") });
 
 const body = await page.locator("body").innerText();
 if (/Welcome back|Sign in to your/i.test(body)) {
-  rec("Sign in", false, `rejected — ${body.split("\n").slice(0, 3).join(" / ")}`);
+  rec(
+    "Sign in",
+    false,
+    `rejected — ${body.split("\n").slice(0, 3).join(" / ")}`,
+  );
   await browser.close();
   process.exit(1);
 }
@@ -68,7 +74,11 @@ for (const [route, expect] of SCREENS) {
   await page.screenshot({
     path: path.join(OUT, `${(route || "dashboard").replace(/\//g, "-")}.png`),
   });
-  rec(expect, ok, ok ? `/${route || ""} reachable` : `"${expect}" not on /${route}`);
+  rec(
+    expect,
+    ok,
+    ok ? `/${route || ""} reachable` : `"${expect}" not on /${route}`,
+  );
 }
 
 const failed = results.filter((r) => !r.ok).length;

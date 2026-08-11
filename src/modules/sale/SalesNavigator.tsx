@@ -14,11 +14,13 @@ const Stack = createNativeStackNavigator<SaleStackParamList>();
 
 export default function SalesNavigator() {
   return (
-    // Sales lands on the invoice list, not on a half-started new sale — the
-    // sidebar's "Sales" and the /sales URL both mean the list. Declaration
-    // order would otherwise make NewSale the stack's initial route.
+    // Sales lands on the till, not the invoice list. Billing is the job a
+    // pharmacist opens this section to do — a hundred times a day — while the
+    // invoice list is something they look at occasionally, and it is one tap
+    // away on the "Invoices" button. Stated explicitly rather than relying on
+    // declaration order.
     <Stack.Navigator
-      initialRouteName="SalesList"
+      initialRouteName="NewSale"
       screenOptions={{ headerShown: false }}
     >
       <Stack.Screen name="NewSale" component={NewSaleScreen} />

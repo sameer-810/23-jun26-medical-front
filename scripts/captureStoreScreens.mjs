@@ -39,7 +39,14 @@ const PASSWORD = process.env.DEMO_PASSWORD || "Admin@123";
  */
 const TARGETS = [
   { key: "phone", dir: "raw-screens", w: 390, h: 844, dsf: 3, mobile: true },
-  { key: "tablet", dir: "raw-screens-tablet", w: 800, h: 1280, dsf: 2, mobile: false },
+  {
+    key: "tablet",
+    dir: "raw-screens-tablet",
+    w: 800,
+    h: 1280,
+    dsf: 2,
+    mobile: false,
+  },
 ];
 
 /**
@@ -158,7 +165,9 @@ async function signOut(page) {
   let btn = page.locator('[aria-label="Sign out"]').first();
   if (!(await btn.count())) {
     // Phone: the sign-out lives in the drawer, behind the hamburger.
-    const menu = page.locator('[aria-label*="menu" i], [aria-label*="drawer" i]').first();
+    const menu = page
+      .locator('[aria-label*="menu" i], [aria-label*="drawer" i]')
+      .first();
     if (await menu.count()) {
       await menu.click().catch(() => {});
       await page.waitForTimeout(1500);
