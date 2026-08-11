@@ -236,6 +236,9 @@ export default function DashboardScreen() {
       subtitle="Your pharmacy at a glance"
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
+      /* Home only, and pinned to the screen rather than to the end of the
+         page — as a child it scrolled away with the content. */
+      overlay={<ScanFab />}
     >
       {/* Operational hero — quick daily actions, not marketing copy. */}
       <GradientHero variant="hero">
@@ -509,9 +512,6 @@ export default function DashboardScreen() {
           )}
         </HStack>
       </Card>
-      {/* Home only. Rendered here rather than app-wide so it cannot
-          appear on a screen it would just cover. */}
-      <ScanFab />
     </Screen>
   );
 }

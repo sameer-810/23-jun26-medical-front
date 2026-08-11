@@ -37,6 +37,16 @@ interface Props {
   refreshing?: boolean;
   onRefresh?: () => void;
   contentStyle?: StyleProp<ViewStyle>;
+  /**
+   * Pinned to the screen, outside the scroller — for a floating button that
+   * must stay put while the page moves under it.
+   *
+   * Passing such a thing as a child does not work: it lands inside the
+   * ScrollView, where `position: absolute; bottom: 0` anchors to the bottom of
+   * the *content* rather than the viewport, so it sits below the fold and is
+   * never seen. That is exactly what happened to the Home scan button.
+   */
+  overlay?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -103,6 +113,7 @@ export function Screen({
   refreshing,
   onRefresh,
   contentStyle,
+  overlay,
   children,
 }: Props) {
   const { width } = useWindowDimensions();
@@ -179,7 +190,7 @@ export function Screen({
     </View>
   );
 
-  const body = !scroll ? (
+  const scroller = !scroll ? (
     <View
       style={{
         flex: 1,
@@ -213,6 +224,16 @@ export function Screen({
     >
       {inner}
     </ScrollView>
+  );
+
+  // The overlay is a sibling of the scroller, so it anchors to the screen.
+  const body = overlay ? (
+    <View style={{ flex: 1 }}>
+      {scroller}
+      {overlay}
+    </View>
+  ) : (
+    scroller
   );
 
   /**

@@ -383,34 +383,42 @@ function ShortBookRow({
 }) {
   return (
     <Card>
-      <HStack gap={10} align="center" justify="space-between">
-        <VStack gap={2} flex={1}>
-          <Text variant="label-lg" tone="primary" numberOfLines={1}>
-            {item.name}
-          </Text>
-          <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
-            {item.brandName || "—"} · {item.sku}
-          </Text>
-        </VStack>
-        <HStack gap={14} align="center">
-          <VStack gap={1} align="flex-end">
+      {/* Two rows on a phone, not one. Packing the name and four metric blocks
+          into a single row left the name with no width at all — every medicine
+          rendered as "Ca…", which is not a reorder list you can work from. */}
+      <VStack gap={10}>
+        <HStack gap={10} align="flex-start" justify="space-between">
+          <VStack gap={2} flex={1}>
+            <Text variant="label-lg" tone="primary" numberOfLines={2}>
+              {item.name}
+            </Text>
+            <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
+              {item.brandName || "—"} · {item.sku}
+            </Text>
+          </VStack>
+          {canManage ? (
+            <RowActions name={item.name} onEdit={onEdit} onRemove={onRemove} />
+          ) : null}
+        </HStack>
+
+        <HStack gap={12} align="center">
+          <StatusChip
+            label={item.onHand === 0 ? "Out" : "Low"}
+            tone={item.onHand === 0 ? "danger" : "warning"}
+          />
+          <VStack gap={1} flex={1}>
             <Text variant="caption" tone="tertiary">
               Stock / Min
             </Text>
             <Text variant="body-sm" tone="secondary">
               {item.onHand} / {item.reorderLevel}
+              {item.sold30 > 0
+                ? ` · ${item.sold30}/mo${
+                    item.daysCover != null ? ` · ${item.daysCover}d left` : ""
+                  }`
+                : ""}
             </Text>
-            {item.sold30 > 0 ? (
-              <Text variant="caption" tone="tertiary">
-                {item.sold30}/mo
-                {item.daysCover != null ? ` · ${item.daysCover}d left` : ""}
-              </Text>
-            ) : null}
           </VStack>
-          <StatusChip
-            label={item.onHand === 0 ? "Out" : "Low"}
-            tone={item.onHand === 0 ? "danger" : "warning"}
-          />
           <VStack gap={1} align="flex-end" style={styles.orderCell}>
             <Text variant="caption" tone="tertiary">
               Order
@@ -424,11 +432,8 @@ function ShortBookRow({
               </Text>
             ) : null}
           </VStack>
-          {canManage ? (
-            <RowActions name={item.name} onEdit={onEdit} onRemove={onRemove} />
-          ) : null}
         </HStack>
-      </HStack>
+      </VStack>
     </Card>
   );
 }
