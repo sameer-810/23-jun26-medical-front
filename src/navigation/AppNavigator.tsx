@@ -29,7 +29,6 @@ import { Menu } from "lucide-react-native";
 import { palette, layout, radius } from "@shared/designSystem";
 import { Text, HStack } from "@shared/ui";
 import { Sidebar } from "./Sidebar";
-import { ScanFab } from "./ScanFab";
 import { CommandPalette } from "./CommandPalette";
 import { NAV_ITEMS, useVisibleNavItems } from "./navItems";
 
@@ -175,7 +174,6 @@ export default function AppNavigator() {
           );
         })}
       </Drawer.Navigator>
-      <ScanFab />
       <CommandPalette />
     </View>
   );

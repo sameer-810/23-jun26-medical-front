@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View } from "react-native";
+import { View, Linking, Pressable, StyleSheet } from "react-native";
 import {
   BellRing,
   BellOff,
@@ -7,6 +7,8 @@ import {
   Check,
   RotateCcw,
   Trash2,
+  Phone,
+  MessageCircle,
 } from "lucide-react-native";
 import {
   useReminders,
@@ -16,6 +18,7 @@ import {
   useRemoveReminder,
 } from "@modules/reminder/hooks/useReminders";
 import { Reminder, ReminderPriority } from "@modules/reminder/types";
+import { sendWhatsApp } from "@shared/whatsapp";
 import { apiErrorMessage } from "@api/apiClient";
 import { palette, radius } from "@shared/designSystem";
 import {
@@ -83,6 +86,32 @@ export default function RemindersScreen() {
   const dateOk = DATE_RE.test(date.trim());
   const timeOk = TIME_RE.test(time.trim());
   const ready = title.trim().length > 0 && dateOk && timeOk;
+
+  /** Dial the number the sale recorded. */
+  const callCustomer = async (r: Reminder) => {
+    if (!r.customerMobile) return;
+    await Linking.openURL(
+      `tel:${r.customerMobile.replace(/[^+\d]/g, "")}`,
+    ).catch(() => {});
+  };
+
+  /**
+   * Open WhatsApp with the message already written.
+   *
+   * A pharmacist mid-shift will not compose a polite refill note twenty times.
+   * The medicine is pulled out of the reminder title, which is where the sale
+   * put it ("Refill call — Priya Nair · Amlodipine").
+   */
+  const whatsappCustomer = async (r: Reminder) => {
+    const med = r.title.includes("·")
+      ? r.title.split("·").pop()?.trim()
+      : undefined;
+    const who = r.customerName ? ` ${r.customerName}` : "";
+    await sendWhatsApp(
+      r.customerMobile,
+      `Hello${who}, this is your pharmacy. Your ${med || "medicine"} should be finishing around now — shall we keep a refill ready, or deliver it to you?`,
+    );
+  };
 
   const submit = () => {
     if (!ready) return;
@@ -237,6 +266,56 @@ export default function RemindersScreen() {
                         {r.notes}
                       </Text>
                     ) : null}
+                    {/* A refill reminder exists to produce a phone call. With
+                        the number only printed, a pharmacist re-types ten
+                        digits twenty times a day — which is how a call list
+                        quietly stops being used. WhatsApp leads because it is
+                        asynchronous: the customer answers when they can, and
+                        the pharmacy is not chasing engaged tones. */}
+                    {!done && r.customerMobile ? (
+                      <HStack gap={8} align="center" style={{ marginTop: 6 }}>
+                        <Pressable
+                          onPress={() => void callCustomer(r)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Call ${r.customerName || "the customer"}`}
+                          style={styles.action}
+                        >
+                          <HStack gap={5} align="center">
+                            <Phone
+                              size={14}
+                              color={palette.teal[700]}
+                              strokeWidth={2.2}
+                            />
+                            <Text
+                              variant="label-sm"
+                              style={{ color: palette.teal[700] }}
+                            >
+                              Call
+                            </Text>
+                          </HStack>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => void whatsappCustomer(r)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`WhatsApp ${r.customerName || "the customer"}`}
+                          style={styles.action}
+                        >
+                          <HStack gap={5} align="center">
+                            <MessageCircle
+                              size={14}
+                              color={palette.teal[700]}
+                              strokeWidth={2.2}
+                            />
+                            <Text
+                              variant="label-sm"
+                              style={{ color: palette.teal[700] }}
+                            >
+                              WhatsApp
+                            </Text>
+                          </HStack>
+                        </Pressable>
+                      </HStack>
+                    ) : null}
                     <HStack gap={6} align="center" wrap>
                       <StatusChip
                         label={formatDue(r.dueAt)}
@@ -305,3 +384,15 @@ const errBox = {
   borderColor: palette.danger.border,
   marginBottom: 16,
 } as const;
+
+const styles = StyleSheet.create({
+  // Bordered, so it reads as something to tap rather than another caption.
+  action: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.teal[600],
+    backgroundColor: palette.teal[50],
+  },
+});

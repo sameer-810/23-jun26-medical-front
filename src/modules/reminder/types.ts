@@ -11,6 +11,10 @@ export interface Reminder {
   completedAt: string | null;
   isOverdue: boolean;
   createdAt: string;
+  /** Who to ring. Carried as data so the list can dial, not just display. */
+  customerId: string | null;
+  customerName: string;
+  customerMobile: string;
 }
 
 export interface ReminderPayload {
@@ -18,6 +22,9 @@ export interface ReminderPayload {
   notes?: string;
   dueAt: string; // ISO string
   priority?: ReminderPriority;
+  customerId?: string | null;
+  customerName?: string;
+  customerMobile?: string;
 }
 
 export interface ReminderUpdate {

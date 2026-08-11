@@ -27,6 +27,7 @@ import { useDashboardSummary } from "@modules/dashboard/hooks/useDashboard";
 import { dashboardApi } from "@modules/dashboard/api/dashboardApi";
 import { useSectionNav } from "@navigation/AppNavigator";
 import { fmtInt, fmtMoney } from "@shared/format";
+import { ScanFab } from "@navigation/ScanFab";
 import { palette, accents, radius } from "@shared/designSystem";
 import {
   Screen,
@@ -508,6 +509,9 @@ export default function DashboardScreen() {
           )}
         </HStack>
       </Card>
+      {/* Home only. Rendered here rather than app-wide so it cannot
+          appear on a screen it would just cover. */}
+      <ScanFab />
     </Screen>
   );
 }

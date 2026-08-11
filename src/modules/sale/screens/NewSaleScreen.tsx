@@ -86,8 +86,25 @@ const prettyExp = (iso: string | null | undefined) => {
   const months = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
   return `${months[Number(m) - 1] || m} ${String(y).slice(2)}`;
 };
+/**
+ * Ring this many days BEFORE the course runs out.
+ *
+ * Calling on the day it finishes is already too late: the customer has either
+ * missed a dose or bought elsewhere on the way home. Retail pharmacy CRMs
+ * (Walgreens, CVS, Boots) all notify a few days ahead for exactly this reason —
+ * the reminder is worth nothing unless there is time left to act on it, order
+ * what is short, or arrange a delivery.
+ */
+const REFILL_LEAD_DAYS = 3;
+
 const money = (n: number) =>
   `₹${(Math.round(n * 100) / 100).toLocaleString("en-IN")}`;
+/** Always two decimals — for the figures that must reconcile to the paisa. */
+const moneyExact = (n: number) =>
+  `₹${(Number(n) || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
 export default function NewSaleScreen() {
   const navigation = useNavigation<any>();
@@ -153,6 +170,17 @@ export default function NewSaleScreen() {
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [taxType, setTaxType] = useState<"intra" | "inter">("intra");
   const [paymentMode, setPaymentMode] = useState("cash");
+  /**
+   * How many days the course runs, chosen while billing.
+   *
+   * "" means "work it out from the quantity", which is what the app did before
+   * and is right for a plain strip-a-day medicine. The picker exists because
+   * plenty of courses are not once-daily: 1 bottle of syrup is not a 1-day
+   * course, and a 10-day antibiotic sold as 2 strips is not 20 days. The
+   * pharmacist knows; now they can say so at the counter rather than correcting
+   * a guessed date afterwards.
+   */
+  const [refillDays, setRefillDays] = useState<string>("");
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [scanError, setScanError] = useState<string | null>(null);
   /**
@@ -161,10 +189,12 @@ export default function NewSaleScreen() {
    * a tap, and landing on a screen that then needs one gives it back.
    */
   const route = useRoute();
-  const autoScan = Boolean(
-    (route.params as { autoScan?: boolean } | undefined)?.autoScan,
-  );
+  /** "qr" = barcode camera, "pack" = batch-number OCR. `true` = legacy, means qr. */
+  const autoScan = (route.params as { autoScan?: boolean | string } | undefined)
+    ?.autoScan;
   const [scanOpen, setScanOpen] = useState(false);
+  /** Camera OCR for packs whose batch number is printed as text, not a barcode. */
+  const [packOpen, setPackOpen] = useState(false);
 
   /**
    * Consume the flag in an effect, not in `useState(autoScan)`.
@@ -180,17 +210,19 @@ export default function NewSaleScreen() {
   useEffect(() => {
     if (!autoScan) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot nav param
-    setScanOpen(true);
+    if (autoScan === "pack") setPackOpen(true);
+    else setScanOpen(true);
     navigation.setParams({ autoScan: false });
   }, [autoScan, navigation]);
   const [soundOff, setSoundOff] = useState(isScanSoundMuted());
-  /** Camera OCR for packs whose batch number is printed as text, not a barcode. */
-  const [packOpen, setPackOpen] = useState(false);
   /** Refill follow-up offered right after a sale completes. */
   const [followUp, setFollowUp] = useState<{
     saleId: string;
     days: number;
     customerName: string;
+    /** Snapshot of the number on file, so the reminder can dial it later. */
+    customerId: string | null;
+    mobile: string;
     medicine: string;
   } | null>(null);
   const createReminder = useCreateReminder();
@@ -551,7 +583,22 @@ export default function NewSaleScreen() {
     },
     { subtotal: 0, discount: 0, taxable: 0, tax: 0 },
   );
-  const grand = Math.round(totals.taxable + totals.tax);
+  /**
+   * The exact figure, to the paisa — and the round-off shown separately.
+   *
+   * This used to be `Math.round(...)`, so ₹311.20 was displayed as ₹311 and the
+   * 20 paise simply vanished: nothing on screen said where they went, which is
+   * what made it an accounting discrepancy rather than a rounding convention.
+   *
+   * The server rounds too (sale.service.js: grandTotal = Math.round(rawGrand),
+   * with a stored roundOff) because that is how a GST invoice settles — whole
+   * rupees collected. So the fix is not to charge ₹311.20; it is to stop hiding
+   * it. Exact total, explicit round-off, and the payable the customer hands
+   * over — the same three lines the goods-received note already prints.
+   */
+  const exactTotal = Math.round((totals.taxable + totals.tax) * 100) / 100;
+  const grand = Math.round(exactTotal);
+  const roundOff = Math.round((grand - exactTotal) * 100) / 100;
   const itemCount = lines.length;
   const qtyCount = lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
 
@@ -595,14 +642,21 @@ export default function NewSaleScreen() {
            * pharmacist can change the date before saving, because plenty of
            * medicines aren't once-daily.
            */
-          const days = Math.round(
+          // The picker wins when it was used; "off" skips the offer entirely.
+          const inferred = Math.round(
             validLines.reduce((t, l) => t + (Number(l.quantity) || 0), 0),
           );
-          if (customerId && days >= 3) {
+          const days =
+            refillDays && refillDays !== "off" ? Number(refillDays) : inferred;
+          const wanted =
+            refillDays !== "off" && (refillDays ? days > 0 : days >= 3);
+          if (customerId && wanted) {
             setFollowUp({
               saleId: sale.id,
               days,
               customerName: selectedCustomer?.name || "the customer",
+              customerId,
+              mobile: selectedCustomer?.mobile || "",
               medicine: lines[0]?.productName || "",
             });
             return;
@@ -1034,6 +1088,38 @@ export default function NewSaleScreen() {
           }}
           allowClear
         />
+        {/* Only once a customer is named — there is nobody to ring back on a
+            walk-in sale, so the control would just be noise. */}
+        {customerId ? (
+          <View>
+            <Text
+              variant="label-sm"
+              tone="tertiary"
+              style={{ marginBottom: 6 }}
+            >
+              REFILL REMINDER
+            </Text>
+            <ChipsRow
+              chips={[
+                { key: "", label: "Auto" },
+                { key: "7", label: "7 days" },
+                { key: "10", label: "10 days" },
+                { key: "15", label: "15 days" },
+                { key: "30", label: "30 days" },
+                { key: "off", label: "No reminder" },
+              ]}
+              active={refillDays}
+              onChange={setRefillDays}
+            />
+            <Text variant="caption" tone="tertiary" style={{ marginTop: 6 }}>
+              {refillDays === "off"
+                ? "No call will be scheduled."
+                : refillDays
+                  ? `Call ${selectedCustomer?.name || "the customer"} in ${Math.max(1, Number(refillDays) - REFILL_LEAD_DAYS)} days — ${REFILL_LEAD_DAYS} days before a ${refillDays}-day course runs out.`
+                  : `Worked out from the quantity sold, ${REFILL_LEAD_DAYS} days before it runs out. Pick a course length to override.`}
+            </Text>
+          </View>
+        ) : null}
         <View>
           <Text variant="label-sm" tone="tertiary" style={{ marginBottom: 6 }}>
             GST TYPE
@@ -1091,10 +1177,21 @@ export default function NewSaleScreen() {
         ) : (
           <Row label="IGST" value={money(totals.tax)} muted />
         )}
+        {/* The exact figure and the round-off, both stated. Showing only the
+            rounded total made 20 paise disappear with nothing to account for
+            them — the discrepancy the audit reported. */}
+        <Row label="Total amt" value={moneyExact(exactTotal)} />
+        {roundOff !== 0 ? (
+          <Row
+            label="Round off"
+            value={`${roundOff > 0 ? "+" : "−"}${moneyExact(Math.abs(roundOff))}`}
+            muted
+          />
+        ) : null}
         <View style={styles.divider} />
         <HStack justify="space-between" align="center">
           <Text variant="h3" tone="primary">
-            Grand total
+            To pay
           </Text>
           <Text variant="display-sm" tone="accent">
             {money(grand)}
@@ -1272,7 +1369,7 @@ export default function NewSaleScreen() {
         title="Set a refill reminder?"
         message={
           followUp
-            ? `${followUp.customerName} bought ${followUp.days} ${followUp.days === 1 ? "unit" : "units"}${followUp.medicine ? ` of ${followUp.medicine}` : ""}. Remind you to call them in ${followUp.days} days, when the course runs out?`
+            ? `Call ${followUp.customerName}${followUp.medicine ? ` about ${followUp.medicine}` : ""} in ${followUp.days} ${followUp.days === 1 ? "day" : "days"}, when the course runs out?`
             : ""
         }
         confirmLabel={`Remind me in ${followUp?.days ?? 0} days`}
@@ -1281,7 +1378,9 @@ export default function NewSaleScreen() {
         onConfirm={() => {
           if (!followUp) return;
           const due = new Date();
-          due.setDate(due.getDate() + followUp.days);
+          due.setDate(
+            due.getDate() + Math.max(1, followUp.days - REFILL_LEAD_DAYS),
+          );
           due.setHours(10, 0, 0, 0);
           createReminder.mutate(
             {
@@ -1289,6 +1388,10 @@ export default function NewSaleScreen() {
               notes: `Course of ${followUp.days} units sold on ${new Date().toLocaleDateString("en-IN")}.`,
               dueAt: due.toISOString(),
               priority: "normal",
+              // The number travels as data, so Reminders can dial it.
+              customerId: followUp.customerId,
+              customerName: followUp.customerName,
+              customerMobile: followUp.mobile,
             },
             {
               // The sale is already saved; a failed reminder must not strand
