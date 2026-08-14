@@ -53,11 +53,21 @@ const DESKTOP = {
   lg: { height: 40, px: 18, fontSize: 14 as const },
 };
 
+/**
+ * Every phone size is at least 44.
+ *
+ * The first cut of this ladder had `xs: 34`, which was wrong twice over: it is
+ * under Apple's 44pt floor and well under Material's 48dp, and it was being
+ * used for row actions — the very buttons a pharmacist hits most. Density on a
+ * pointer surface is a nicety; density on a touch surface is a mis-tap. The
+ * sizes now differ only in padding and label size, not in how big a target
+ * your thumb gets.
+ */
 const PHONE = {
-  xs: { height: 34, px: 12, fontSize: 13 as const },
-  sm: { height: 40, px: 14, fontSize: 13 as const },
-  md: { height: 44, px: 16, fontSize: 14 as const },
-  lg: { height: 48, px: 20, fontSize: 15 as const },
+  xs: { height: 44, px: 12, fontSize: 13 as const },
+  sm: { height: 44, px: 14, fontSize: 13 as const },
+  md: { height: 46, px: 16, fontSize: 14 as const },
+  lg: { height: 50, px: 20, fontSize: 15 as const },
 };
 
 export function Button({
@@ -112,8 +122,12 @@ export function Button({
         style={[
           styles.base,
           {
-            height: s.height,
+            // minHeight, not height: with OS text scaling turned up the label
+            // needs more room than the slot, and a fixed height clips it —
+            // silently, since RN 0.85 hides text overflowing a border radius.
+            minHeight: s.height,
             paddingHorizontal: s.px,
+            paddingVertical: 6,
             backgroundColor: c.bg,
             borderColor: c.border,
             borderWidth: c.borderWidth,

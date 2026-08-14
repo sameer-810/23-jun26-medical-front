@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
   cellWrap: {
     flexDirection: "row",
     alignItems: "center",
-    height: 34,
+    minHeight: 34,
     borderWidth: 1,
     borderRadius: radius.sm,
     paddingHorizontal: 8,

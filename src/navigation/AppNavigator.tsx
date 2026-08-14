@@ -11,7 +11,7 @@
  * shareable. `linking` in App.tsx maps each route to its path — both halves are
  * required, and either alone does nothing.
  */
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   View,
   Pressable,
@@ -30,6 +30,7 @@ import { palette, layout, radius } from "@shared/designSystem";
 import { Text, HStack } from "@shared/ui";
 import { Sidebar } from "./Sidebar";
 import { CommandPalette } from "./CommandPalette";
+import { PhoneTabBar, useHasPhoneTabs } from "./PhoneTabBar";
 import { NAV_ITEMS, useVisibleNavItems } from "./navItems";
 
 import DashboardScreen from "@modules/dashboard/screens/DashboardScreen";
@@ -99,24 +100,56 @@ export default function AppNavigator() {
   const { width } = useWindowDimensions();
   const isWide = width >= layout.wideBreakpoint;
   const [collapsed, setCollapsed] = useState(false);
+  const [activeSection, setActiveSection] = useState("Dashboard");
+  /**
+   * The drawer's own navigation object, captured when it renders its panel.
+   *
+   * The tab bar lives outside the drawer's context, so it has no navigation of
+   * its own — but `drawerContent` is handed a real one, and that is the object
+   * that can both `navigate` between sections and `openDrawer` for More.
+   */
+  const drawerNav = useRef<DrawerContentComponentProps["navigation"] | null>(
+    null,
+  );
   // Only routes the user may actually use get registered — so a deep link to a
   // section they lack permission for can't render its shell.
   const items = useVisibleNavItems();
+  const hasTabs = useHasPhoneTabs();
 
-  const drawerContent = (props: DrawerContentComponentProps) => (
-    <Sidebar
-      activeRoute={props.state.routeNames[props.state.index]}
-      onNavigate={(name) => props.navigation.navigate(name)}
-      collapsed={isWide && collapsed}
-      onToggleCollapse={isWide ? () => setCollapsed((c) => !c) : undefined}
-    />
-  );
+  const drawerContent = (props: DrawerContentComponentProps) => {
+    drawerNav.current = props.navigation;
+    return (
+      <Sidebar
+        activeRoute={props.state.routeNames[props.state.index]}
+        onNavigate={(name) => props.navigation.navigate(name)}
+        collapsed={isWide && collapsed}
+        onToggleCollapse={isWide ? () => setCollapsed((c) => !c) : undefined}
+      />
+    );
+  };
 
   return (
     <View style={{ flex: 1 }}>
       <Drawer.Navigator
         initialRouteName="Dashboard"
         drawerContent={drawerContent}
+        /**
+         * Track which section is showing so the phone tab bar can highlight it.
+         *
+         * The bar has to render as a sibling of the navigator (it sits over the
+         * content, not inside the drawer panel), which puts it outside the
+         * drawer's navigation context — so it can't read the state itself. The
+         * `state` event fires on every navigation, including deep links and
+         * browser back, so this stays correct without polling.
+         */
+        screenListeners={{
+          state: (e) => {
+            const s = e.data?.state;
+            if (!s) return;
+            const name = s.routeNames[s.index];
+            if (name) setActiveSection(String(name));
+          },
+        }}
         screenOptions={{
           // The permanent drawer IS the sidebar on desktop; phones get an app bar.
           drawerType: isWide ? "permanent" : "front",
@@ -124,18 +157,22 @@ export default function AppNavigator() {
           header: ({ route, navigation }) => (
             <SafeAreaView edges={["top"]} style={styles.appBarSafe}>
               <HStack align="center" gap={12} style={styles.appBar}>
-                <Pressable
-                  onPress={() => navigation.openDrawer()}
-                  hitSlop={8}
-                  style={styles.menuBtn}
-                  accessibilityLabel="Open menu"
-                >
-                  <Menu
-                    size={22}
-                    color={palette.text.primary}
-                    strokeWidth={2}
-                  />
-                </Pressable>
+                {/* Only when the bottom bar isn't carrying a "More" tab —
+                    two controls opening the same drawer is clutter. */}
+                {hasTabs ? null : (
+                  <Pressable
+                    onPress={() => navigation.openDrawer()}
+                    hitSlop={8}
+                    style={styles.menuBtn}
+                    accessibilityLabel="Open menu"
+                  >
+                    <Menu
+                      size={22}
+                      color={palette.text.primary}
+                      strokeWidth={2}
+                    />
+                  </Pressable>
+                )}
                 <Image
                   source={require("../../assets/brand/mark.png")}
                   style={styles.appBarLogo}
@@ -174,6 +211,13 @@ export default function AppNavigator() {
           );
         })}
       </Drawer.Navigator>
+      {!isWide ? (
+        <PhoneTabBar
+          activeRoute={activeSection}
+          onNavigate={(name) => drawerNav.current?.navigate(name)}
+          onOpenMore={() => drawerNav.current?.openDrawer()}
+        />
+      ) : null}
       <CommandPalette />
     </View>
   );

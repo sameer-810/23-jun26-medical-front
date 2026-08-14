@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 11,
-    height: layout.controlHeightPhone,
+    minHeight: layout.controlHeightPhone,
     borderRadius: radius.md,
     borderWidth: outline.width,
     borderColor: outline.color,

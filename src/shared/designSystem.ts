@@ -153,6 +153,86 @@ export const palette = {
 export const brand = palette.teal;
 
 /**
+ * Dark surfaces, ink and borders.
+ *
+ * NOT AN INVERSION. A flipped light theme gives you pure black behind pure
+ * white, which on OLED smears and — for the astigmatic ~40% of adults — makes
+ * light text halo badly. This is the standard elevation model instead: a very
+ * dark desaturated ground, with each layer above it slightly lighter rather
+ * than separated by shadow, and text that tops out near #E8EDEC rather than
+ * white.
+ *
+ * The semantic colours are re-tuned rather than reused: `success.bg` #E4F5EE is
+ * a pale mint that becomes a glowing slab on a dark ground, so the dark set
+ * uses deep desaturated fills with light text and keeps the same 4.5:1 floor.
+ *
+ * A caution worth recording, because it argues against ever defaulting to this:
+ * the reading research (Piepenbrock 2013/2014, and NN/g's review of it) finds
+ * light-on-dark measurably WORSE for proofreading accuracy in normally-sighted
+ * people. This app displays batch numbers, dosages and expiry dates, where a
+ * misread has consequences. Dark mode belongs here as an option that follows
+ * the OS — never as the default.
+ */
+export const darkPalette = {
+  ink: {
+    900: "#F2F6F5",
+    800: "#E4EBE9",
+    700: "#CBD5D2",
+    600: "#A7B4B1",
+    500: "#8593904",
+    400: "#6B7976",
+    300: "#4B5956",
+    200: "#33403D",
+    100: "#26312E",
+    50: "#1C2523",
+  },
+  surface: {
+    /** Cards and panels — one step above the canvas. */
+    primary: "#1A2321",
+    /** App canvas. Not black: #000 shows OLED smear on scroll. */
+    secondary: "#111917",
+    tertiary: "#212C29",
+    raised: "#212C29",
+    /** Wells, table headers, pressed rows. */
+    sunken: "#141D1B",
+    dark: "#0B110F",
+    darkRaised: "#1A2321",
+  },
+  text: {
+    primary: "#E8EDEC",
+    secondary: "#B4C0BD",
+    tertiary: "#8A9793",
+    disabled: "#5E6B68",
+    inverse: "#0F1F1B",
+    /** Lifted from 700 to 400: the deep green is unreadable on a dark ground. */
+    accent: "#39D080",
+    link: "#5FAAEF",
+  },
+  border: {
+    subtle: "#26312E",
+    default: "#2F3B38",
+    strong: "#41504C",
+    focus: "#39D080",
+    dark: "#0B110F",
+  },
+  // Deep fills, light text — same 4.5:1 discipline as the light set.
+  success: { bg: "#12301F", text: "#5FD498", border: "#1F5133" },
+  warning: { bg: "#33260E", text: "#E5B45C", border: "#57401A" },
+  danger: { bg: "#3A1A16", text: "#F08C7C", border: "#5E2A24" },
+  info: { bg: "#12283D", text: "#6FB4F0", border: "#1D4468" },
+} as const;
+
+/** Status accents, re-tuned for a dark ground. */
+export const darkAccents = {
+  teal: { color: "#39D080", tint: "#12301F" },
+  blue: { color: "#5FAAEF", tint: "#12283D" },
+  amber: { color: "#E5B45C", tint: "#33260E" },
+  red: { color: "#F08C7C", tint: "#3A1A16" },
+  purple: { color: "#A79BF0", tint: "#241F3D" },
+  neutral: { color: "#8A9793", tint: "#212C29" },
+} as const;
+
+/**
  * Status accents for metrics.
  *
  * These used to paint a 3px coloured cap and a tinted icon bubble on every KPI

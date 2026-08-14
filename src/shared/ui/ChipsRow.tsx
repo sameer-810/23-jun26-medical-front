@@ -58,11 +58,14 @@ export function ChipsRow({ chips, active, onChange }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { height: layout.chipRowHeight },
+  // minHeight throughout: a chip row that clips its own labels when the OS
+  // text size is raised is worse than one that gets taller.
+  container: { minHeight: layout.chipRowHeight },
   content: { paddingHorizontal: 16, gap: 6, alignItems: "center" },
   chip: {
-    height: layout.chipHeight,
+    minHeight: layout.chipHeight,
     paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: radius.md,
     backgroundColor: palette.surface.primary,
     borderWidth: outline.width,

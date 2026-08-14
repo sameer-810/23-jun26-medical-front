@@ -215,18 +215,27 @@ export default function DashboardScreen() {
       action: "View",
     });
 
+  /**
+   * `inTabBar` marks the actions the phone's bottom bar already reaches in one
+   * tap. Repeating "New sale" and "Receive stock" as buttons directly above a
+   * nav bar carrying Sell and Receive is the same link twice on one screen —
+   * it costs a third of the fold and teaches nobody where the app lives. On a
+   * desktop, where there is no tab bar, all four stay.
+   */
   const quickActions = [
     {
       label: "New sale",
       icon: ShoppingCart,
       perm: PERMISSIONS.SALES_MANAGE,
       primary: true,
+      inTabBar: true,
       onPress: () => navigation.navigate("Sales", { screen: "NewSale" }),
     },
     {
       label: "Receive stock",
       icon: PackagePlus,
       perm: PERMISSIONS.STOCK_INWARD_MANAGE,
+      inTabBar: true,
       onPress: () => navigation.navigate("Receive", { screen: "ReceiveStock" }),
     },
     {
@@ -241,7 +250,7 @@ export default function DashboardScreen() {
       perm: PERMISSIONS.REPORTS_VIEW,
       onPress: () => go("Reports"),
     },
-  ].filter((a) => has(a.perm));
+  ].filter((a) => has(a.perm) && (wide || !a.inTabBar));
 
   /**
    * Quick actions as a toolbar, not a hero.
@@ -257,7 +266,7 @@ export default function DashboardScreen() {
           key={a.label}
           label={a.label}
           variant={a.primary ? "primary" : "secondary"}
-          size="sm"
+          size={wide ? "sm" : "xs"}
           fullWidth={false}
           icon={
             <a.icon

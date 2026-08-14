@@ -72,7 +72,16 @@ export function ListRow({
       ) : null}
 
       <View style={styles.textCol}>
-        <Text variant="label" tone="primary" numberOfLines={1}>
+        {/*
+          Two lines, not one.
+
+          "Amoxicillin + Clavulanic Acid 625mg" truncated to "Amoxicillin +
+          Clav…" is a dispensing hazard, not a cosmetic compromise — and it gets
+          worse the moment someone raises the OS text size, which is exactly the
+          user most likely to mis-read it. The row has a minHeight rather than a
+          height, so a second line grows the row instead of being clipped.
+        */}
+        <Text variant="label" tone="primary" numberOfLines={2}>
           {title}
         </Text>
         {subtitle ? (

@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   sizeActive: { backgroundColor: palette.teal[700] },
   nav: {
     width: 30,
-    height: 30,
+    minHeight: 30,
     borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   },
   num: {
     minWidth: 30,
-    height: 30,
+    minHeight: 30,
     paddingHorizontal: 4,
     borderRadius: radius.sm,
     alignItems: "center",

@@ -39,6 +39,11 @@ interface Props {
   align?: "left" | "center" | "right";
   numberOfLines?: number;
   adjustsFontSizeToFit?: boolean;
+  /**
+   * Override the role's OS-text-scaling ceiling. Pass `0` for "no limit" —
+   * see MAX_SCALE below for why the defaults exist.
+   */
+  maxFontSizeMultiplier?: number;
   style?: StyleProp<TextStyle>;
   children: React.ReactNode;
 }
@@ -94,6 +99,49 @@ function familyForWeight(variant: Variant, weight: string): string {
   return fonts.bodyRegular;
 }
 
+/**
+ * How far each role is allowed to grow when the OS text size is turned up.
+ *
+ * THIS IS NOT AN ACCESSIBILITY OPT-OUT — read before changing it.
+ *
+ * React Native's `<Text>` has `allowFontScaling: true` by default, so every
+ * label in this app already scales with the OS setting. What it does NOT have
+ * is a ceiling: at iOS's largest accessibility size React multiplies the font
+ * by 3.571 (its own table in RCTAccessibilityManager, more aggressive than
+ * UIKit's own ~3.1). That turns a 13px row label into 46px inside a 44px row,
+ * and since RN 0.85 text overflowing a rounded corner is CLIPPED rather than
+ * spilled — so it doesn't look broken, it silently disappears.
+ *
+ * So the choice isn't "scale or don't". It's "scale into a readable layout" vs
+ * "scale into an invisible one". Body copy — the stuff someone with low vision
+ * actually needs bigger — is left uncapped and lives in containers that grow.
+ * Chrome that sits in a fixed slot (tab labels, chips, table headers, eyebrows)
+ * is capped, because past that point it is clipped and helps nobody.
+ *
+ * React Native core reached the same conclusion for LogBox in v0.87 and settled
+ * on 1.5 as "the highest possible value without breaking the UI".
+ */
+const MAX_SCALE: Partial<Record<Variant, number>> = {
+  // Fixed-slot chrome — clipped rather than useful beyond this.
+  overline: 1.3,
+  "label-sm": 1.4,
+  caption: 1.5,
+  // Row titles and control labels: they sit in minHeight rows that grow, but
+  // not without limit.
+  label: 1.6,
+  "label-lg": 1.6,
+  h4: 1.6,
+  h3: 1.6,
+  // Big figures are already large; scaling them 3.5x only steals room from the
+  // labels that say what they mean.
+  "display-sm": 1.5,
+  "display-md": 1.5,
+  "display-lg": 1.5,
+  // body, body-sm, body-lg, h1, h2 are deliberately ABSENT = uncapped. These
+  // carry the actual content — medicine names, hints, page titles — and must be
+  // allowed to reach 200%+ for WCAG 1.4.4.
+};
+
 export function Text({
   variant = "body",
   tone = "primary",
@@ -101,6 +149,7 @@ export function Text({
   align,
   numberOfLines,
   adjustsFontSizeToFit,
+  maxFontSizeMultiplier,
   style,
   children,
 }: Props) {
@@ -109,6 +158,8 @@ export function Text({
     <RNText
       numberOfLines={numberOfLines}
       adjustsFontSizeToFit={adjustsFontSizeToFit}
+      // An explicit prop wins; otherwise the role's ceiling; otherwise none.
+      maxFontSizeMultiplier={maxFontSizeMultiplier ?? MAX_SCALE[variant]}
       style={[
         base,
         { color: toneMap[tone] },

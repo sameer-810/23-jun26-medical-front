@@ -161,11 +161,24 @@ function Choice({
 
 const styles = StyleSheet.create({
   safe: { position: "absolute", left: 0, right: 0, bottom: 0 },
-  wrap: { alignItems: "center", paddingBottom: 14 },
+  /**
+   * Sits above the phone tab bar, at the trailing edge.
+   *
+   * It used to be centred on the bottom edge, which is exactly where the tab
+   * bar's middle destination now lives — the two would have overlapped, and a
+   * circle covering a nav button is how you get mis-taps on the one control a
+   * pharmacist uses most. Trailing-aligned and lifted clear is the standard
+   * placement for a FAB coexisting with a navigation bar.
+   */
+  wrap: {
+    alignItems: "flex-end",
+    paddingRight: 16,
+    paddingBottom: layout.tabBarHeight + 12,
+  },
   fab: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: palette.teal[600],
     alignItems: "center",
     justifyContent: "center",
