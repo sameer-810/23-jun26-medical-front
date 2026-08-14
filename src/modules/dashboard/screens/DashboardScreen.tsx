@@ -31,6 +31,7 @@ import {
   HStack,
   Card,
   StatRow,
+  TrendChart,
   SectionHeader,
   Button,
   Banner,
@@ -259,27 +260,31 @@ export default function DashboardScreen() {
    * rest are outlined. On a phone they sit under the title in a wrapping row
    * rather than as four stacked full-width bars.
    */
-  const actionBar = quickActions.length ? (
-    <HStack gap={8} wrap>
-      {quickActions.map((a) => (
-        <Button
-          key={a.label}
-          label={a.label}
-          variant={a.primary ? "primary" : "secondary"}
-          size={wide ? "sm" : "xs"}
-          fullWidth={false}
-          icon={
-            <a.icon
-              size={14}
-              color={a.primary ? "#FFFFFF" : palette.text.secondary}
-              strokeWidth={2}
-            />
-          }
-          onPress={a.onPress}
-        />
-      ))}
-    </HStack>
-  ) : null;
+  const actionBar =
+    quickActions.length || !wide ? (
+      <HStack gap={8} wrap align="center">
+        {/* Phone only: the fastest path to a sale, and the product's whole
+          pitch. On desktop there is a barcode gun and a sidebar. */}
+        {!wide ? <ScanFab /> : null}
+        {quickActions.map((a) => (
+          <Button
+            key={a.label}
+            label={a.label}
+            variant={a.primary ? "primary" : "secondary"}
+            size={wide ? "sm" : "xs"}
+            fullWidth={false}
+            icon={
+              <a.icon
+                size={14}
+                color={a.primary ? "#FFFFFF" : palette.text.secondary}
+                strokeWidth={2}
+              />
+            }
+            onPress={a.onPress}
+          />
+        ))}
+      </HStack>
+    ) : null;
 
   return (
     <Screen
@@ -287,9 +292,6 @@ export default function DashboardScreen() {
       right={wide ? actionBar : undefined}
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
-      /* Home only, and pinned to the screen rather than to the end of the
-         page — as a child it scrolled away with the content. */
-      overlay={<ScanFab />}
     >
       {/* On a phone the actions get their own line under the title. */}
       {!wide && actionBar ? (
@@ -298,6 +300,24 @@ export default function DashboardScreen() {
 
       {/* Headline figures — one panel, hairline-divided. */}
       <StatRow stats={kpis} />
+
+      {/*
+        The trend chart, when the backend supplies the series.
+
+        Guarded rather than assumed: `daily` was added to /dashboard/finance
+        after this app shipped, so against an older deployment the dashboard
+        simply renders without a chart instead of erroring.
+      */}
+      {fin?.sales.daily?.length ? (
+        <TrendChart
+          title="Daily sales"
+          subtitle="Last 30 days · gross, before returns"
+          format={money}
+          data={fin.sales.daily}
+          height={wide ? 132 : 104}
+          style={{ marginTop: 10 }}
+        />
+      ) : null}
 
       {/* Needs attention — the reason this page exists. */}
       <SectionHeader title="Needs attention" />
@@ -406,6 +426,7 @@ export default function DashboardScreen() {
 
       {/* Sales & purchases — a small ledger, not a card of chips. */}
       <SectionHeader title="Sales & purchases" />
+
       <ListGroup>
         <ListRow
           title="Sales"

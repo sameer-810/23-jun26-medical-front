@@ -1,8 +1,15 @@
 /**
- * Home-only "scan to sell" button, centred at the bottom of the screen.
+ * Home-only "scan to sell" control.
  *
  * On a phone the fastest possible sale is: pick up the pack, point the camera,
- * take the money. This is the one action worth a permanent target.
+ * take the money — worth a shortcut on the home screen.
+ *
+ * NO LONGER A FLOATING CIRCLE. Once the bottom tab bar arrived, a FAB pinned
+ * above it landed squarely on the row actions in "Needs attention" — a green
+ * disc sitting on top of the "Reorder" button is a mis-tap waiting to happen,
+ * and Material 3 reserves the FAB for the primary action *of a screen* rather
+ * than a control that follows you around. It renders inline in the dashboard's
+ * action row instead: always visible, never over anything.
  *
  * Rendered BY the Dashboard, not by the navigator. It used to render app-wide,
  * which the audit reported twice over: it covered content on Receive Stock and
@@ -27,11 +34,10 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { ScanLine, ScanText, X } from "lucide-react-native";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
-import { palette, layout, radius, shadows } from "@shared/designSystem";
+import { palette, layout, radius } from "@shared/designSystem";
 import { Text, VStack, HStack } from "@shared/ui";
 
 export function ScanFab() {
@@ -57,25 +63,17 @@ export function ScanFab() {
 
   return (
     <>
-      <SafeAreaView
-        edges={["bottom"]}
-        style={styles.safe}
-        pointerEvents="box-none"
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Scan a pack to start a sale"
+        onPress={() => setAsking(true)}
+        style={({ pressed }) => [styles.trigger, pressed && { opacity: 0.85 }]}
       >
-        <View style={styles.wrap} pointerEvents="box-none">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Scan a pack to start a sale"
-            onPress={() => setAsking(true)}
-            style={({ pressed }) => [styles.fab, pressed && { opacity: 0.85 }]}
-          >
-            <ScanLine size={26} color="#FFFFFF" strokeWidth={2.2} />
-            <Text variant="label-sm" style={styles.label}>
-              Scan
-            </Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
+        <ScanLine size={15} color="#FFFFFF" strokeWidth={2.2} />
+        <Text variant="label" style={styles.label}>
+          Scan to sell
+        </Text>
+      </Pressable>
 
       <Modal
         visible={asking}
@@ -160,32 +158,19 @@ function Choice({
 }
 
 const styles = StyleSheet.create({
-  safe: { position: "absolute", left: 0, right: 0, bottom: 0 },
   /**
-   * Sits above the phone tab bar, at the trailing edge.
-   *
-   * It used to be centred on the bottom edge, which is exactly where the tab
-   * bar's middle destination now lives — the two would have overlapped, and a
-   * circle covering a nav button is how you get mis-taps on the one control a
-   * pharmacist uses most. Trailing-aligned and lifted clear is the standard
-   * placement for a FAB coexisting with a navigation bar.
+   * An ordinary button in the dashboard's action row. The floating variant and
+   * its bottom-anchored SafeAreaView are gone — see the note at the top.
    */
-  wrap: {
-    alignItems: "flex-end",
-    paddingRight: 16,
-    paddingBottom: layout.tabBarHeight + 12,
-  },
-  fab: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: palette.teal[600],
+  trigger: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    // A ring so the button reads as raised above whatever it covers.
-    borderWidth: 3,
-    borderColor: palette.surface.primary,
-    ...shadows.lg,
+    gap: 6,
+    minHeight: 44,
+    paddingHorizontal: 14,
+    borderRadius: radius.md,
+    backgroundColor: palette.teal[700],
+    alignSelf: "flex-start",
   },
   label: { color: "#FFFFFF", marginTop: 1 },
   backdrop: {

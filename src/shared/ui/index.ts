@@ -8,6 +8,8 @@ export { Card } from "./Card";
 export { GradientHero } from "./GradientHero";
 export { StatTile } from "./StatTile";
 export { StatRow } from "./StatRow";
+export { TrendChart } from "./TrendChart";
+export type { TrendPoint } from "./TrendChart";
 export type { Stat } from "./StatRow";
 export { ListRow, ListGroup, Divider } from "./ListRow";
 export { SectionHeader } from "./SectionHeader";

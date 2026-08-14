@@ -43,6 +43,14 @@ export interface DashboardFinance {
     trend7Pct?: number | null;
     last30: number;
     last30Count: number;
+    /**
+     * Gross sales per day for the last 30 days, oldest first, zero-filled.
+     *
+     * Optional on purpose: it was added to the dashboard endpoint after the app
+     * shipped, so a client running against an older backend simply gets no
+     * chart rather than a crash.
+     */
+    daily?: { date: string; value: number; count: number }[];
   };
   purchases: { last30: number };
   margin: {

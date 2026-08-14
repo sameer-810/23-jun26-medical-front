@@ -3,8 +3,6 @@ import { View, StyleSheet } from "react-native";
 import {
   AlertTriangle,
   AlertOctagon,
-  CheckCircle2,
-  Info,
   type LucideIcon,
 } from "lucide-react-native";
 import { palette, radius } from "../designSystem";
