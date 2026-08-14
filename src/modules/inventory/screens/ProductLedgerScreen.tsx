@@ -4,21 +4,23 @@ import { useRoute } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { ScrollText } from "lucide-react-native";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
-import { palette } from "@shared/designSystem";
+import { palette, numeric } from "@shared/designSystem";
 import {
   Screen,
   Text,
   VStack,
   HStack,
   Card,
-  StatTile,
+  StatRow,
   Pagination,
   EmptyState,
   Skeleton,
+  useBreakpoint,
 } from "@shared/ui";
 
 export default function ProductLedgerScreen() {
   const route = useRoute<any>();
+  const { isWide } = useBreakpoint();
   const id = route.params?.id as string;
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -70,35 +72,27 @@ export default function ProductLedgerScreen() {
           <Text variant="body-sm" tone="tertiary">
             {product.saltComposition || "—"} · {product.brandName || "—"}
           </Text>
-          <HStack gap={12} style={{ flexWrap: "wrap" }}>
-            <StatTile
-              label="Current stock"
-              value={`${data?.data.currentStock ?? 0} ${product.baseUnit || ""}`}
-              tone="teal"
-              style={styles.tile}
-            />
-            <StatTile
-              label="Min qty"
-              value={String(product.reorderLevel ?? 0)}
-              style={styles.tile}
-            />
-            <StatTile
-              label="MRP"
-              value={`₹${product.mrp ?? 0}`}
-              style={styles.tile}
-            />
-            <StatTile
-              label="GST"
-              value={`${product.taxRatePct ?? 0}%`}
-              style={styles.tile}
-            />
-            <StatTile
-              label="HSN"
-              value={product.hsnCode || "—"}
-              tone="slate"
-              style={styles.tile}
-            />
-          </HStack>
+          {/* Five product facts on one panel. They used to be five separate
+              tiles, two of them filled (green stock, slate HSN) — none of these
+              is a status, they are just the product's numbers, so none of them
+              gets a colour. Columns are set explicitly because StatRow caps its
+              own default at four and would leave a lone cell on a second row. */}
+          <StatRow
+            columns={isWide ? 5 : 2}
+            stats={[
+              {
+                label: "Current stock",
+                value: `${data?.data.currentStock ?? 0} ${product.baseUnit || ""}`,
+              },
+              {
+                label: "Min qty",
+                value: String(product.reorderLevel ?? 0),
+              },
+              { label: "MRP", value: `₹${product.mrp ?? 0}` },
+              { label: "GST", value: `${product.taxRatePct ?? 0}%` },
+              { label: "HSN", value: product.hsnCode || "—" },
+            ]}
+          />
         </VStack>
       ) : null}
 
@@ -208,12 +202,13 @@ export default function ProductLedgerScreen() {
 }
 
 const styles = StyleSheet.create({
-  tile: { flexGrow: 1, flexBasis: 110 },
   row: { paddingVertical: 10, paddingHorizontal: 12 },
   head: { borderBottomWidth: 1, borderBottomColor: palette.border.default },
   divider: { height: 1, backgroundColor: palette.border.subtle },
   cDate: { width: 92 },
   cType: { flex: 1 },
-  cNum: { width: 46, textAlign: "right" },
+  // In / Out / Close are a column of figures that has to line up down the page,
+  // so the tabular variant lives on the column style rather than each cell.
+  cNum: { width: 46, textAlign: "right", ...numeric },
   cParty: { flex: 1, textAlign: "right" },
 });

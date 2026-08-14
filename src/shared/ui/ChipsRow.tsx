@@ -59,11 +59,11 @@ export function ChipsRow({ chips, active, onChange }: Props) {
 
 const styles = StyleSheet.create({
   container: { height: layout.chipRowHeight },
-  content: { paddingHorizontal: 20, gap: 8, alignItems: "center" },
+  content: { paddingHorizontal: 16, gap: 6, alignItems: "center" },
   chip: {
     height: layout.chipHeight,
-    paddingHorizontal: 16,
-    borderRadius: radius.full,
+    paddingHorizontal: 12,
+    borderRadius: radius.md,
     backgroundColor: palette.surface.primary,
     borderWidth: outline.width,
     borderColor: outline.color,

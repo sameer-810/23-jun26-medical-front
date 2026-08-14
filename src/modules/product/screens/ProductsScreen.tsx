@@ -1,33 +1,35 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Pressable, ActivityIndicator } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ActivityIndicator,
+  useWindowDimensions,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  Package,
-  ChevronRight,
-  Pill,
-  BookOpen,
-} from "lucide-react-native";
+import { Plus, Package, Pill, BookOpen } from "lucide-react-native";
 import { useProducts, useCategories } from "@modules/product/hooks/useProducts";
 import { ProductListItem } from "@modules/product/types";
 import { medguideApi } from "@modules/medguide/api/medguideApi";
 import { Medicine } from "@modules/medguide/types";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
-import { palette, radius } from "@shared/designSystem";
+import { palette, radius, layout } from "@shared/designSystem";
 import {
   Screen,
   Text,
   VStack,
   HStack,
-  Card,
   Button,
   StatusChip,
   ChipsRow,
   SearchInput,
   EmptyState,
   Pagination,
+  ListRow,
+  ListGroup,
+  SectionHeader,
 } from "@shared/ui";
 
 /** Below this the catalogue matches too much to be a useful suggestion. */
@@ -35,6 +37,11 @@ const CATALOG_MIN_CHARS = 2;
 
 export default function ProductsScreen() {
   const navigation = useNavigation<any>();
+  const { width } = useWindowDimensions();
+  const gutter =
+    width >= layout.wideBreakpoint
+      ? layout.screenPadding
+      : layout.screenPaddingPhone;
   const qc = useQueryClient();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canManage = hasPermission(PERMISSIONS.PRODUCTS_MANAGE);
@@ -137,17 +144,18 @@ export default function ProductsScreen() {
       onRefresh={refetch}
       right={
         canManage || canOpenMedGuide ? (
-          <HStack gap={10} align="center">
+          <HStack gap={8} align="center">
             {canOpenMedGuide && (
               <Button
                 label="MedGuide"
                 variant="secondary"
+                size="sm"
                 fullWidth={false}
                 icon={
                   <BookOpen
-                    size={18}
-                    color={palette.text.primary}
-                    strokeWidth={1.9}
+                    size={14}
+                    color={palette.text.secondary}
+                    strokeWidth={2}
                   />
                 }
                 onPress={() => navigation.navigate("MedGuide")}
@@ -156,8 +164,9 @@ export default function ProductsScreen() {
             {canManage && (
               <Button
                 label="Add product"
+                size="sm"
                 fullWidth={false}
-                icon={<Plus size={18} color="#FFFFFF" strokeWidth={2.2} />}
+                icon={<Plus size={14} color="#FFFFFF" strokeWidth={2.2} />}
                 onPress={() => navigation.navigate("ProductForm")}
               />
             )}
@@ -172,7 +181,10 @@ export default function ProductsScreen() {
       />
 
       {categoryChips.length > 1 && (
-        <View style={{ marginHorizontal: -24, marginTop: 12 }}>
+        // Bleed the scroller to the screen edges so chips can run off-canvas
+        // rather than stopping inside the gutter. The gutter is responsive now,
+        // so this has to read the same token Screen does.
+        <View style={{ marginHorizontal: -gutter, marginTop: 10 }}>
           <ChipsRow
             chips={categoryChips}
             active={categoryId}
@@ -197,14 +209,16 @@ export default function ProductsScreen() {
           }
         />
       ) : (
-        <VStack gap={12} style={{ marginTop: 16 }}>
-          {products.map((p) => (
-            <ProductRow
-              key={p.id}
-              product={p}
-              onPress={() => navigation.navigate("ProductForm", { id: p.id })}
-            />
-          ))}
+        <VStack gap={12} style={{ marginTop: 12 }}>
+          <ListGroup>
+            {products.map((p) => (
+              <ProductRow
+                key={p.id}
+                product={p}
+                onPress={() => navigation.navigate("ProductForm", { id: p.id })}
+              />
+            ))}
+          </ListGroup>
 
           <Pagination
             page={page}
@@ -227,15 +241,15 @@ export default function ProductsScreen() {
       ) : null}
 
       {canManage && debouncedSearch.length >= CATALOG_MIN_CHARS ? (
-        <View style={{ marginTop: 22 }}>
-          <HStack gap={8} align="center" style={{ marginBottom: 10 }}>
-            <Text variant="label-sm" tone="tertiary">
-              FROM THE MEDICINE CATALOGUE
-            </Text>
-            {catalogLoading ? (
-              <ActivityIndicator size="small" color={palette.teal[600]} />
-            ) : null}
-          </HStack>
+        <View>
+          <SectionHeader
+            title="From the medicine catalogue"
+            action={
+              catalogLoading ? (
+                <ActivityIndicator size="small" color={palette.teal[600]} />
+              ) : undefined
+            }
+          />
           {catalogSuggestions.length === 0 ? (
             <Text variant="body-sm" tone="tertiary">
               {catalogLoading
@@ -243,7 +257,7 @@ export default function ProductsScreen() {
                 : "Nothing else in the catalogue matches that."}
             </Text>
           ) : (
-            <VStack gap={8}>
+            <ListGroup>
               {catalogSuggestions.map((m) => (
                 <CatalogRow
                   key={m._id}
@@ -252,7 +266,7 @@ export default function ProductsScreen() {
                   onAdd={() => addFromCatalog(m)}
                 />
               ))}
-            </VStack>
+            </ListGroup>
           )}
         </View>
       ) : null}
@@ -275,32 +289,21 @@ function CatalogRow({
   onAdd: () => void;
 }) {
   return (
-    <Card elevation="base">
-      <HStack gap={12} align="center">
-        <View style={[styles.icon, { backgroundColor: palette.ink[50] }]}>
-          <Package size={20} color={palette.text.tertiary} strokeWidth={1.9} />
-        </View>
-        <VStack gap={4} flex={1}>
-          <HStack gap={8} align="center">
-            <Text variant="label-lg" tone="primary" numberOfLines={1}>
-              {medicine.name}
-            </Text>
-            {medicine.prescriptionRequired && (
-              <Pill size={14} color={palette.danger.text} strokeWidth={2} />
-            )}
-          </HStack>
-          <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
-            {[medicine.saltComposition, medicine.manufacturerName]
-              .filter(Boolean)
-              .join("  ·  ") || "—"}
-          </Text>
-          <HStack gap={6} wrap>
-            <StatusChip label={`MRP ₹${medicine.mrp}`} tone="neutral" />
-            {medicine.packLabel ? (
-              <StatusChip label={medicine.packLabel} tone="neutral" />
-            ) : null}
-          </HStack>
-        </VStack>
+    <ListRow
+      title={medicine.name}
+      subtitle={
+        [
+          medicine.saltComposition,
+          medicine.manufacturerName,
+          medicine.packLabel,
+        ]
+          .filter(Boolean)
+          .join(" · ") || "—"
+      }
+      value={`₹${medicine.mrp}`}
+      valueHint="MRP"
+      chevron={false}
+      right={
         <Pressable
           onPress={onAdd}
           disabled={busy}
@@ -311,16 +314,27 @@ function CatalogRow({
           {busy ? (
             <ActivityIndicator size="small" color={palette.teal[700]} />
           ) : (
-            <Text variant="label" style={{ color: palette.teal[700] }}>
+            <Text variant="label-sm" style={{ color: palette.teal[700] }}>
               + Add
             </Text>
           )}
         </Pressable>
-      </HStack>
-    </Card>
+      }
+    />
   );
 }
 
+/**
+ * One medicine in the catalogue.
+ *
+ * This was a bordered card 118px tall — a 46px tinted icon well, the name, an
+ * identifier line and a row of pill chips, with a 12px gap to the next card. A
+ * chemist scrolling 121 products saw four at a time on a phone and six on a
+ * 900px desktop window. It is now a 44/60px row on a shared surface: the price
+ * moves to the right where a number belongs, the GST rate joins the identifier
+ * line, and only genuinely exceptional states (Schedule drug, Rx, inactive)
+ * still earn a chip.
+ */
 function ProductRow({
   product,
   onPress,
@@ -328,71 +342,53 @@ function ProductRow({
   product: ProductListItem;
   onPress: () => void;
 }) {
+  const flags = (
+    <HStack gap={4} align="center">
+      {product.prescriptionRequired ? (
+        <Pill size={13} color={palette.danger.text} strokeWidth={2} />
+      ) : null}
+      {product.scheduleDrug ? (
+        <StatusChip label={`Sch ${product.scheduleDrug}`} tone="warning" />
+      ) : null}
+      {!product.isActive ? <StatusChip label="Inactive" tone="danger" /> : null}
+    </HStack>
+  );
+
+  const hasFlags =
+    product.prescriptionRequired || product.scheduleDrug || !product.isActive;
+
   return (
-    <Card onPress={onPress} elevation="base">
-      <HStack gap={14} align="center">
-        <View style={styles.icon}>
-          <Package size={20} color={palette.teal[600]} strokeWidth={1.9} />
-        </View>
-        <VStack gap={4} flex={1}>
-          <HStack gap={8} align="center">
-            <Text variant="label-lg" tone="primary" numberOfLines={1}>
-              {product.name}
-            </Text>
-            {product.prescriptionRequired && (
-              <Pill size={14} color={palette.danger.text} strokeWidth={2} />
-            )}
-          </HStack>
-          <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
-            {[product.sku, product.brandName, product.categoryName]
-              .filter(Boolean)
-              .join("  ·  ")}
-          </Text>
-          <HStack gap={6} wrap>
-            <StatusChip
-              label={`₹${product.sellingPrice} / ${product.baseUnit}`}
-              tone="info"
-            />
-            {product.taxRatePct > 0 && (
-              <StatusChip label={`GST ${product.taxRatePct}%`} tone="neutral" />
-            )}
-            {product.scheduleDrug ? (
-              <StatusChip
-                label={`Schedule ${product.scheduleDrug}`}
-                tone="warning"
-              />
-            ) : null}
-            {!product.isActive && <StatusChip label="Inactive" tone="danger" />}
-          </HStack>
-        </VStack>
-        <ChevronRight size={18} color={palette.text.tertiary} strokeWidth={2} />
-      </HStack>
-    </Card>
+    <ListRow
+      title={product.name}
+      subtitle={[
+        product.sku,
+        product.brandName,
+        product.taxRatePct > 0 ? `GST ${product.taxRatePct}%` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+      value={`₹${product.sellingPrice}`}
+      valueHint={`per ${product.baseUnit}`}
+      right={hasFlags ? flags : undefined}
+      onPress={onPress}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  icon: {
-    width: 46,
-    height: 46,
-    borderRadius: radius.md,
-    backgroundColor: palette.teal[50],
-    alignItems: "center",
-    justifyContent: "center",
-  },
   addBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    height: 28,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: palette.teal[700],
-    minWidth: 74,
+    borderColor: palette.border.strong,
+    minWidth: 62,
     alignItems: "center",
     justifyContent: "center",
   },
   note: {
-    marginTop: 14,
-    padding: 12,
+    marginTop: 12,
+    padding: 10,
     borderRadius: radius.md,
     backgroundColor: palette.teal[50],
   },

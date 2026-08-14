@@ -265,22 +265,24 @@ export default function OrderFormScreen() {
         />
       </Card>
 
-      <HStack gap={10} style={{ marginTop: 16 }}>
-        <View style={{ flex: 1 }}>
-          <Button
-            label="Save draft"
-            variant="secondary"
-            loading={mut.isPending}
-            onPress={() => submit("draft")}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Button
-            label="Place order"
-            loading={mut.isPending}
-            onPress={() => submit("placed")}
-          />
-        </View>
+      {/* Right-aligned on desktop: a pair of half-page-wide bars is a phone
+          pattern, and the commit button belongs at the end of the form. */}
+      <HStack gap={8} justify="flex-end" style={{ marginTop: 14 }}>
+        <Button
+          label="Save draft"
+          variant="secondary"
+          size="md"
+          fullWidth={false}
+          loading={mut.isPending}
+          onPress={() => submit("draft")}
+        />
+        <Button
+          label="Place order"
+          size="md"
+          fullWidth={false}
+          loading={mut.isPending}
+          onPress={() => submit("placed")}
+        />
       </HStack>
     </Screen>
   );

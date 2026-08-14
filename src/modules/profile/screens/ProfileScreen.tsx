@@ -80,7 +80,7 @@ export default function ProfileScreen() {
         <HStack gap={16} align="center">
           <Avatar
             name={user?.fullName || "U"}
-            size={60}
+            size={48}
             tone={user?.role === "admin" ? "cobalt" : "teal"}
           />
           <VStack gap={4} flex={1}>

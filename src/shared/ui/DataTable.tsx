@@ -24,6 +24,7 @@ import { Text } from "./Text";
 import { Card } from "./Card";
 import { EmptyState } from "./EmptyState";
 import { Pagination } from "./Pagination";
+import { ListGroup } from "./ListRow";
 
 export interface Column<T> {
   key: string;
@@ -110,15 +111,26 @@ export function DataTable<T>({
       />
     );
 
-  // ---- Mobile: cards ----
+  /**
+   * ---- Mobile: one grouped list, not a stack of cards ----
+   *
+   * Each row used to be spaced 12px from the next, which was right when every
+   * `mobileCard` was a bordered, shadowed Card. Now that they render as flat
+   * `ListRow`s the gaps left them floating on the canvas with nothing holding
+   * them together. `ListGroup` gives the run a single surface and hairline
+   * dividers, which is what the desktop table is too — same data, same object,
+   * one column instead of six.
+   */
   if (narrow && mobileCard)
     return (
       <View>
-        {paged.map((r, i) => (
-          <View key={keyExtractor(r, i)} style={{ marginBottom: 12 }}>
-            {mobileCard(r)}
-          </View>
-        ))}
+        <ListGroup>
+          {paged.map((r, i) => (
+            <React.Fragment key={keyExtractor(r, i)}>
+              {mobileCard(r)}
+            </React.Fragment>
+          ))}
+        </ListGroup>
         {pageSize > 0 && rows.length > pageSize ? (
           <Pagination
             page={page}
@@ -269,9 +281,11 @@ const styles = StyleSheet.create({
     borderBottomColor: palette.border.subtle,
   },
   headerRow: {
-    backgroundColor: palette.neutral[50],
-    borderBottomWidth: 1.5,
-    borderBottomColor: palette.border.strong,
+    backgroundColor: palette.surface.sunken,
+    // A hairline, like every other rule in the app. The 1.5px double-weight
+    // line under the header was the only one of its kind in the product.
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border.default,
   },
   headCell: {
     flexDirection: "row",

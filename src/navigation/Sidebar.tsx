@@ -280,14 +280,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 8,
   },
+  /**
+   * 36px, not 48. These rows were built at thumb size, but the sidebar only
+   * exists on the desktop shell where the input is a mouse — 22 sections at
+   * 48px each ran the nav well past the fold on a laptop, which is why it
+   * needed scrolling to reach Sales.
+   */
   navRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: radius.md,
-    marginBottom: 4,
+    gap: 10,
+    height: layout.navRowHeight,
+    paddingHorizontal: 10,
+    borderRadius: radius.sm,
+    marginBottom: 1,
   },
   navRowCollapsed: {
     justifyContent: "center",
@@ -296,16 +302,16 @@ const styles = StyleSheet.create({
   },
   navRowActive: { backgroundColor: palette.teal[50] },
   sectionLabel: {
-    paddingHorizontal: 14,
-    marginTop: 14,
-    marginBottom: 4,
+    paddingHorizontal: 10,
+    marginTop: 12,
+    marginBottom: 2,
     letterSpacing: 0.6,
   },
   sectionDivider: {
     height: 1,
     backgroundColor: palette.border.subtle,
-    marginVertical: 8,
-    marginHorizontal: 6,
+    marginVertical: 6,
+    marginHorizontal: 4,
   },
   footer: {
     paddingTop: 14,

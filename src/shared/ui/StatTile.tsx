@@ -12,7 +12,7 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import type { LucideIcon } from "lucide-react-native";
-import { palette, radius, motion, outline } from "../designSystem";
+import { palette, radius, motion, outline, numeric } from "../designSystem";
 import { Text } from "./Text";
 
 type Tone = "light" | "teal" | "cobalt" | "slate";
@@ -23,7 +23,11 @@ interface Props {
   icon?: LucideIcon;
   hint?: string;
   tone?: Tone;
-  /** ServRx colour-coded card: adds a top border + tinted icon in this accent. */
+  /**
+   * Status accent. Only pass this when the metric genuinely carries a state
+   * (expiring soon = red, dues = amber). A metric with no status gets no
+   * colour — that restraint is the whole point of the new system.
+   */
   accent?: { color: string; tint: string };
   /**
    * Period-over-period change chip. `pct` sign drives the arrow; `good` drives
@@ -35,8 +39,16 @@ interface Props {
 }
 
 /**
- * StatTile — a bento metric block (2026 bento-grid). `tone` switches between a
- * light surface and accent fills; press gives a soft spring.
+ * StatTile — a single metric in a bordered tile.
+ *
+ * Rebuilt for density. It used to be 104px tall with 18px padding, a 38px
+ * tinted icon bubble, a 26px number and a 3px coloured cap — roughly 28,000px²
+ * of card to display ten characters. It is now a 72px tile: label above value,
+ * icon demoted to a small mark beside the label, no coloured cap unless the
+ * metric carries a real status.
+ *
+ * For a dashboard's headline metrics prefer `StatRow`, which drops the boxes
+ * altogether and separates figures with hairlines the way Stripe does.
  */
 export function StatTile({
   label,
@@ -56,25 +68,18 @@ export function StatTile({
 
   const dark = tone !== "light";
   const valueColor = dark ? "#FFFFFF" : palette.text.primary;
-  // 0.9 (not 0.82): the caption under a filled tile is ~12px, so it needs all
-  // the contrast it can get against the brand fill.
   const labelColor = dark ? "rgba(255,255,255,0.90)" : palette.text.tertiary;
   const iconColor = dark
-    ? "#FFFFFF"
+    ? "rgba(255,255,255,0.85)"
     : accent
       ? accent.color
-      : palette.teal[600];
-  const iconBg = dark
-    ? "rgba(255,255,255,0.18)"
-    : accent
-      ? accent.tint
-      : palette.teal[50];
+      : palette.text.disabled;
 
   const fill =
     tone === "teal"
-      ? palette.teal[700] // white value + caption sit on this — needs 4.5:1
+      ? palette.teal[700]
       : tone === "cobalt"
-        ? palette.cobalt[600]
+        ? palette.cobalt[700]
         : tone === "slate"
           ? palette.ink[800]
           : palette.surface.primary;
@@ -86,55 +91,60 @@ export function StatTile({
         ? palette.success.text
         : palette.danger.text
     : undefined;
-  const trendBg = trend
-    ? dark
-      ? "rgba(255,255,255,0.18)"
-      : trend.good
-        ? palette.success.bg
-        : palette.danger.bg
-    : undefined;
 
   const inner = (
     <>
-      {trend ? (
-        <View style={[styles.trend, { backgroundColor: trendBg }]}>
-          <Text
-            variant="label-sm"
-            style={{ color: trendColor, fontWeight: "700" }}
-          >
-            {trend.pct >= 0 ? "▲" : "▼"} {Math.abs(trend.pct)}%
-          </Text>
-        </View>
-      ) : null}
-      {Icon ? (
-        <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
-          <Icon size={18} color={iconColor} strokeWidth={2} />
-        </View>
-      ) : null}
-      <View style={{ marginTop: Icon ? 14 : 0 }}>
+      {/* Label line — the metric's name, with the icon as a quiet mark. */}
+      <View style={styles.labelRow}>
+        {Icon ? (
+          <Icon
+            size={13}
+            color={iconColor}
+            strokeWidth={2}
+            style={{ marginRight: 6 }}
+          />
+        ) : null}
+        <Text
+          variant="caption"
+          numberOfLines={1}
+          style={{ color: labelColor, flex: 1 }}
+        >
+          {label}
+        </Text>
+      </View>
+
+      {/* Value line — the figure, with any delta sitting beside it. */}
+      <View style={styles.valueRow}>
         <Text
           variant="display-sm"
           numberOfLines={1}
           adjustsFontSizeToFit
-          style={{ color: valueColor }}
+          style={[{ color: valueColor }, numeric]}
         >
           {value}
         </Text>
-        <Text variant="caption" style={{ color: labelColor, marginTop: 2 }}>
-          {label}
-        </Text>
-        {hint ? (
+        {trend ? (
           <Text
             variant="label-sm"
-            style={{
-              color: dark ? "rgba(255,255,255,0.75)" : palette.text.tertiary,
-              marginTop: 6,
-            }}
+            style={{ color: trendColor, marginLeft: 6, marginBottom: 2 }}
           >
-            {hint}
+            {trend.pct >= 0 ? "↑" : "↓"} {Math.abs(trend.pct)}%
           </Text>
         ) : null}
       </View>
+
+      {hint ? (
+        <Text
+          variant="caption"
+          numberOfLines={1}
+          style={{
+            color: dark ? "rgba(255,255,255,0.72)" : palette.text.disabled,
+            marginTop: 1,
+          }}
+        >
+          {hint}
+        </Text>
+      ) : null}
     </>
   );
 
@@ -146,8 +156,10 @@ export function StatTile({
           backgroundColor: fill,
           borderColor: dark ? "transparent" : outline.color,
         },
+        // A left rule, not a full cap across the top: it marks the status
+        // without turning the tile into a coloured object.
         accent && !dark
-          ? { borderTopColor: accent.color, borderTopWidth: 3 }
+          ? { borderLeftColor: accent.color, borderLeftWidth: 2 }
           : null,
         style,
       ]}
@@ -162,7 +174,7 @@ export function StatTile({
     <Animated.View style={[animStyle, style ? undefined : { flex: 1 }]}>
       <Pressable
         onPress={onPress}
-        onPressIn={() => scale.set(withSpring(0.97, motion.spring.crisp))}
+        onPressIn={() => scale.set(withSpring(0.99, motion.spring.crisp))}
         onPressOut={() => scale.set(withSpring(1, motion.spring.gentle))}
       >
         {body}
@@ -176,23 +188,18 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: radius.lg,
     borderWidth: outline.width,
-    padding: 18,
-    minHeight: 104,
-    justifyContent: "space-between",
-  },
-  iconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.md,
-    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 72,
     justifyContent: "center",
   },
-  trend: {
-    position: "absolute",
-    top: 14,
-    right: 14,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.full,
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  valueRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
   },
 });

@@ -16,7 +16,8 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
-import { palette, radius, outline, shadows } from "../designSystem";
+import { palette, radius, outline, shadows, layout } from "../designSystem";
+import { useControlHeight } from "./useBreakpoint";
 import { Text } from "./Text";
 
 export interface ComboItem {
@@ -69,6 +70,7 @@ export function Combobox({
   const [focused, setFocused] = useState(false);
   const [hi, setHi] = useState(-1);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const controlHeight = useControlHeight();
 
   // `alwaysOpen` keeps the list mounted regardless of focus (modal pickers).
   const open = alwaysOpen || (focused && query.trim().length > 0);
@@ -109,7 +111,10 @@ export function Combobox({
       <View
         style={[
           styles.field,
-          { borderColor: focused ? palette.teal[500] : outline.color },
+          {
+            minHeight: controlHeight,
+            borderColor: focused ? palette.teal[500] : outline.color,
+          },
           focused && { borderWidth: 1.5 },
         ]}
       >
@@ -200,19 +205,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: radius.md,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    minHeight: 50,
+    paddingHorizontal: 11,
     backgroundColor: palette.surface.primary,
   },
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     color: palette.text.primary,
-    paddingVertical: 13,
+    paddingVertical: 8,
   },
   panel: {
     position: "absolute",
-    top: 56,
+    top: layout.controlHeightPhone + 6,
     left: 0,
     right: 0,
     backgroundColor: palette.surface.primary,
@@ -231,12 +235,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     elevation: 0,
   },
-  empty: { padding: 16, alignItems: "center" },
+  empty: { padding: 14, alignItems: "center" },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minHeight: layout.rowHeight,
   },
   rowActive: { backgroundColor: palette.teal[50] },
 });

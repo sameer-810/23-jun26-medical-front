@@ -1,21 +1,19 @@
 import React, { useState } from "react";
 import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Plus, Truck, ChevronRight } from "lucide-react-native";
+import { Plus, Truck } from "lucide-react-native";
 import { useSuppliers } from "@modules/supplier/hooks/useSuppliers";
 import { Supplier } from "@modules/supplier/types";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
-import { palette } from "@shared/designSystem";
 import {
   Screen,
   Text,
   VStack,
   HStack,
   Card,
-  Avatar,
   Button,
-  StatusChip,
+  ListRow,
   SearchInput,
   Pagination,
   DataTable,
@@ -200,25 +198,17 @@ function SupplierRow({
   supplier: Supplier;
   onPress: () => void;
 }) {
+  // GSTIN is an identifier, not a status — it joins the contact line rather
+  // than taking a chip of its own on every row.
   return (
-    <Card onPress={onPress} elevation="base">
-      <HStack gap={14} align="center">
-        <Avatar name={supplier.name} size={46} tone="slate" />
-        <VStack gap={4} flex={1}>
-          <Text variant="label-lg" tone="primary" numberOfLines={1}>
-            {supplier.name}
-          </Text>
-          <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
-            {[supplier.contactPerson, supplier.mobile]
-              .filter(Boolean)
-              .join(" · ") || "No contact"}
-          </Text>
-          {supplier.gstin ? (
-            <StatusChip label={`GSTIN ${supplier.gstin}`} tone="neutral" />
-          ) : null}
-        </VStack>
-        <ChevronRight size={18} color={palette.text.tertiary} strokeWidth={2} />
-      </HStack>
-    </Card>
+    <ListRow
+      title={supplier.name}
+      subtitle={
+        [supplier.contactPerson, supplier.mobile, supplier.gstin]
+          .filter(Boolean)
+          .join(" · ") || "No contact"
+      }
+      onPress={onPress}
+    />
   );
 }

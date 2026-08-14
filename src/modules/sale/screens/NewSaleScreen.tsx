@@ -1064,8 +1064,8 @@ export default function NewSaleScreen() {
   );
 
   const configCard = (
-    <Card style={{ marginBottom: 12 }}>
-      <VStack gap={14}>
+    <Card style={{ marginBottom: 10 }}>
+      <VStack gap={12}>
         <Select
           label="Customer (walk-in if blank)"
           placeholder="Search name or mobile…"
@@ -1092,12 +1092,8 @@ export default function NewSaleScreen() {
             walk-in sale, so the control would just be noise. */}
         {customerId ? (
           <View>
-            <Text
-              variant="label-sm"
-              tone="tertiary"
-              style={{ marginBottom: 6 }}
-            >
-              REFILL REMINDER
+            <Text variant="caption" tone="tertiary" style={{ marginBottom: 4 }}>
+              Refill reminder
             </Text>
             <ChipsRow
               chips={[
@@ -1121,8 +1117,8 @@ export default function NewSaleScreen() {
           </View>
         ) : null}
         <View>
-          <Text variant="label-sm" tone="tertiary" style={{ marginBottom: 6 }}>
-            GST TYPE
+          <Text variant="caption" tone="tertiary" style={{ marginBottom: 4 }}>
+            GST type
           </Text>
           <ChipsRow
             chips={[
@@ -1134,8 +1130,8 @@ export default function NewSaleScreen() {
           />
         </View>
         <View>
-          <Text variant="label-sm" tone="tertiary" style={{ marginBottom: 6 }}>
-            PAYMENT
+          <Text variant="caption" tone="tertiary" style={{ marginBottom: 4 }}>
+            Payment
           </Text>
           <ChipsRow
             chips={[
@@ -1153,8 +1149,8 @@ export default function NewSaleScreen() {
   );
 
   const totalsCard = (
-    <Card style={{ marginBottom: 12 }}>
-      <VStack gap={8}>
+    <Card style={{ marginBottom: 10 }}>
+      <VStack gap={6}>
         <Row
           label={`Subtotal · ${itemCount} item${itemCount === 1 ? "" : "s"}`}
           value={money(totals.subtotal)}
@@ -1272,6 +1268,7 @@ export default function NewSaleScreen() {
           <Button
             label={soundOff ? "Sound off" : "Sound on"}
             variant="secondary"
+            size="sm"
             fullWidth={false}
             icon={
               soundOff ? (
@@ -1298,6 +1295,7 @@ export default function NewSaleScreen() {
           <Button
             label="Camera"
             variant="secondary"
+            size="sm"
             fullWidth={false}
             icon={
               <Camera size={16} color={palette.text.primary} strokeWidth={2} />
@@ -1310,6 +1308,7 @@ export default function NewSaleScreen() {
           <Button
             label="Read pack"
             variant="secondary"
+            size="sm"
             fullWidth={false}
             icon={
               <ScanText
@@ -1323,6 +1322,7 @@ export default function NewSaleScreen() {
           <Button
             label="Invoices"
             variant="secondary"
+            size="sm"
             fullWidth={false}
             icon={
               <History size={16} color={palette.text.primary} strokeWidth={2} />

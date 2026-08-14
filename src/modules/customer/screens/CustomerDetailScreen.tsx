@@ -21,7 +21,7 @@ import { useSales } from "@modules/sale/hooks/useSales";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { sendWhatsApp } from "@shared/whatsapp";
-import { palette } from "@shared/designSystem";
+import { palette, accents, numeric } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -31,7 +31,10 @@ import {
   Avatar,
   Button,
   StatusChip,
-  StatTile,
+  StatRow,
+  SectionHeader,
+  ListRow,
+  ListGroup,
   EmptyState,
   ConfirmDialog,
   PromptDialog,
@@ -90,7 +93,7 @@ export default function CustomerDetailScreen() {
         <VStack gap={16}>
           <Card>
             <HStack gap={14} align="center">
-              <Skeleton width={54} height={54} rounded="full" />
+              <Skeleton width={40} height={40} rounded="full" />
               <VStack gap={8} flex={1}>
                 <Skeleton width="50%" height={18} />
                 <Skeleton width="70%" height={14} />
@@ -125,7 +128,8 @@ export default function CustomerDetailScreen() {
     >
       <Card style={{ marginBottom: 16 }}>
         <HStack gap={14} align="center">
-          <Avatar name={customer?.name || "?"} size={54} />
+          {/* 40, not 54 — an initials disc is an identifier, not a portrait. */}
+          <Avatar name={customer?.name || "?"} size={40} />
           <VStack gap={6} flex={1}>
             {customer?.mobile ? (
               <HStack gap={6} align="center">
@@ -171,6 +175,7 @@ export default function CustomerDetailScreen() {
             <Button
               label="Edit"
               variant="secondary"
+              size="sm"
               fullWidth={false}
               icon={
                 <Pencil
@@ -185,36 +190,24 @@ export default function CustomerDetailScreen() {
         </HStack>
       </Card>
 
-      <HStack gap={12} style={{ marginBottom: 16 }}>
-        <View style={{ flex: 1 }}>
-          <StatTile
-            label="Invoices"
-            value={String(sales?.meta?.total ?? 0)}
-            tone="light"
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <StatTile
-            label="Net purchases"
-            value={money(totalSpent)}
-            tone="teal"
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <StatTile
-            label="Outstanding"
-            value={money(outstanding)}
-            accent={
-              outstanding > 0
-                ? { color: palette.danger.text, tint: palette.danger.bg }
-                : undefined
-            }
-          />
-        </View>
-      </HStack>
+      {/* Three figures on one panel. Only "Outstanding" carries a colour, and
+          only when the customer actually owes something — a green "Net
+          purchases" card was tinting a neutral fact as good news. */}
+      <StatRow
+        style={{ marginBottom: 16 }}
+        stats={[
+          { label: "Invoices", value: String(sales?.meta?.total ?? 0) },
+          { label: "Net purchases", value: money(totalSpent) },
+          {
+            label: "Outstanding",
+            value: money(outstanding),
+            accent: outstanding > 0 ? accents.red : undefined,
+          },
+        ]}
+      />
 
       {canManage ? (
-        <HStack gap={10} style={{ marginBottom: 24 }}>
+        <HStack gap={10} style={{ marginBottom: 20 }}>
           <View style={{ flex: 1 }}>
             <Button
               label={
@@ -259,95 +252,86 @@ export default function CustomerDetailScreen() {
         </HStack>
       ) : null}
 
-      <Text variant="h3" tone="primary" style={{ marginBottom: 12 }}>
-        Purchase history
-      </Text>
+      <SectionHeader title="Purchase history" />
       {history.length === 0 ? (
         <EmptyState icon={Receipt} title="No purchases yet" />
       ) : (
-        <VStack gap={12}>
+        /* One list surface instead of a stack of floating invoice cards. The
+           status chip is only drawn when the sale is NOT plainly completed —
+           chipping "completed" on every row is a green stripe down the page
+           that tells the reader nothing. */
+        <ListGroup>
           {history.map((s) => (
-            <Card key={s.id} elevation="base">
-              <HStack align="center" justify="space-between">
-                <VStack gap={3} flex={1}>
-                  <Text variant="label-lg" tone="primary">
-                    {s.invoiceNo}
-                  </Text>
-                  <Text variant="caption" tone="tertiary">
-                    {new Date(s.saleDate).toLocaleDateString()} · {s.itemCount}{" "}
-                    item{s.itemCount === 1 ? "" : "s"}
-                  </Text>
-                </VStack>
-                <VStack gap={4} align="flex-end">
-                  <Text variant="label-lg" tone="primary">
-                    {money(s.grandTotal)}
-                  </Text>
+            <ListRow
+              key={s.id}
+              title={s.invoiceNo}
+              subtitle={`${new Date(s.saleDate).toLocaleDateString()} · ${s.itemCount} item${s.itemCount === 1 ? "" : "s"}`}
+              value={money(s.grandTotal)}
+              right={
+                s.status === "completed" ? undefined : (
                   <StatusChip
                     label={s.status.replace("_", " ")}
                     tone={STATUS_TONE[s.status]}
                   />
-                </VStack>
-              </HStack>
-            </Card>
+                )
+              }
+            />
           ))}
-        </VStack>
+        </ListGroup>
       )}
 
       {ledger.length > 0 ? (
-        <VStack gap={12} style={{ marginTop: 24 }}>
-          <Text variant="h3" tone="primary">
-            Account statement
-          </Text>
-          <Card padded={false} style={{ paddingVertical: 4 }}>
+        <View>
+          <SectionHeader title="Account statement" />
+          {/* ListGroup already owns the surface and the hairlines between rows,
+              so the hand-rolled divider Views are gone. The rows themselves stay
+              hand-built rather than becoming ListRows: the signed movement has
+              to sit before the running balance, and ListRow puts `right` after
+              `value`. */}
+          <ListGroup>
             {ledger.map((r, i) => (
-              <View key={i}>
-                {i > 0 ? (
-                  <View
-                    style={{
-                      height: 1,
-                      backgroundColor: palette.border.subtle,
-                    }}
-                  />
-                ) : null}
-                <HStack
-                  gap={10}
-                  align="center"
-                  justify="space-between"
-                  style={{ paddingVertical: 10, paddingHorizontal: 12 }}
-                >
-                  <VStack gap={1} flex={1}>
-                    <Text variant="body-sm" tone="primary">
-                      {r.type} {r.ref ? `· ${r.ref}` : ""}
-                    </Text>
-                    <Text variant="caption" tone="tertiary">
-                      {new Date(r.date).toLocaleDateString("en-IN")}
-                      {r.note ? ` · ${r.note}` : ""}
-                    </Text>
-                  </VStack>
-                  <Text
-                    variant="body-sm"
-                    weight="600"
-                    style={{
+              <HStack
+                key={i}
+                gap={10}
+                align="center"
+                justify="space-between"
+                style={{ paddingVertical: 10, paddingHorizontal: 14 }}
+              >
+                <VStack gap={1} flex={1}>
+                  <Text variant="body-sm" tone="primary">
+                    {r.type} {r.ref ? `· ${r.ref}` : ""}
+                  </Text>
+                  <Text variant="caption" tone="tertiary">
+                    {new Date(r.date).toLocaleDateString("en-IN")}
+                    {r.note ? ` · ${r.note}` : ""}
+                  </Text>
+                </VStack>
+                <Text
+                  variant="body-sm"
+                  weight="600"
+                  style={[
+                    numeric,
+                    {
                       color: r.debit
                         ? palette.danger.text
                         : palette.success.text,
-                    }}
-                  >
-                    {r.debit ? `+${money(r.debit)}` : `−${money(r.credit)}`}
-                  </Text>
-                  <Text
-                    variant="body-sm"
-                    weight="700"
-                    tone="primary"
-                    style={{ width: 74, textAlign: "right" }}
-                  >
-                    {money(r.balance)}
-                  </Text>
-                </HStack>
-              </View>
+                    },
+                  ]}
+                >
+                  {r.debit ? `+${money(r.debit)}` : `−${money(r.credit)}`}
+                </Text>
+                <Text
+                  variant="body-sm"
+                  weight="600"
+                  tone="primary"
+                  style={[numeric, { width: 74, textAlign: "right" }]}
+                >
+                  {money(r.balance)}
+                </Text>
+              </HStack>
             ))}
-          </Card>
-        </VStack>
+          </ListGroup>
+        </View>
       ) : null}
 
       {canManage && customer?.isActive && (
@@ -355,7 +339,7 @@ export default function CustomerDetailScreen() {
           label="Deactivate customer"
           variant="destructive"
           icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2} />}
-          style={{ marginTop: 24 }}
+          style={{ marginTop: 20 }}
           loading={removeMut.isPending}
           onPress={() => setRemoveOpen(true)}
         />

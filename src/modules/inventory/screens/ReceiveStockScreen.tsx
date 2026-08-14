@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TextInput,
   ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import {
@@ -63,7 +64,7 @@ import {
 } from "@modules/inventory/receiveDraft";
 import { apiErrorMessage } from "@api/apiClient";
 import { fmtMoneyExact, fmtAmountExact } from "@shared/format";
-import { palette, radius } from "@shared/designSystem";
+import { palette, radius, layout } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -122,6 +123,8 @@ function expiryInfo(s: string): { state: ExpiryState; days: number } {
 export default function ReceiveStockScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const { width } = useWindowDimensions();
+  const wide = width >= layout.wideBreakpoint;
 
   // The catalogue can run to tens of thousands of items, so it's never loaded
   // whole: the picker searches server-side and `knownProducts` caches whatever
@@ -1073,13 +1076,25 @@ export default function ReceiveStockScreen() {
         </HStack>
       </Card>
 
-      <Button
-        label="Receive stock"
-        size="lg"
-        loading={mut.isPending}
-        disabled={!validLines.length || blockedByExpired || needsShortConfirm}
-        onPress={submit}
-      />
+      {/* Right-aligned on desktop. A full-bleed 1,140px green bar across the
+          bottom of a wide window is a phone pattern that followed us onto the
+          counter PC; a commit button belongs at the end of the form it commits,
+          at the size of the other controls. On a phone it still spans. */}
+      <View
+        style={{
+          marginTop: 4,
+          alignItems: wide ? "flex-end" : "stretch",
+        }}
+      >
+        <Button
+          label="Receive stock"
+          size="lg"
+          fullWidth={!wide}
+          loading={mut.isPending}
+          disabled={!validLines.length || blockedByExpired || needsShortConfirm}
+          onPress={submit}
+        />
+      </View>
 
       {/* Keyed by line so each open starts from that line's bill data. */}
       {creatingFor && (

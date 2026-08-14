@@ -25,7 +25,7 @@ import { useImageCapture, CapturedImage } from "@shared/useImageCapture";
 import { apiErrorMessage } from "@api/apiClient";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
-import { palette, radius } from "@shared/designSystem";
+import { palette, radius, accents } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -33,13 +33,15 @@ import {
   HStack,
   Card,
   Button,
-  StatTile,
+  StatRow,
   StatusChip,
   Select,
   TextField,
   DateField,
   ChipsRow,
   EmptyState,
+  ListRow,
+  ListGroup,
   ConfirmDialog,
 } from "@shared/ui";
 
@@ -188,35 +190,38 @@ export default function PdcScreen() {
       title="Cheques & PDC"
       subtitle="Post-dated cheques you owe and are owed"
     >
-      <HStack gap={12} style={{ marginBottom: 16 }}>
-        <View style={{ flex: 1 }}>
-          <StatTile
-            label="Payable (pending)"
-            value={money(summary?.payable.total ?? 0)}
-            hint={`${summary?.payable.count ?? 0} cheque${(summary?.payable.count ?? 0) === 1 ? "" : "s"}`}
-            accent={
-              (summary?.payable.total ?? 0) > 0
-                ? { color: palette.danger.text, tint: palette.danger.bg }
-                : undefined
-            }
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <StatTile
-            label="Receivable (pending)"
-            value={money(summary?.receivable.total ?? 0)}
-            hint={`${summary?.receivable.count ?? 0} cheque${(summary?.receivable.count ?? 0) === 1 ? "" : "s"}`}
-            tone="teal"
-          />
-        </View>
-      </HStack>
+      {/* Two figures, one panel. Receivable used to be a filled green card next
+          to the payable one, which read as "good news" styling on what is just
+          the other half of the same pair. Only payable keeps a colour, and only
+          while there is actually money going out. */}
+      <StatRow
+        style={{ marginBottom: 16 }}
+        stats={[
+          {
+            label: "Payable (pending)",
+            value: money(summary?.payable.total ?? 0),
+            hint: `${summary?.payable.count ?? 0} cheque${(summary?.payable.count ?? 0) === 1 ? "" : "s"}`,
+            accent: (summary?.payable.total ?? 0) > 0 ? accents.red : undefined,
+          },
+          {
+            label: "Receivable (pending)",
+            value: money(summary?.receivable.total ?? 0),
+            hint: `${summary?.receivable.count ?? 0} cheque${(summary?.receivable.count ?? 0) === 1 ? "" : "s"}`,
+          },
+        ]}
+      />
 
+      {/* Two half-width bars stretched across a 1,200px page is a phone layout
+          that followed us onto the desktop. These are toolbar actions: they take
+          the width of their labels and sit at the start of the row. */}
       {canManage ? (
-        <HStack gap={10} style={{ marginBottom: 16 }}>
-          <View style={{ flex: 1 }}>
+        <HStack gap={8} style={{ marginBottom: 14 }}>
+          <View>
             <Button
               label={showForm ? "Cancel" : "Add cheque"}
               variant={showForm ? "secondary" : "primary"}
+              size="sm"
+              fullWidth={false}
               icon={
                 showForm ? (
                   <X size={16} color={palette.text.secondary} strokeWidth={2} />
@@ -227,10 +232,12 @@ export default function PdcScreen() {
               onPress={() => setShowForm((s) => !s)}
             />
           </View>
-          <View style={{ flex: 1 }}>
+          <View>
             <Button
               label={reading ? "Reading…" : "Scan cheque"}
               variant="secondary"
+              size="sm"
+              fullWidth={false}
               loading={reading}
               icon={
                 <Camera
@@ -401,62 +408,39 @@ export default function PdcScreen() {
           message="Post-dated cheques you record appear here, ordered by date."
         />
       ) : (
-        <VStack gap={12}>
+        /* One surface, hairlines between cheques. Each row used to be its own
+           floating card carrying a 32px tinted square around a direction arrow;
+           the arrow alone says issued-vs-received, and the tint was saying it a
+           second time in a colour that clashed with the status chip beside it.
+           A cheque's actions stay in a strip under its own row rather than in
+           `right` — four buttons will not fit beside a party name on a phone. */
+        <ListGroup>
           {cheques.map((c: Cheque) => {
             const issued = c.direction === "issued";
             return (
-              <Card key={c._id} elevation="base">
-                <HStack align="center" justify="space-between" gap={10}>
-                  <HStack gap={10} align="center" flex={1}>
-                    <View
-                      style={[
-                        styles.dirBadge,
-                        {
-                          backgroundColor: issued
-                            ? palette.danger.bg
-                            : palette.teal[50],
-                        },
-                      ]}
-                    >
-                      {issued ? (
-                        <ArrowUpRight
-                          size={16}
-                          color={palette.danger.text}
-                          strokeWidth={2.2}
-                        />
-                      ) : (
-                        <ArrowDownLeft
-                          size={16}
-                          color={palette.teal[600]}
-                          strokeWidth={2.2}
-                        />
-                      )}
-                    </View>
-                    <VStack gap={3} flex={1}>
-                      <Text variant="label-lg" tone="primary">
-                        {c.partyName || (issued ? "Supplier" : "Customer")}
-                      </Text>
-                      <Text variant="caption" tone="tertiary">
-                        {fmtDate(c.chequeDate)}
-                        {c.chequeNo ? ` · #${c.chequeNo}` : ""}
-                        {c.bankName ? ` · ${c.bankName}` : ""}
-                      </Text>
-                    </VStack>
-                  </HStack>
-                  <VStack gap={4} align="flex-end">
-                    <Text variant="label-lg" tone="primary">
-                      {money(c.amount)}
-                    </Text>
+              <View key={c._id}>
+                <ListRow
+                  icon={issued ? ArrowUpRight : ArrowDownLeft}
+                  title={c.partyName || (issued ? "Supplier" : "Customer")}
+                  subtitle={[
+                    fmtDate(c.chequeDate),
+                    c.chequeNo ? `#${c.chequeNo}` : null,
+                    c.bankName,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  value={money(c.amount)}
+                  right={
                     <StatusChip label={c.status} tone={STATUS_TONE[c.status]} />
-                  </VStack>
-                </HStack>
+                  }
+                />
 
                 {canManage && c.status === "pending" ? (
-                  <HStack gap={8} style={{ marginTop: 12 }}>
+                  <HStack gap={8} wrap style={styles.actions}>
                     <Button
                       label="Cleared"
                       variant="secondary"
-                      size="sm"
+                      size="xs"
                       fullWidth={false}
                       icon={
                         <Check
@@ -473,7 +457,7 @@ export default function PdcScreen() {
                     <Button
                       label="Bounced"
                       variant="secondary"
-                      size="sm"
+                      size="xs"
                       fullWidth={false}
                       icon={
                         <Ban
@@ -489,7 +473,7 @@ export default function PdcScreen() {
                     <Button
                       label="Cancel"
                       variant="ghost"
-                      size="sm"
+                      size="xs"
                       fullWidth={false}
                       onPress={() =>
                         statusMut.mutate({ id: c._id, status: "cancelled" })
@@ -499,11 +483,11 @@ export default function PdcScreen() {
                 ) : null}
 
                 {canManage && c.status !== "cleared" ? (
-                  <HStack justify="flex-end" style={{ marginTop: 8 }}>
+                  <HStack justify="flex-end" style={styles.actions}>
                     <Button
                       label="Delete"
                       variant="ghost"
-                      size="sm"
+                      size="xs"
                       fullWidth={false}
                       icon={
                         <Trash2
@@ -516,10 +500,10 @@ export default function PdcScreen() {
                     />
                   </HStack>
                 ) : null}
-              </Card>
+              </View>
             );
           })}
-        </VStack>
+        </ListGroup>
       )}
 
       <ConfirmDialog
@@ -542,12 +526,10 @@ export default function PdcScreen() {
 }
 
 const styles = {
-  dirBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.sm,
-    alignItems: "center",
-    justifyContent: "center",
+  /** Action strip under a cheque row. Aligns to ListRow's 14px gutter. */
+  actions: {
+    paddingHorizontal: 14,
+    paddingBottom: 10,
   },
 } as const;
 

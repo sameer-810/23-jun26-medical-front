@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Pill, Plus, Search } from "lucide-react-native";
 import { useCatalog, useCatalogStats } from "@modules/admin/hooks/useAdmin";
 import { AdminNav } from "@modules/admin/components/AdminNav";
 import type { CatalogProduct } from "@modules/admin/types";
-import { palette } from "@shared/designSystem";
+import { palette, numeric } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -13,7 +13,7 @@ import {
   HStack,
   Card,
   Button,
-  StatTile,
+  StatRow,
   StatusChip,
   TextField,
   Pagination,
@@ -81,7 +81,7 @@ export default function CatalogListScreen() {
       sortable: true,
       sortValue: (p) => p.mrp,
       render: (p) => (
-        <Text variant="label" weight="600" tone="secondary">
+        <Text variant="label" weight="600" tone="secondary" style={numeric}>
           ₹{p.mrp}
         </Text>
       ),
@@ -118,31 +118,30 @@ export default function CatalogListScreen() {
     >
       <AdminNav active="catalog" />
 
-      <HStack gap={12} style={{ marginBottom: 16, flexWrap: "wrap" }}>
-        <StatTile
-          label="Products"
-          value={(stats?.total ?? 0).toLocaleString("en-IN")}
-          icon={Pill}
-          tone="teal"
-          style={styles.tile}
-        />
-        <StatTile
-          label="Active"
-          value={(stats?.active ?? 0).toLocaleString("en-IN")}
-          style={styles.tile}
-        />
-        <StatTile
-          label="With images"
-          value={(stats?.withImages ?? 0).toLocaleString("en-IN")}
-          style={styles.tile}
-        />
-        <StatTile
-          label="With clinical"
-          value={(stats?.withClinical ?? 0).toLocaleString("en-IN")}
-          tone="slate"
-          style={styles.tile}
-        />
-      </HStack>
+      {/* Catalogue coverage. All four are plain counts of how complete the
+          shared catalogue is — none of them is a fault state, so none of them
+          takes an accent. */}
+      <StatRow
+        style={{ marginBottom: 16 }}
+        stats={[
+          {
+            label: "Products",
+            value: (stats?.total ?? 0).toLocaleString("en-IN"),
+          },
+          {
+            label: "Active",
+            value: (stats?.active ?? 0).toLocaleString("en-IN"),
+          },
+          {
+            label: "With images",
+            value: (stats?.withImages ?? 0).toLocaleString("en-IN"),
+          },
+          {
+            label: "With clinical",
+            value: (stats?.withClinical ?? 0).toLocaleString("en-IN"),
+          },
+        ]}
+      />
 
       <View style={{ marginBottom: 12 }}>
         <TextField
@@ -233,7 +232,7 @@ function CatalogRow({
           </Text>
         </VStack>
         <VStack gap={4} align="flex-end">
-          <Text variant="label" weight="600" tone="secondary">
+          <Text variant="label" weight="600" tone="secondary" style={numeric}>
             ₹{product.mrp}
           </Text>
           {product.prescriptionRequired ? (
@@ -244,7 +243,3 @@ function CatalogRow({
     </Card>
   );
 }
-
-const styles = StyleSheet.create({
-  tile: { flexGrow: 1, flexBasis: 150 },
-});

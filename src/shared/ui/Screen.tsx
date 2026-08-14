@@ -130,7 +130,14 @@ export function Screen({
    */
   const phoneBottom = useTabBottomPadding(16);
   const deskBottom = useBottomPadding(32);
-  const bottom = width < layout.wideBreakpoint ? phoneBottom : deskBottom;
+  const wide = width >= layout.wideBreakpoint;
+  const bottom = wide ? deskBottom : phoneBottom;
+  /**
+   * Page gutter. 24px on a 390px phone spends 12% of the screen width on
+   * nothing, which is a real part of why the phone build felt so empty and ran
+   * so long — every list was squeezed into 342px of usable width.
+   */
+  const gutter = wide ? layout.screenPadding : layout.screenPaddingPhone;
   // On a phone, actions sitting beside the title squeeze the subtitle into a
   // ragged column — drop them onto their own line instead.
   const stackHeader = width < 700;
@@ -142,18 +149,29 @@ export function Screen({
       <BackLink label={back || "Back"} onPress={goBack} />
     );
 
+  /**
+   * Page header.
+   *
+   * This used to be a three-line stack — an uppercase overline, a 23px title
+   * and a subtitle — with 20px under it, on every one of 58 screens. On a phone
+   * that is ~250px of masthead before the user sees a single medicine, and the
+   * overline nearly always restated the sidebar section they had just tapped
+   * ("CATALOGUE / Products"). The title alone carries it; the subtitle is kept
+   * for the screens that use it to explain a workflow, and the overline is
+   * dropped on phones where the app bar already names the section.
+   */
   const header = (title || right) && (
     <View
       style={{
         flexDirection: stackHeader ? "column" : "row",
-        alignItems: stackHeader ? "stretch" : "flex-end",
+        alignItems: stackHeader ? "stretch" : "center",
         justifyContent: "space-between",
-        marginBottom: 20,
-        gap: 12,
+        marginBottom: 14,
+        gap: 10,
       }}
     >
-      <VStack gap={3} flex={stackHeader ? undefined : 1}>
-        {overline ? (
+      <VStack gap={1} flex={stackHeader ? undefined : 1}>
+        {overline && wide ? (
           <Text variant="overline" tone="tertiary">
             {overline}
           </Text>
@@ -195,7 +213,7 @@ export function Screen({
       style={{
         flex: 1,
         backgroundColor: palette.surface.secondary,
-        padding: 24,
+        padding: gutter,
       }}
     >
       {inner}
@@ -203,7 +221,7 @@ export function Screen({
   ) : (
     <ScrollView
       style={{ flex: 1, backgroundColor: palette.surface.secondary }}
-      contentContainerStyle={{ padding: 24, paddingBottom: bottom }}
+      contentContainerStyle={{ padding: gutter, paddingBottom: bottom }}
       showsVerticalScrollIndicator={false}
       /**
        * Without this, the first tap while the keyboard is open only dismisses

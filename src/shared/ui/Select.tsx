@@ -8,9 +8,10 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { ChevronDown, Check, Plus, X, Search } from "lucide-react-native";
-import { palette, radius, outline, shadows } from "../designSystem";
+import { palette, radius, outline, shadows, layout } from "../designSystem";
 import { Text } from "./Text";
 import { TextField } from "./TextField";
+import { useControlHeight } from "./useBreakpoint";
 
 export interface SelectOption {
   value: string;
@@ -82,6 +83,7 @@ export function Select({
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const controlHeight = useControlHeight();
 
   const selected = options.find((o) => o.value === value);
   // Fall back to a caller-supplied label so a selected item still shows even
@@ -146,7 +148,11 @@ export function Select({
         accessibilityLabel={
           label ? `${label}: ${shownLabel || "not set"}` : undefined
         }
-        style={[styles.field, error ? styles.fieldError : null]}
+        style={[
+          styles.field,
+          { minHeight: controlHeight },
+          error ? styles.fieldError : null,
+        ]}
       >
         <Text
           variant="body"
@@ -336,8 +342,7 @@ const styles = StyleSheet.create({
   field: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 50,
-    paddingHorizontal: 14,
+    paddingHorizontal: 11,
     borderRadius: radius.md,
     borderWidth: outline.width,
     borderColor: outline.color,
@@ -386,8 +391,9 @@ const styles = StyleSheet.create({
   optionRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 13,
-    paddingHorizontal: 12,
+    minHeight: layout.rowHeight,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderRadius: radius.sm,
   },
   createRow: {

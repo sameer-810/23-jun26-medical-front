@@ -141,14 +141,14 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(15,23,42,0.45)",
     alignItems: "center",
     justifyContent: "center",
-    padding: 24,
+    padding: 20,
   },
   card: {
     width: "100%",
     maxWidth: 420,
     backgroundColor: palette.surface.primary,
     borderRadius: radius.xl,
-    padding: 22,
+    padding: 18,
     ...shadows.xl,
   },
 });

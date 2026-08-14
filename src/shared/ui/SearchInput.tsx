@@ -5,7 +5,7 @@
 import React from "react";
 import { View, TextInput, StyleSheet } from "react-native";
 import { Search } from "lucide-react-native";
-import { palette, radius, outline } from "../designSystem";
+import { palette, radius, outline, layout } from "../designSystem";
 
 interface Props {
   value: string;
@@ -46,9 +46,9 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    height: 48,
+    gap: 8,
+    paddingHorizontal: 11,
+    height: layout.controlHeightPhone,
     borderRadius: radius.md,
     borderWidth: outline.width,
     borderColor: outline.color,
@@ -56,11 +56,11 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    // Fill the 48px box. At paddingVertical:0 the input itself was only 20px
-    // tall, so taps landing in the surrounding padding hit nothing — the field
-    // looked 48px and behaved like 20px.
+    // Fill the box. At paddingVertical:0 the input itself was only 20px tall,
+    // so taps landing in the surrounding padding hit nothing — the field
+    // looked full height and behaved like 20px.
     alignSelf: "stretch",
-    fontSize: 15,
+    fontSize: 14,
     color: palette.text.primary,
     paddingVertical: 0,
   },

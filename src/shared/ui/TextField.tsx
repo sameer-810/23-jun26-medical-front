@@ -10,6 +10,7 @@ import {
 import { Eye, EyeOff } from "lucide-react-native";
 import { palette, radius, outline } from "../designSystem";
 import { Text } from "./Text";
+import { useControlHeight } from "./useBreakpoint";
 
 interface Props extends Omit<TextInputProps, "style"> {
   label?: string;
@@ -28,6 +29,7 @@ export function TextField({
   ...inputProps
 }: Props) {
   const [focused, setFocused] = useState(false);
+  const controlHeight = useControlHeight();
   // Any password field gets a reveal toggle, unless the caller supplies its own
   // trailing element. Admins setting someone else's temporary password have no
   // way to check what they typed — and they are about to read it out loud.
@@ -68,6 +70,7 @@ export function TextField({
             borderColor,
             backgroundColor: palette.surface.primary,
             borderWidth: focused ? 1.5 : 1,
+            minHeight: controlHeight,
           },
         ]}
       >
@@ -109,13 +112,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderRadius: radius.md,
-    paddingHorizontal: 14,
-    minHeight: 50,
+    paddingHorizontal: 11,
   },
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     color: palette.text.primary,
-    paddingVertical: 13,
+    paddingVertical: 8,
   },
 });

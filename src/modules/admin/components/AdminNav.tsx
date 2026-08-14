@@ -56,7 +56,7 @@ export function AdminNav({ active }: { active: Section }) {
             </Text>
             <View style={styles.badge}>
               <Text variant="label-sm" style={{ color: palette.cobalt[700] }}>
-                PLATFORM CONSOLE
+                Platform console
               </Text>
             </View>
           </HStack>

@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { View } from "react-native";
+import { View, useWindowDimensions } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Plus, Receipt, ChevronRight } from "lucide-react-native";
+import { Plus, Receipt } from "lucide-react-native";
 import { useSales } from "@modules/sale/hooks/useSales";
 import { SaleListItem } from "@modules/sale/types";
-import { palette } from "@shared/designSystem";
+import { layout } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -13,6 +13,7 @@ import {
   Card,
   Button,
   StatusChip,
+  ListRow,
   ChipsRow,
   SearchInput,
   Pagination,
@@ -30,6 +31,11 @@ const STATUS_TONE = {
 
 export default function SalesListScreen() {
   const navigation = useNavigation<any>();
+  const { width } = useWindowDimensions();
+  const gutter =
+    width >= layout.wideBreakpoint
+      ? layout.screenPadding
+      : layout.screenPaddingPhone;
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
 
@@ -163,6 +169,7 @@ export default function SalesListScreen() {
       right={
         <Button
           label="New sale"
+          size="sm"
           fullWidth={false}
           icon={<Plus size={18} color="#FFFFFF" strokeWidth={2.2} />}
           onPress={() => navigation.navigate("NewSale")}
@@ -174,7 +181,7 @@ export default function SalesListScreen() {
         onChangeText={setSearch}
         placeholder="Search invoice, customer or mobile"
       />
-      <View style={{ marginHorizontal: -24, marginTop: 12 }}>
+      <View style={{ marginHorizontal: -gutter, marginTop: 10 }}>
         <ChipsRow
           chips={[
             { key: "all", label: "All" },
@@ -226,12 +233,11 @@ function ListSkeleton() {
       {[0, 1, 2, 3, 4].map((i) => (
         <Card key={i} elevation="base">
           <HStack gap={14} align="center">
-            <Skeleton width={22} height={22} rounded="sm" />
             <VStack gap={6} flex={1}>
-              <Skeleton width="40%" height={16} />
-              <Skeleton width="70%" height={12} />
+              <Skeleton width="40%" height={14} />
+              <Skeleton width="70%" height={11} />
             </VStack>
-            <Skeleton width={70} height={16} />
+            <Skeleton width={64} height={14} />
           </HStack>
         </Card>
       ))}
@@ -239,6 +245,14 @@ function ListSkeleton() {
   );
 }
 
+/**
+ * The phone rendering of an invoice.
+ *
+ * The payment mode was a second chip beside the status, which put two lozenges
+ * on every row for something that is only ever one word — it reads better in
+ * the identifier line with the customer and the date. Only the status, which is
+ * the field a pharmacist scans this list for, keeps its chip.
+ */
 function SaleRow({
   sale,
   onPress,
@@ -247,42 +261,27 @@ function SaleRow({
   onPress: () => void;
 }) {
   return (
-    <Card onPress={onPress} elevation="base">
-      <HStack gap={14} align="center">
-        <Receipt size={22} color={palette.teal[600]} strokeWidth={1.9} />
-        <VStack gap={4} flex={1}>
-          <Text variant="label-lg" tone="primary">
-            {sale.invoiceNo}
-          </Text>
-          <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
-            {[
-              sale.customerName,
-              new Date(sale.saleDate).toLocaleDateString(),
-              `${sale.itemCount} item${sale.itemCount === 1 ? "" : "s"}`,
-            ].join("  ·  ")}
-          </Text>
-          <HStack gap={6} wrap>
-            <StatusChip
-              label={sale.status.replace("_", " ")}
-              tone={STATUS_TONE[sale.status]}
-            />
-            {sale.paymentMode ? (
-              <StatusChip label={sale.paymentMode} tone="neutral" />
-            ) : null}
-          </HStack>
-        </VStack>
-        <VStack gap={2} align="flex-end">
-          <Text variant="label-lg" tone="primary">
-            {money(sale.grandTotal)}
-          </Text>
-          {sale.totalReturned > 0 && (
-            <Text variant="caption" tone="danger">
-              -{money(sale.totalReturned)}
-            </Text>
-          )}
-        </VStack>
-        <ChevronRight size={18} color={palette.text.tertiary} strokeWidth={2} />
-      </HStack>
-    </Card>
+    <ListRow
+      title={sale.invoiceNo}
+      subtitle={[
+        sale.customerName,
+        new Date(sale.saleDate).toLocaleDateString(),
+        `${sale.itemCount} item${sale.itemCount === 1 ? "" : "s"}`,
+        sale.paymentMode,
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+      value={money(sale.grandTotal)}
+      valueHint={
+        sale.totalReturned > 0 ? `−${money(sale.totalReturned)}` : undefined
+      }
+      right={
+        <StatusChip
+          label={sale.status.replace("_", " ")}
+          tone={STATUS_TONE[sale.status]}
+        />
+      }
+      onPress={onPress}
+    />
   );
 }

@@ -6,15 +6,19 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
-import {
-  Poppins_600SemiBold,
-  Poppins_700Bold,
-} from "@expo-google-fonts/poppins";
+/**
+ * One family, three weights.
+ *
+ * Poppins used to carry the headings. A geometric display face beside data type
+ * is the clearest "consumer app" tell there is, and every business tool this
+ * product is measured against (Stripe, Linear, Shopify, Vercel) ships a single
+ * grotesque and gets hierarchy from size and colour instead. Dropping it also
+ * takes two font files off the initial web load.
+ */
 import {
   Inter_400Regular,
   Inter_500Medium,
   Inter_600SemiBold,
-  Inter_700Bold,
 } from "@expo-google-fonts/inter";
 
 import RootNavigator from "@navigation/RootNavigator";
@@ -162,12 +166,9 @@ const linking = {
 
 export default function App() {
   const [fontsLoaded] = useFonts({
-    Poppins_600SemiBold,
-    Poppins_700Bold,
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
-    Inter_700Bold,
   });
 
   useEffect(() => {

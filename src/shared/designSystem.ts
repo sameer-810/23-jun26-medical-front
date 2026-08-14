@@ -1,29 +1,54 @@
 /**
- * Plusveda Design System — ServRx-aligned (2026).
+ * Plusveda Design System — "quiet premium" (2026 rev).
  *
- * The Plusveda logo green (#10A058) is the single confident brand colour, cobalt
- * blue the secondary accent, on clean cool-white surfaces (never warm/greige).
- * Friendly rounded headings (Poppins) + highly legible data type (Inter).
- * Colour-coded KPI cards, tinted summary bars, brand tab underlines and active
- * states, soft shadows over hairline borders.
+ * WHAT CHANGED AND WHY
+ * --------------------
+ * The previous system was a consumer-app language — Poppins headings, 26px KPI
+ * numbers in 104px colour-coded cards, gradient hero banners, 24px gutters,
+ * 44px minimum buttons — applied to a data-dense trade tool. On a chemist's
+ * counter PC that reads as a toy, and on a phone one number filled a third of
+ * the screen. The verdict from the client was blunt and correct: big cards,
+ * loose spacing, junior.
  *
- * Token *structure* is unchanged from the previous system, so every screen and
- * the shared/ui kit re-skin from these values alone.
+ * The fix is not new colours. It is DENSITY and RESTRAINT, which is what every
+ * business tool people call beautiful actually has in common (Stripe, Linear,
+ * Shopify Polaris, Vercel Geist, Mercury):
+ *
+ *   1. Body text sits at 13–14px, not 14.5–16. Page titles at 20px, not 23.
+ *   2. One typeface. Poppins is gone; Inter carries everything. A second
+ *      "friendly" display family is the loudest junior tell there is.
+ *   3. Weights stop at 600. Nothing in this app is 700+ any more.
+ *   4. Radii are locked to 4 / 6 / 8 / 10 / 12. Mixed 14/18/22 radii on
+ *      neighbouring surfaces is what makes a screen look assembled by hand.
+ *   5. Borders, not shadows. A resting card is a white plane with a 1px
+ *      hairline on a tinted canvas. Shadow is reserved for things that genuinely
+ *      float (menus, dialogs, the FAB).
+ *   6. The brand green is an ACCENT, not a surface. It marks the primary action,
+ *      the active nav row, links and focus — and nothing else. Roughly 90% of
+ *      pixels on any screen should be neutral. Colour that isn't carrying a
+ *      status meaning is noise.
+ *
+ * The token *keys* are unchanged, so all ~618 `palette.*`, 138 `radius.*` and
+ * every `<Text variant>` call-site re-skins from these values alone.
  */
 
 export const palette = {
-  // Ink — cool slate for calm, high-legibility text
+  /**
+   * Ink — near-black tinted very slightly green so it belongs to the brand
+   * family. Pure #000 on pure #FFF is the highest-contrast, cheapest-looking
+   * pairing in UI; every considered system tints both ends.
+   */
   ink: {
-    900: "#17242D",
-    800: "#1E2C36",
-    700: "#334049",
-    600: "#4A5760",
-    500: "#697680",
-    400: "#94A2AB",
-    300: "#C6CFD5",
-    200: "#E1E7EB",
-    100: "#EFF3F5",
-    50: "#F6F9FB",
+    900: "#0F1F1B",
+    800: "#152A25",
+    700: "#2C3B37",
+    600: "#44534F",
+    500: "#647572",
+    400: "#93A19E",
+    300: "#C4CDCB",
+    200: "#DFE5E3",
+    100: "#EDF1F0",
+    50: "#F5F8F7",
   },
 
   /**
@@ -47,7 +72,7 @@ export const palette = {
     50: "#EEFBF5",
   },
 
-  // Accent — cobalt blue (links, secondary CTAs, info, "sales")
+  // Accent — cobalt blue. Links and "sales" only; no longer a second CTA fill.
   cobalt: {
     900: "#0E3F6E",
     800: "#125C9C",
@@ -61,39 +86,40 @@ export const palette = {
     50: "#EFF6FE",
   },
 
-  // Cool neutral surfaces
+  // Cool neutral surfaces, tinted to match ink.
   neutral: {
     0: "#FFFFFF",
-    50: "#F6F9FB",
-    100: "#EFF3F5",
-    200: "#E1E7EB",
-    300: "#C6CFD5",
-    400: "#94A2AB",
-    500: "#697680",
-    600: "#4A5760",
-    700: "#334049",
-    800: "#1E2C36",
-    900: "#17242D",
+    50: "#F5F8F7",
+    100: "#EDF1F0",
+    200: "#DFE5E3",
+    300: "#C4CDCB",
+    400: "#93A19E",
+    500: "#647572",
+    600: "#44534F",
+    700: "#2C3B37",
+    800: "#152A25",
+    900: "#0F1F1B",
   },
 
   surface: {
     primary: "#FFFFFF",
-    secondary: "#F3F6F8",
-    tertiary: "#EDF2F4",
+    /** App canvas. Cards are white planes ON this — never white-on-white. */
+    secondary: "#F6F8F8",
+    tertiary: "#F0F4F3",
     raised: "#FFFFFF",
-    sunken: "#E9EFF2",
-    dark: "#122029",
-    darkRaised: "#1B2C36",
+    /** Wells, table header rows, input backgrounds. */
+    sunken: "#F0F4F3",
+    dark: "#101E1A",
+    darkRaised: "#182924",
   },
 
   text: {
-    primary: "#17242D",
-    secondary: "#425059",
-    // 5.05:1 on white. Was #788690 at 3.74:1 — below the 4.5:1 WCAG AA floor,
-    // and this token carries every section label, hint and timestamp in the
-    // app, so one wrong value failed on every screen at once.
-    tertiary: "#667079",
-    disabled: "#A9B4BC",
+    primary: "#0F1F1B",
+    secondary: "#3F4F4C",
+    // 5.1:1 on white. This token carries every section label, hint and
+    // timestamp in the app, so one wrong value fails on every screen at once.
+    tertiary: "#647572",
+    disabled: "#A3AFAC",
     inverse: "#FFFFFF",
     accent: "#0C7942", // brand green 700 — passes AA on white
     // 5.87:1 on white. #1E8FE6 was 3.43:1 — links are body-size text,
@@ -102,18 +128,21 @@ export const palette = {
   },
 
   border: {
-    subtle: "#EFF3F5",
-    default: "#E4EAEE",
-    strong: "#D5DDE2",
+    /** Row dividers inside a card. */
+    subtle: "#EDF1F0",
+    /** The hairline. Every card, table and panel edge in the app. */
+    default: "#E2E8E6",
+    /** Input borders and anything that must read as interactive. */
+    strong: "#CDD6D4",
     focus: "#10A058",
-    dark: "#2A3A44",
+    dark: "#243530",
   },
 
-  // Semantic — stock / expiry / billing states
-  success: { bg: "#E4F5EE", text: "#0F7A54", border: "#B7E6D3" }, // 4.73:1 (was 3.28)
-  warning: { bg: "#FBF1DC", text: "#8A5A11", border: "#F3DCA6" }, // 5.27:1 (was 3.26)
-  danger: { bg: "#FCEAE7", text: "#B32D1D", border: "#F6C9C1" }, // 5.46:1 (was 3.88)
-  info: { bg: "#E7F1FC", text: "#1467AE", border: "#BFDDF8" }, // 5.13:1 (was 3.63)
+  // Semantic — stock / expiry / billing states. Contrast-checked on white.
+  success: { bg: "#E4F5EE", text: "#0F7A54", border: "#B7E6D3" }, // 4.73:1
+  warning: { bg: "#FBF1DC", text: "#8A5A11", border: "#F3DCA6" }, // 5.27:1
+  danger: { bg: "#FCEAE7", text: "#B32D1D", border: "#F6C9C1" }, // 5.46:1
+  info: { bg: "#E7F1FC", text: "#1467AE", border: "#BFDDF8" }, // 5.13:1
 } as const;
 
 /**
@@ -124,136 +153,179 @@ export const palette = {
 export const brand = palette.teal;
 
 /**
- * KPI accent set — colour-coded metric cards. Each entry is a
- * { color, tint } pair for a card's top border + soft icon background.
+ * Status accents for metrics.
+ *
+ * These used to paint a 3px coloured cap and a tinted icon bubble on every KPI
+ * card, which is how a dashboard ends up looking like a box of highlighters.
+ * They are still here for the few places a metric genuinely carries a status
+ * (expiring = red, dues = amber), but the default is now `none` — a metric with
+ * no status gets no colour at all.
  */
 export const accents = {
-  teal: { color: "#10A058", tint: "#E6F9F0" },
+  teal: { color: "#10A058", tint: "#E9F7F0" },
   blue: { color: "#1E8FE6", tint: "#E7F1FC" },
   amber: { color: "#C1801C", tint: "#FBF1DC" },
   red: { color: "#DB4B3D", tint: "#FCEAE7" },
   purple: { color: "#7C6FE0", tint: "#EEECFB" },
+  neutral: { color: "#647572", tint: "#F0F4F3" },
 } as const;
 
+/**
+ * 4pt spacing grid. Semantic names, because the old string-keyed scale
+ * (`spacing["1.5"]`) was hostile enough to use that it had zero call-sites in
+ * the entire app while 556 raw magic numbers grew up around it.
+ */
+export const space = {
+  none: 0,
+  hair: 2,
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  "2xl": 24,
+  "3xl": 32,
+  "4xl": 40,
+  "5xl": 48,
+  "6xl": 64,
+} as const;
+
+/** Back-compat numeric alias. Prefer `space`. */
 export const spacing = {
   "0": 0,
   px: 1,
   "0.5": 2,
   "1": 4,
-  "1.5": 6,
   "2": 8,
-  "2.5": 10,
   "3": 12,
-  "3.5": 14,
   "4": 16,
   "5": 20,
   "6": 24,
-  "7": 28,
   "8": 32,
-  "9": 36,
   "10": 40,
   "12": 48,
-  "14": 56,
   "16": 64,
-  "20": 80,
 } as const;
 
-// Soft, rounded corners for the clean clinical language.
+/**
+ * Radius ladder — deliberately short. Controls 6, small surfaces 8, cards 10,
+ * dialogs 12. Nothing in the product is rounder than 12 except pills.
+ */
 export const radius = {
-  xs: 6,
-  sm: 8,
-  md: 12,
-  lg: 14,
-  xl: 18,
-  "2xl": 22,
-  "3xl": 28,
+  xs: 4,
+  sm: 6,
+  md: 8, // buttons, inputs, chips, icon wells
+  lg: 10, // cards, tables, panels
+  xl: 12, // dialogs, sheets, hero panels
+  "2xl": 14,
+  "3xl": 16,
   full: 9999,
 } as const;
 
 // Thin hairline outline.
-export const outline = { width: 1, color: "#E4EAEE" } as const;
+export const outline = { width: 1, color: palette.border.default } as const;
 
 /**
- * Bundled font families (loaded via expo-font in App.tsx). Poppins carries the
- * friendly rounded headings; Inter carries body copy and all tabular data.
- * If a family fails to load the platform falls back to the system sans — no crash.
+ * One family, Inter, at three weights.
+ *
+ * Poppins used to carry "friendly rounded headings". Mixing a geometric display
+ * face into a data tool is the single clearest junior tell in the audit — every
+ * system this product is measured against (Stripe, Linear, Geist, Mercury)
+ * ships one grotesque throughout and gets its hierarchy from size and colour.
+ *
+ * `display`/`heading` now point at Inter so no call-site has to change. The
+ * Poppins files are no longer loaded in App.tsx.
  */
 export const fonts = {
-  display: "Poppins_700Bold",
-  heading: "Poppins_600SemiBold",
+  display: "Inter_600SemiBold",
+  heading: "Inter_600SemiBold",
   bodyRegular: "Inter_400Regular",
   bodyMedium: "Inter_500Medium",
   semibold: "Inter_600SemiBold",
-  bold: "Inter_700Bold",
+  bold: "Inter_600SemiBold",
 } as const;
+
+/**
+ * Tabular figures. Every rupee amount, quantity and batch count in the app must
+ * use these or columns of numbers wobble — proportional digits in a money
+ * column is a tell people feel without being able to name.
+ */
+export const numeric: { fontVariant: ["tabular-nums"] } = {
+  fontVariant: ["tabular-nums"],
+};
 
 export const typography = {
   display: {
     large: {
       fontFamily: fonts.display,
-      fontSize: 38,
-      lineHeight: 46,
-      fontWeight: "700" as const,
+      fontSize: 28,
+      lineHeight: 34,
+      fontWeight: "600" as const,
       letterSpacing: -0.5,
     },
     medium: {
       fontFamily: fonts.display,
-      fontSize: 30,
-      lineHeight: 38,
-      fontWeight: "700" as const,
+      fontSize: 24,
+      lineHeight: 30,
+      fontWeight: "600" as const,
       letterSpacing: -0.4,
     },
+    /** The KPI number. */
     small: {
       fontFamily: fonts.display,
-      fontSize: 26,
-      lineHeight: 34,
-      fontWeight: "700" as const,
-      letterSpacing: -0.3,
-    },
-  },
-  heading: {
-    h1: {
-      fontFamily: fonts.display,
-      fontSize: 23,
-      lineHeight: 30,
-      fontWeight: "700" as const,
-      letterSpacing: -0.4,
-    },
-    h2: {
-      fontFamily: fonts.heading,
-      fontSize: 19,
+      fontSize: 21,
       lineHeight: 26,
       fontWeight: "600" as const,
       letterSpacing: -0.3,
     },
-    h3: {
+  },
+  heading: {
+    /** Page title. */
+    h1: {
+      fontFamily: fonts.display,
+      fontSize: 20,
+      lineHeight: 26,
+      fontWeight: "600" as const,
+      letterSpacing: -0.3,
+    },
+    h2: {
       fontFamily: fonts.heading,
-      fontSize: 16,
-      lineHeight: 22,
+      fontSize: 17,
+      lineHeight: 24,
       fontWeight: "600" as const,
       letterSpacing: -0.2,
     },
-    h4: {
+    /** Card / section title. */
+    h3: {
       fontFamily: fonts.heading,
-      fontSize: 14,
+      fontSize: 15,
       lineHeight: 20,
       fontWeight: "600" as const,
       letterSpacing: -0.1,
+    },
+    h4: {
+      fontFamily: fonts.heading,
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: "600" as const,
+      letterSpacing: 0,
     },
   },
   body: {
     large: {
       fontFamily: fonts.bodyRegular,
-      fontSize: 16,
-      lineHeight: 25,
-      fontWeight: "400" as const,
-    },
-    default: {
-      fontFamily: fonts.bodyRegular,
-      fontSize: 14.5,
+      fontSize: 15,
       lineHeight: 22,
       fontWeight: "400" as const,
     },
+    /** Default body. */
+    default: {
+      fontFamily: fonts.bodyRegular,
+      fontSize: 14,
+      lineHeight: 20,
+      fontWeight: "400" as const,
+    },
+    /** Table cells, secondary lines, dense lists. */
     small: {
       fontFamily: fonts.bodyRegular,
       fontSize: 13,
@@ -264,7 +336,7 @@ export const typography = {
   label: {
     large: {
       fontFamily: fonts.semibold,
-      fontSize: 14.5,
+      fontSize: 14,
       lineHeight: 20,
       fontWeight: "600" as const,
       letterSpacing: -0.1,
@@ -283,7 +355,7 @@ export const typography = {
       fontSize: 12,
       lineHeight: 16,
       fontWeight: "600" as const,
-      letterSpacing: 0.2,
+      letterSpacing: 0.1,
     },
   },
   caption: {
@@ -291,40 +363,52 @@ export const typography = {
     fontSize: 12,
     lineHeight: 16,
     fontWeight: "500" as const,
-    letterSpacing: 0.1,
+    letterSpacing: 0,
   },
+  /**
+   * Eyebrow labels. Dropped to 11px with tighter tracking — at 12/1.0 it
+   * competed with the page title sitting directly under it.
+   */
   overline: {
     fontFamily: fonts.semibold,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: "700" as const,
-    letterSpacing: 1,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "600" as const,
+    letterSpacing: 0.6,
     textTransform: "uppercase" as const,
   },
 } as const;
 
-// Soft, blurred elevation (clean clinical depth).
-const soft = (y: number, radius: number, opacity: number, elev: number) => ({
-  shadowColor: "#17242D",
+/**
+ * Elevation.
+ *
+ * Resting surfaces get NO shadow — a hairline border on a tinted canvas does
+ * the separating. These exist for things that genuinely float above the page.
+ */
+const soft = (y: number, blur: number, opacity: number, elev: number) => ({
+  shadowColor: "#0F1F1B",
   shadowOffset: { width: 0, height: y },
   shadowOpacity: opacity,
-  shadowRadius: radius,
+  shadowRadius: blur,
   elevation: elev,
 });
 
 export const shadows = {
   none: {},
-  xs: soft(1, 2, 0.04, 1),
-  sm: soft(2, 8, 0.06, 2),
-  md: soft(4, 14, 0.08, 4),
-  lg: soft(10, 26, 0.1, 8),
-  xl: soft(16, 38, 0.13, 14),
+  xs: soft(1, 2, 0.03, 1),
+  sm: soft(1, 3, 0.05, 2),
+  md: soft(4, 12, 0.07, 4),
+  lg: soft(8, 24, 0.1, 8),
+  xl: soft(16, 36, 0.12, 14),
 } as const;
 
 export const elevation = {
-  base: shadows.xs,
-  raised: shadows.sm,
+  /** Cards at rest — flat. */
+  base: shadows.none,
+  raised: shadows.xs,
+  /** Menus, pickers, the FAB. */
   floating: shadows.md,
+  /** Dialogs and sheets. */
   overlay: shadows.lg,
 } as const;
 
@@ -339,15 +423,18 @@ export const motion = {
 } as const;
 
 /**
- * Gradients — the Plusveda green→blue brand sweep, for expo-linear-gradient.
- * Stops are deliberately a shade deeper than the 600 logo green: these panels
- * carry white body copy, so every stop clears 4.5:1 (600 would only reach 3.4).
+ * Gradients.
+ *
+ * The green→blue sweep is retired from product surfaces: a gradient banner at
+ * the top of a working dashboard is decoration where the user wants density,
+ * and it was the loudest thing on the screen. These are kept for auth/marketing
+ * panels, where a brand moment is the actual job.
  */
 export const gradients = {
-  hero: ["#0C7942", "#0C7963", "#1873C0"] as const, // brand green → teal → blue
+  hero: ["#0C7942", "#0C7963", "#1873C0"] as const,
   teal: ["#0FA05C", "#0A6B3B"] as const,
   cobalt: ["#3B9AEA", "#1673C0"] as const,
-  light: ["#FFFFFF", "#F3F6F8"] as const,
+  light: ["#FFFFFF", "#F6F8F8"] as const,
   mist: ["#EEFBF5", "#EFF6FE"] as const,
 } as const;
 
@@ -384,17 +471,31 @@ export const breakpoints = {
 } as const;
 
 export const layout = {
-  screenPadding: 20,
-  cardPadding: 20,
-  sectionGap: 28,
+  /** Page gutter. Phones get less — 24px on a 390px screen is 12% of it. */
+  screenPadding: 24,
+  screenPaddingPhone: 16,
+  /** Card padding — Polaris ships exactly this and it is the right number. */
+  cardPadding: 16,
+  cardPaddingCompact: 12,
+  /** Inputs, selects, comboboxes. Consume via `useControlHeight()`. */
+  controlHeight: 38,
+  controlHeightPhone: 46,
+  sectionGap: 24,
   itemGap: 12,
-  sidebarWidth: 248,
-  sidebarCollapsedWidth: 76,
-  tabBarHeight: 72,
-  tabBarClearance: 96,
-  chipHeight: 36,
-  chipRowHeight: 44,
-  contentMaxWidth: 1200,
+  sidebarWidth: 240,
+  sidebarCollapsedWidth: 68,
+  /** Sidebar nav rows. 48px was a touch target on a desktop pointer surface. */
+  navRowHeight: 36,
+  tabBarHeight: 64,
+  tabBarClearance: 88,
+  chipHeight: 30,
+  chipRowHeight: 38,
+  /** Table/list metrics. */
+  rowHeight: 44,
+  rowHeightDense: 36,
+  rowHeightPhone: 60,
+  tableHeaderHeight: 36,
+  contentMaxWidth: 1240,
   // Width at/above which the layout switches to the desktop sidebar shell.
   wideBreakpoint: 900,
 } as const;

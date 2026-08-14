@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { View, Linking, Pressable, StyleSheet } from "react-native";
 import {
-  BellRing,
   BellOff,
   CalendarPlus,
   Check,

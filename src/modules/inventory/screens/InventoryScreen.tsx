@@ -1,25 +1,23 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, useWindowDimensions } from "react-native";
+import { View, useWindowDimensions } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
   Boxes,
-  IndianRupee,
   PackageX,
   ChevronRight,
   CalendarSearch,
 } from "lucide-react-native";
 import { useStock, useStockValue } from "@modules/inventory/hooks/useInventory";
 import { StockSummaryItem } from "@modules/inventory/types";
-import { palette, radius } from "@shared/designSystem";
+import { palette, layout, numeric } from "@shared/designSystem";
 import {
   Screen,
   Text,
   VStack,
-  HStack,
-  Card,
   Button,
-  StatTile,
+  StatRow,
   StatusChip,
+  ListRow,
   ChipsRow,
   Pagination,
   SearchInput,
@@ -33,7 +31,6 @@ const money = fmtMoney;
 export default function InventoryScreen() {
   const navigation = useNavigation<any>();
   const { width } = useWindowDimensions();
-  const cols = width >= 640 ? 3 : 1;
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -70,7 +67,10 @@ export default function InventoryScreen() {
 
   if (!isLoading && totalPages > 0 && page > totalPages) setPage(totalPages);
 
-  const tileW = cols === 1 ? "100%" : "33.33%";
+  const gutter =
+    width >= layout.wideBreakpoint
+      ? layout.screenPadding
+      : layout.screenPaddingPhone;
   const open = (s: StockSummaryItem) =>
     navigation.navigate("ProductInventory", { id: s.productId });
 
@@ -98,11 +98,26 @@ export default function InventoryScreen() {
       width: 150,
       sortable: true,
       sortValue: (s) => s.available,
+      /**
+       * Plain figures, not a chip per row.
+       *
+       * Every row carried a tinted pill here — 50 blue and amber lozenges down
+       * a column of 50 products, which reads as decoration and leaves nothing
+       * for a genuine exception to stand out against. The number is the data;
+       * only a low reading takes a colour, and the "Low stock" chip at the end
+       * of the row already says so.
+       */
       render: (s) => (
-        <StatusChip
-          label={`${s.available}/${s.onHand} ${s.baseUnit}`}
-          tone={s.isLow ? "warning" : "info"}
-        />
+        <Text
+          variant="body-sm"
+          numberOfLines={1}
+          style={[
+            numeric,
+            { color: s.isLow ? palette.warning.text : palette.text.primary },
+          ]}
+        >
+          {s.available}/{s.onHand} {s.baseUnit}
+        </Text>
       ),
     },
     {
@@ -185,43 +200,35 @@ export default function InventoryScreen() {
         />
       }
     >
-      <View
-        style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 }}
-      >
-        <View style={{ width: tileW, padding: 6 }}>
-          <StatTile
-            label="Stock value (cost)"
-            value={money(value?.costValue ?? 0)}
-            icon={IndianRupee}
-            tone="teal"
-          />
-        </View>
-        <View style={{ width: tileW, padding: 6 }}>
-          <StatTile
-            label="Retail value"
-            value={money(value?.sellValue ?? 0)}
-            icon={IndianRupee}
-            tone="light"
-          />
-        </View>
-        <View style={{ width: tileW, padding: 6 }}>
-          <StatTile
-            label="Units in stock"
-            value={fmtQty(value?.totalUnits)}
-            icon={Boxes}
-            tone="light"
-          />
-        </View>
-      </View>
+      {/* One panel, three figures. The first of these used to be a solid green
+          card beside two white ones — a filled brand-colour surface makes one
+          metric shout at the reader for no reason other than being first. */}
+      <StatRow
+        columns={3}
+        stats={[
+          {
+            label: "Stock value (cost)",
+            value: money(value?.costValue ?? 0),
+          },
+          {
+            label: "Retail value",
+            value: money(value?.sellValue ?? 0),
+          },
+          {
+            label: "Units in stock",
+            value: fmtQty(value?.totalUnits),
+          },
+        ]}
+      />
 
-      <View style={{ marginTop: 14 }}>
+      <View style={{ marginTop: 12 }}>
         <SearchInput
           value={search}
           onChangeText={setSearch}
           placeholder="Search products in stock"
         />
       </View>
-      <View style={{ marginHorizontal: -24, marginTop: 12 }}>
+      <View style={{ marginHorizontal: -gutter, marginTop: 10 }}>
         <ChipsRow
           chips={[
             { key: "all", label: "All stock" },
@@ -271,6 +278,15 @@ export default function InventoryScreen() {
   );
 }
 
+/**
+ * The phone rendering of a stock line.
+ *
+ * Was a card with a 46px tinted icon well and three chips under the name; the
+ * quantity, the cost and the low flag were all lozenges, so nothing stood out
+ * and four products filled the screen. The quantity now sits on the right where
+ * a number belongs, the cost joins the identifier line, and "Low stock" is the
+ * only chip left — which is the one that means something.
+ */
 function StockRow({
   item,
   onPress,
@@ -279,53 +295,17 @@ function StockRow({
   onPress: () => void;
 }) {
   return (
-    <Card onPress={onPress} elevation="base">
-      <HStack gap={14} align="center">
-        <View
-          style={[
-            styles.icon,
-            item.isLow && { backgroundColor: palette.warning.bg },
-          ]}
-        >
-          <Boxes
-            size={20}
-            color={item.isLow ? palette.warning.text : palette.teal[600]}
-            strokeWidth={1.9}
-          />
-        </View>
-        <VStack gap={4} flex={1}>
-          <Text variant="label-lg" tone="primary" numberOfLines={1}>
-            {item.name}
-          </Text>
-          <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
-            {item.sku} · {item.batches} batch{item.batches === 1 ? "" : "es"} ·{" "}
-            {item.locations} location{item.locations === 1 ? "" : "s"}
-          </Text>
-          <HStack gap={6} wrap>
-            <StatusChip
-              label={`${item.available}/${item.onHand} ${item.baseUnit}`}
-              tone="info"
-            />
-            <StatusChip
-              label={`${money(item.costValue)} cost`}
-              tone="neutral"
-            />
-            {item.isLow && <StatusChip label="Low stock" tone="warning" />}
-          </HStack>
-        </VStack>
-        <ChevronRight size={18} color={palette.text.tertiary} strokeWidth={2} />
-      </HStack>
-    </Card>
+    <ListRow
+      title={item.name}
+      subtitle={`${item.sku} · ${item.batches} batch${
+        item.batches === 1 ? "" : "es"
+      } · ${money(item.costValue)} cost`}
+      value={`${item.available}/${item.onHand}`}
+      valueHint={item.baseUnit}
+      right={
+        item.isLow ? <StatusChip label="Low stock" tone="warning" /> : undefined
+      }
+      onPress={onPress}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  icon: {
-    width: 46,
-    height: 46,
-    borderRadius: radius.md,
-    backgroundColor: palette.teal[50],
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});

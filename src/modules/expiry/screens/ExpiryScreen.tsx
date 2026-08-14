@@ -1,14 +1,9 @@
 import React from "react";
-import { View, useWindowDimensions } from "react-native";
-import {
-  AlarmClock,
-  CalendarX2,
-  ShieldCheck,
-  MapPin,
-} from "lucide-react-native";
+import { View } from "react-native";
+import { ShieldCheck, MapPin } from "lucide-react-native";
 import { useExpiryReport } from "@modules/expiry/hooks/useExpiry";
 import { ExpiryBatch } from "@modules/expiry/api/expiryApi";
-import { palette, accents } from "@shared/designSystem";
+import { palette, accents, numeric } from "@shared/designSystem";
 import { fmtInt, fmtMoney } from "@shared/format";
 import {
   Screen,
@@ -16,7 +11,8 @@ import {
   VStack,
   HStack,
   Card,
-  StatTile,
+  StatRow,
+  SectionHeader,
   StatusChip,
   EmptyState,
   DataTable,
@@ -39,9 +35,6 @@ const batchStatusLabel = (b: ExpiryBatch) =>
     : `${b.daysToExpiry}d · ${b.expiryDate.slice(0, 10)}`;
 
 export default function ExpiryScreen() {
-  const { width } = useWindowDimensions();
-  const cols = width >= 800 ? 3 : 1;
-  const tileW = cols === 1 ? "100%" : "33.33%";
   const { data, isLoading, refetch, isRefetching } = useExpiryReport();
 
   const nothing = !isLoading && data && data.summary.total === 0;
@@ -54,33 +47,30 @@ export default function ExpiryScreen() {
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
     >
-      <View
-        style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 }}
-      >
-        <View style={{ width: tileW, padding: 6 }}>
-          <StatTile
-            label="Expired"
-            value={fmtInt(data?.summary.expired)}
-            icon={CalendarX2}
-            accent={accents.red}
-          />
-        </View>
-        <View style={{ width: tileW, padding: 6 }}>
-          <StatTile
-            label="Expiring soon"
-            value={fmtInt(data?.summary.expiringSoon)}
-            icon={AlarmClock}
-            accent={accents.amber}
-          />
-        </View>
-        <View style={{ width: tileW, padding: 6 }}>
-          <StatTile
-            label="Value at risk"
-            value={money(data?.summary.valueAtRisk ?? 0)}
-            tone="teal"
-          />
-        </View>
-      </View>
+      {/* One panel of three. The tiles used to carry a calendar/alarm icon each
+          and an accent regardless of the number — a red "Expired" card reading
+          0 is a false alarm sitting at the top of the page every morning. The
+          status dot is now earned: it appears only when there is something to
+          act on. */}
+      <StatRow
+        stats={[
+          {
+            label: "Expired",
+            value: fmtInt(data?.summary.expired),
+            accent: (data?.summary.expired ?? 0) > 0 ? accents.red : undefined,
+          },
+          {
+            label: "Expiring soon",
+            value: fmtInt(data?.summary.expiringSoon),
+            accent:
+              (data?.summary.expiringSoon ?? 0) > 0 ? accents.amber : undefined,
+          },
+          {
+            label: "Value at risk",
+            value: money(data?.summary.valueAtRisk ?? 0),
+          },
+        ]}
+      />
 
       {isLoading && !data ? (
         <ListSkeleton />
@@ -95,7 +85,6 @@ export default function ExpiryScreen() {
           {(data?.expired.length ?? 0) > 0 && (
             <Section
               title="Expired — remove from sellable stock"
-              tone="danger"
               items={data!.expired}
             />
           )}
@@ -106,9 +95,6 @@ export default function ExpiryScreen() {
               <Section
                 key={b.days}
                 title={`Within ${b.days} days`}
-                tone={
-                  b.days <= 30 ? "danger" : b.days <= 60 ? "warning" : "info"
-                }
                 items={b.items}
               />
             ))}
@@ -118,15 +104,16 @@ export default function ExpiryScreen() {
   );
 }
 
-function Section({
-  title,
-  tone,
-  items,
-}: {
-  title: string;
-  tone: "danger" | "warning" | "info";
-  items: ExpiryBatch[];
-}) {
+/**
+ * A bucket of batches under its own heading.
+ *
+ * The heading used to end in a filled danger/warning/info chip carrying the
+ * item count, which meant every section title dragged a coloured pill along
+ * with it and the page read as three severities before you had read a word.
+ * The title already says the severity ("Expired…", "Within 30 days"), and each
+ * row still carries its own status chip, so the count is now just a count.
+ */
+function Section({ title, items }: { title: string; items: ExpiryBatch[] }) {
   const columns: Column<ExpiryBatch>[] = [
     {
       key: "productName",
@@ -175,7 +162,7 @@ function Section({
       sortable: true,
       sortValue: (b) => b.onHand,
       render: (b) => (
-        <Text variant="label" tone="primary">
+        <Text variant="label" tone="primary" style={numeric}>
           {b.onHand} {b.baseUnit}
         </Text>
       ),
@@ -191,13 +178,8 @@ function Section({
   ];
 
   return (
-    <View style={{ marginTop: 24 }}>
-      <HStack gap={8} align="center" style={{ marginBottom: 12 }}>
-        <Text variant="h3" tone="primary">
-          {title}
-        </Text>
-        <StatusChip label={String(items.length)} tone={tone} />
-      </HStack>
+    <View>
+      <SectionHeader title={title} count={items.length} />
       <DataTable<ExpiryBatch>
         columns={columns}
         rows={items}
@@ -221,7 +203,7 @@ function ExpiryRow({ batch: b }: { batch: ExpiryBatch }) {
               {b.sku} · batch {b.batchNumber}
             </Text>
           </VStack>
-          <Text variant="label-lg" tone="primary">
+          <Text variant="label-lg" tone="primary" style={numeric}>
             {b.onHand} {b.baseUnit}
           </Text>
         </HStack>
@@ -230,8 +212,8 @@ function ExpiryRow({ batch: b }: { batch: ExpiryBatch }) {
           <StatusChip label={`${money(b.stockValue)} at risk`} tone="neutral" />
           {b.locations.map((l, i) => (
             <View key={i} style={locPill}>
-              <MapPin size={12} color={palette.teal[600]} strokeWidth={2} />
-              <Text variant="label-sm" tone="secondary">
+              <MapPin size={12} color={palette.text.tertiary} strokeWidth={2} />
+              <Text variant="label-sm" tone="secondary" style={numeric}>
                 {l.code} · {l.quantity}
               </Text>
             </View>
@@ -261,6 +243,11 @@ function ListSkeleton() {
   );
 }
 
+/**
+ * Where the batch is sitting. Neutral, not brand green — a shelf code is a
+ * location, and tinting it with the primary colour put the least urgent thing
+ * on an expiry row in the loudest paint on the screen.
+ */
 const locPill = {
   flexDirection: "row" as const,
   alignItems: "center" as const,
@@ -268,5 +255,5 @@ const locPill = {
   paddingHorizontal: 8,
   paddingVertical: 4,
   borderRadius: 999,
-  backgroundColor: palette.teal[50],
+  backgroundColor: palette.surface.sunken,
 };

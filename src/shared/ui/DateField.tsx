@@ -18,7 +18,7 @@
 import React, { useState } from "react";
 import { View, Pressable, Platform, StyleSheet } from "react-native";
 import { Calendar } from "lucide-react-native";
-import { palette, radius, outline } from "../designSystem";
+import { palette, radius, outline, layout } from "../designSystem";
 import { Text } from "./Text";
 
 // Native-only module: requiring it on web would pull in native bindings that
@@ -229,14 +229,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: radius.md,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    minHeight: 50,
+    paddingHorizontal: 11,
+    minHeight: layout.controlHeightPhone,
   },
   // Matches the goods-received grid's other cells so one column doesn't jump.
   cellWrap: {
     flexDirection: "row",
     alignItems: "center",
-    height: 38,
+    height: 34,
     borderWidth: 1,
     borderRadius: radius.sm,
     paddingHorizontal: 8,

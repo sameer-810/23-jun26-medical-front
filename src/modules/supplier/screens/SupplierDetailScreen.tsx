@@ -19,7 +19,7 @@ import {
 import { supplierApi } from "@modules/supplier/api/supplierApi";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
-import { palette } from "@shared/designSystem";
+import { palette, accents, numeric } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -29,7 +29,10 @@ import {
   Avatar,
   Button,
   StatusChip,
-  StatTile,
+  StatRow,
+  SectionHeader,
+  ListRow,
+  ListGroup,
   EmptyState,
   ConfirmDialog,
   PromptDialog,
@@ -77,7 +80,7 @@ export default function SupplierDetailScreen() {
         <VStack gap={16}>
           <Card>
             <HStack gap={14} align="center">
-              <Skeleton width={54} height={54} rounded="full" />
+              <Skeleton width={40} height={40} rounded="full" />
               <VStack gap={8} flex={1}>
                 <Skeleton width="50%" height={18} />
                 <Skeleton width="70%" height={14} />
@@ -112,7 +115,8 @@ export default function SupplierDetailScreen() {
     >
       <Card style={{ marginBottom: 16 }}>
         <HStack gap={14} align="center">
-          <Avatar name={supplier?.name || "?"} size={54} tone="slate" />
+          {/* 40, not 54 — an initials disc is an identifier, not a portrait. */}
+          <Avatar name={supplier?.name || "?"} size={40} tone="slate" />
           <VStack gap={6} flex={1}>
             {supplier?.mobile ? (
               <HStack gap={6} align="center">
@@ -158,6 +162,7 @@ export default function SupplierDetailScreen() {
             <Button
               label="Edit"
               variant="secondary"
+              size="sm"
               fullWidth={false}
               icon={
                 <Pencil
@@ -172,33 +177,27 @@ export default function SupplierDetailScreen() {
         </HStack>
       </Card>
 
-      <HStack gap={12} style={{ marginBottom: 16 }}>
-        <View style={{ flex: 1 }}>
-          <StatTile
-            label="Purchases"
-            value={String(supplier?.purchases?.count ?? 0)}
-            tone="light"
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <StatTile
-            label="Total purchased"
-            value={money(supplier?.purchases?.value ?? 0)}
-            tone="teal"
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <StatTile
-            label="Need to pay"
-            value={money(outstanding)}
-            accent={
-              outstanding > 0
-                ? { color: palette.danger.text, tint: palette.danger.bg }
-                : undefined
-            }
-          />
-        </View>
-      </HStack>
+      {/* Three figures on one panel. "Total purchased" lost its filled green
+          card — it is a lifetime total, not a status — leaving colour to the
+          one metric that is a live obligation, and only when it is non-zero. */}
+      <StatRow
+        style={{ marginBottom: 16 }}
+        stats={[
+          {
+            label: "Purchases",
+            value: String(supplier?.purchases?.count ?? 0),
+          },
+          {
+            label: "Total purchased",
+            value: money(supplier?.purchases?.value ?? 0),
+          },
+          {
+            label: "Need to pay",
+            value: money(outstanding),
+            accent: outstanding > 0 ? accents.red : undefined,
+          },
+        ]}
+      />
 
       {canManage ? (
         <Button
@@ -215,15 +214,13 @@ export default function SupplierDetailScreen() {
               strokeWidth={2}
             />
           }
-          style={{ marginBottom: 24 }}
+          style={{ marginBottom: 20 }}
           loading={payMut.isPending}
           onPress={() => setPayOpen(true)}
         />
       ) : null}
 
-      <Text variant="h3" tone="primary" style={{ marginBottom: 12 }}>
-        Purchase history
-      </Text>
+      <SectionHeader title="Purchase history" />
       {(purchases || []).length === 0 ? (
         <EmptyState
           icon={PackageCheck}
@@ -231,84 +228,71 @@ export default function SupplierDetailScreen() {
           message="Goods received from this supplier appear here."
         />
       ) : (
-        <VStack gap={12}>
+        /* One list surface instead of a stack of floating receipt cards. */
+        <ListGroup>
           {(purchases || []).map((p) => (
-            <Card key={p.id} elevation="base">
-              <HStack align="center" justify="space-between">
-                <VStack gap={3} flex={1}>
-                  <Text variant="label-lg" tone="primary">
-                    {p.receiptNo}
-                  </Text>
-                  <Text variant="caption" tone="tertiary">
-                    {new Date(p.receivedAt).toLocaleDateString()} ·{" "}
-                    {p.lineCount} line{p.lineCount === 1 ? "" : "s"} ·{" "}
-                    {p.totalQuantity} units
-                  </Text>
-                </VStack>
-                <Text variant="label-lg" tone="primary">
-                  {money(p.totalValue)}
-                </Text>
-              </HStack>
-            </Card>
+            <ListRow
+              key={p.id}
+              title={p.receiptNo}
+              subtitle={`${new Date(p.receivedAt).toLocaleDateString()} · ${p.lineCount} line${p.lineCount === 1 ? "" : "s"} · ${p.totalQuantity} units`}
+              value={money(p.totalValue)}
+            />
           ))}
-        </VStack>
+        </ListGroup>
       )}
 
       {ledger.length > 0 ? (
-        <VStack gap={12} style={{ marginTop: 24 }}>
-          <Text variant="h3" tone="primary">
-            Account statement
-          </Text>
-          <Card padded={false} style={{ paddingVertical: 4 }}>
+        <View>
+          <SectionHeader title="Account statement" />
+          {/* ListGroup already owns the surface and the hairlines between rows,
+              so the hand-rolled divider Views are gone. The rows themselves stay
+              hand-built rather than becoming ListRows: the signed movement has
+              to sit before the running balance, and ListRow puts `right` after
+              `value`. */}
+          <ListGroup>
             {ledger.map((r, i) => (
-              <View key={i}>
-                {i > 0 ? (
-                  <View
-                    style={{
-                      height: 1,
-                      backgroundColor: palette.border.subtle,
-                    }}
-                  />
-                ) : null}
-                <HStack
-                  gap={10}
-                  align="center"
-                  justify="space-between"
-                  style={{ paddingVertical: 10, paddingHorizontal: 12 }}
-                >
-                  <VStack gap={1} flex={1}>
-                    <Text variant="body-sm" tone="primary">
-                      {r.type} {r.ref ? `· ${r.ref}` : ""}
-                    </Text>
-                    <Text variant="caption" tone="tertiary">
-                      {new Date(r.date).toLocaleDateString("en-IN")}
-                      {r.note ? ` · ${r.note}` : ""}
-                    </Text>
-                  </VStack>
-                  <Text
-                    variant="body-sm"
-                    weight="600"
-                    style={{
+              <HStack
+                key={i}
+                gap={10}
+                align="center"
+                justify="space-between"
+                style={{ paddingVertical: 10, paddingHorizontal: 14 }}
+              >
+                <VStack gap={1} flex={1}>
+                  <Text variant="body-sm" tone="primary">
+                    {r.type} {r.ref ? `· ${r.ref}` : ""}
+                  </Text>
+                  <Text variant="caption" tone="tertiary">
+                    {new Date(r.date).toLocaleDateString("en-IN")}
+                    {r.note ? ` · ${r.note}` : ""}
+                  </Text>
+                </VStack>
+                <Text
+                  variant="body-sm"
+                  weight="600"
+                  style={[
+                    numeric,
+                    {
                       color: r.debit
                         ? palette.danger.text
                         : palette.success.text,
-                    }}
-                  >
-                    {r.debit ? `+${money(r.debit)}` : `−${money(r.credit)}`}
-                  </Text>
-                  <Text
-                    variant="body-sm"
-                    weight="700"
-                    tone="primary"
-                    style={{ width: 74, textAlign: "right" }}
-                  >
-                    {money(r.balance)}
-                  </Text>
-                </HStack>
-              </View>
+                    },
+                  ]}
+                >
+                  {r.debit ? `+${money(r.debit)}` : `−${money(r.credit)}`}
+                </Text>
+                <Text
+                  variant="body-sm"
+                  weight="600"
+                  tone="primary"
+                  style={[numeric, { width: 74, textAlign: "right" }]}
+                >
+                  {money(r.balance)}
+                </Text>
+              </HStack>
             ))}
-          </Card>
-        </VStack>
+          </ListGroup>
+        </View>
       ) : null}
 
       {canManage && supplier?.isActive && (
@@ -316,7 +300,7 @@ export default function SupplierDetailScreen() {
           label="Deactivate supplier"
           variant="destructive"
           icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2} />}
-          style={{ marginTop: 24 }}
+          style={{ marginTop: 20 }}
           loading={removeMut.isPending}
           onPress={() => setRemoveOpen(true)}
         />

@@ -142,7 +142,7 @@ export default function SaleDetailScreen() {
         <HStack justify="space-between" align="flex-start">
           <VStack gap={3}>
             <Text variant="caption" tone="tertiary">
-              BILL TO
+              Bill to
             </Text>
             <Text variant="label-lg" tone="primary">
               {sale.customerName}

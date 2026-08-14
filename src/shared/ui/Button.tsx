@@ -1,7 +1,6 @@
 /**
- * Button — clinical / minimal: solid fill, soft elevation, large rounded
- * corners, subtle scale-press. Variants: primary (teal), accent (cobalt),
- * secondary (hairline outline), ghost, destructive.
+ * Button — flat fill, tight radius, no shadow. Variants: primary (brand green),
+ * accent (cobalt), secondary (hairline outline), ghost, destructive.
  */
 import React from "react";
 import {
@@ -10,19 +9,20 @@ import {
   ActivityIndicator,
   StyleSheet,
   ViewStyle,
+  useWindowDimensions,
 } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
 } from "react-native-reanimated";
-import { palette, radius, shadows, outline } from "../designSystem";
+import { palette, radius, outline, layout } from "../designSystem";
 import { Text } from "./Text";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type Variant = "primary" | "secondary" | "ghost" | "accent" | "destructive";
-type Size = "sm" | "md" | "lg";
+type Size = "xs" | "sm" | "md" | "lg";
 
 interface Props {
   label: string;
@@ -37,13 +37,27 @@ interface Props {
   style?: ViewStyle;
 }
 
-const SIZES = {
-  // 44 is the Apple HIG / WCAG-AAA touch floor. At 38 these were reachable
-  // with a mouse and fiddly with a thumb, and "sm" is what every row action
-  // and toolbar button uses.
-  sm: { height: 44, px: 16, fontSize: 13 as const },
-  md: { height: 48, px: 18, fontSize: 15 as const },
-  lg: { height: 54, px: 22, fontSize: 16 as const },
+/**
+ * Two ladders, because this one codebase is both a phone app and a counter-PC
+ * desktop app and the right control height is genuinely different.
+ *
+ * A pointer wants 32px (Atlassian's default; Polaris sits at 28–32) — 48px
+ * buttons on a 1440px screen are what made the toolbars look oversized. A thumb
+ * wants the 44px Apple HIG floor. Neither number is correct for both, so the
+ * component picks per layout rather than shipping one compromise.
+ */
+const DESKTOP = {
+  xs: { height: 28, px: 10, fontSize: 12 as const },
+  sm: { height: 32, px: 12, fontSize: 13 as const },
+  md: { height: 36, px: 14, fontSize: 14 as const },
+  lg: { height: 40, px: 18, fontSize: 14 as const },
+};
+
+const PHONE = {
+  xs: { height: 34, px: 12, fontSize: 13 as const },
+  sm: { height: 40, px: 14, fontSize: 13 as const },
+  md: { height: 44, px: 16, fontSize: 14 as const },
+  lg: { height: 48, px: 20, fontSize: 15 as const },
 };
 
 export function Button({
@@ -59,10 +73,10 @@ export function Button({
   style,
 }: Props) {
   const press = useSharedValue(0);
+  const { width } = useWindowDimensions();
   const isDisabled = disabled || loading;
   const c = getVariantColors(variant);
-  const s = SIZES[size];
-  const flat = variant === "ghost";
+  const s = (width >= layout.wideBreakpoint ? DESKTOP : PHONE)[size];
 
   /**
    * The disabled dimming lives IN here, not in the style array.
@@ -104,7 +118,8 @@ export function Button({
             borderColor: c.border,
             borderWidth: c.borderWidth,
           },
-          !flat && variant !== "secondary" && shadows.sm,
+          // No shadow. A filled button is already the loudest thing on the row;
+          // lifting it off the page as well is the "junior" tell.
           animStyle,
         ]}
       >
@@ -112,15 +127,15 @@ export function Button({
           <ActivityIndicator color={c.text} size="small" />
         ) : (
           <View style={styles.row}>
-            {icon && <View style={{ marginRight: 8 }}>{icon}</View>}
+            {icon && <View style={{ marginRight: 6 }}>{icon}</View>}
             <Text
-              variant="label-lg"
+              variant="label"
               weight="600"
               style={{ color: c.text, fontSize: s.fontSize }}
             >
               {label}
             </Text>
-            {rightIcon && <View style={{ marginLeft: 8 }}>{rightIcon}</View>}
+            {rightIcon && <View style={{ marginLeft: 6 }}>{rightIcon}</View>}
           </View>
         )}
       </AnimatedPressable>

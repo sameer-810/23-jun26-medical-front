@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import {
   Building2,
@@ -15,7 +15,7 @@ import {
 } from "@modules/admin/hooks/useAdmin";
 import { AdminNav } from "@modules/admin/components/AdminNav";
 import type { AdminOrg } from "@modules/admin/types";
-import { palette, radius } from "@shared/designSystem";
+import { palette, accents, numeric } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -23,7 +23,7 @@ import {
   HStack,
   Card,
   Button,
-  StatTile,
+  StatRow,
   StatusChip,
   TextField,
   Pagination,
@@ -62,35 +62,26 @@ export default function AdminDashboardScreen() {
     >
       <AdminNav active="pharmacies" />
 
-      {/* Platform overview */}
-      <HStack gap={12} style={{ marginBottom: 16, flexWrap: "wrap" }}>
-        <StatTile
-          label="Total pharmacies"
-          value={String(overview?.totalOrgs ?? "—")}
-          icon={Building2}
-          tone="teal"
-          style={styles.tile}
-        />
-        <StatTile
-          label="Active"
-          value={String(overview?.activeOrgs ?? "—")}
-          tone="light"
-          style={styles.tile}
-        />
-        <StatTile
-          label="Suspended"
-          value={String(overview?.suspendedOrgs ?? "—")}
-          tone="light"
-          style={styles.tile}
-        />
-        <StatTile
-          label="Total users"
-          value={String(overview?.totalUsers ?? "—")}
-          icon={Users}
-          tone="slate"
-          style={styles.tile}
-        />
-      </HStack>
+      {/* Platform overview — one hairline-divided panel. Only "Suspended"
+          earns colour, and only while there is something suspended: the other
+          three are just counts and a count is not a status. */}
+      <StatRow
+        style={{ marginBottom: 16 }}
+        stats={[
+          {
+            label: "Total pharmacies",
+            value: String(overview?.totalOrgs ?? "—"),
+          },
+          { label: "Active", value: String(overview?.activeOrgs ?? "—") },
+          {
+            label: "Suspended",
+            value: String(overview?.suspendedOrgs ?? "—"),
+            accent:
+              (overview?.suspendedOrgs ?? 0) > 0 ? accents.amber : undefined,
+          },
+          { label: "Total users", value: String(overview?.totalUsers ?? "—") },
+        ]}
+      />
 
       {/* Search */}
       <View style={{ marginBottom: 12 }}>
@@ -150,10 +141,10 @@ function PharmacyRow({ org, onPress }: { org: AdminOrg; onPress: () => void }) {
     <Card elevation="base" onPress={onPress}>
       <VStack gap={10}>
         <HStack gap={10} align="center" justify="space-between">
+          {/* The tinted building bubble is gone. Every row carried the same
+              icon, so it identified nothing — it only pushed the name in by
+              46px and put a second colour next to the status chip. */}
           <HStack gap={10} align="center" style={{ flex: 1 }}>
-            <View style={styles.orgIcon}>
-              <Building2 size={18} color={palette.teal[600]} strokeWidth={2} />
-            </View>
             <VStack gap={2} flex={1}>
               <Text variant="label-lg" tone="primary" numberOfLines={1}>
                 {org.name}
@@ -194,21 +185,9 @@ function MiniStat({
   return (
     <HStack gap={6} align="center">
       <Icon size={14} color={palette.text.tertiary} strokeWidth={1.8} />
-      <Text variant="body-sm" tone="secondary">
+      <Text variant="body-sm" tone="secondary" style={numeric}>
         {value.toLocaleString("en-IN")} {label}
       </Text>
     </HStack>
   );
 }
-
-const styles = StyleSheet.create({
-  tile: { flexGrow: 1, flexBasis: 160 },
-  orgIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
-    backgroundColor: palette.teal[50],
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});

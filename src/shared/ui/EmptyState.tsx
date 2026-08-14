@@ -10,38 +10,65 @@ interface Props {
   title: string;
   message?: string;
   action?: React.ReactNode;
+  /** For an empty state filling a whole page rather than a card. */
+  large?: boolean;
 }
 
-export function EmptyState({ icon: Icon, title, message, action }: Props) {
+/**
+ * EmptyState — compact by default.
+ *
+ * The old one opened with a 76px tinted circle 64px down the page, a 16px
+ * heading and a centred paragraph, which on the billing screen produced a
+ * near-full-screen "No items yet" monument above the thing the pharmacist
+ * actually needed. An empty state is a caption explaining why a container is
+ * empty, not an illustration — it should sit inside the container it describes
+ * and take about three lines.
+ */
+export function EmptyState({
+  icon: Icon,
+  title,
+  message,
+  action,
+  large = false,
+}: Props) {
   return (
     <VStack
       align="center"
-      gap={12}
-      style={{ marginTop: 64, paddingHorizontal: 24 }}
+      gap={6}
+      style={{
+        paddingVertical: large ? 40 : 28,
+        paddingHorizontal: 20,
+      }}
     >
       <View style={styles.icon}>
-        <Icon size={32} color={palette.teal[500]} strokeWidth={1.6} />
+        <Icon size={18} color={palette.text.disabled} strokeWidth={2} />
       </View>
-      <Text variant="h3" tone="secondary" align="center">
+      <Text variant="label" tone="secondary" align="center">
         {title}
       </Text>
       {message ? (
-        <Text variant="body-sm" tone="tertiary" align="center">
+        <Text
+          variant="body-sm"
+          tone="tertiary"
+          align="center"
+          style={{ maxWidth: 340 }}
+        >
           {message}
         </Text>
       ) : null}
-      {action ? <View style={{ marginTop: 8 }}>{action}</View> : null}
+      {action ? <View style={{ marginTop: 6 }}>{action}</View> : null}
     </VStack>
   );
 }
 
 const styles = StyleSheet.create({
   icon: {
-    width: 76,
-    height: 76,
+    width: 36,
+    height: 36,
     borderRadius: radius.full,
-    backgroundColor: palette.teal[50],
+    backgroundColor: palette.surface.sunken,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 2,
   },
 });

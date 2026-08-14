@@ -169,7 +169,7 @@ function UserRow({ user, onPress }: { user: TeamUser; onPress: () => void }) {
       <HStack gap={14} align="center">
         <Avatar
           name={user.fullName}
-          size={46}
+          size={32}
           tone={isAdmin ? "cobalt" : "teal"}
         />
         <VStack gap={4} flex={1}>

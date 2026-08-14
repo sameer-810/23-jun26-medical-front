@@ -42,8 +42,8 @@ export function Fab({ onPress, icon, label }: Props) {
 const styles = StyleSheet.create({
   wrap: { position: "absolute", right: 24, bottom: 28 },
   fab: {
-    width: 58,
-    height: 58,
+    width: 52,
+    height: 52,
     borderRadius: radius.full,
     backgroundColor: palette.teal[700],
     alignItems: "center",

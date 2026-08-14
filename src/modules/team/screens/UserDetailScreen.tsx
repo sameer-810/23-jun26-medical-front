@@ -103,7 +103,7 @@ export default function UserDetailScreen() {
         <HStack gap={14} align="center">
           <Avatar
             name={user.fullName}
-            size={54}
+            size={40}
             tone={isAdmin ? "cobalt" : "teal"}
           />
           <VStack gap={4} flex={1}>

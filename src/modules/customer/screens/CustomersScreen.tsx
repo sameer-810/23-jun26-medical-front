@@ -1,21 +1,19 @@
 import React, { useState } from "react";
 import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Plus, Users, Phone, ChevronRight } from "lucide-react-native";
+import { Plus, Users } from "lucide-react-native";
 import { useCustomers } from "@modules/customer/hooks/useCustomers";
 import { Customer } from "@modules/customer/types";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
-import { palette } from "@shared/designSystem";
 import {
   Screen,
   Text,
   VStack,
   HStack,
   Card,
-  Avatar,
   Button,
-  StatusChip,
+  ListRow,
   SearchInput,
   Pagination,
   DataTable,
@@ -161,10 +159,9 @@ function ListSkeleton() {
       {[0, 1, 2, 3, 4].map((i) => (
         <Card key={i} elevation="base">
           <HStack gap={14} align="center">
-            <Skeleton width={46} height={46} rounded="full" />
             <VStack gap={6} flex={1}>
-              <Skeleton width="45%" height={16} />
-              <Skeleton width="30%" height={12} />
+              <Skeleton width="45%" height={14} />
+              <Skeleton width="30%" height={11} />
             </VStack>
           </HStack>
         </Card>
@@ -180,38 +177,15 @@ function CustomerRow({
   customer: Customer;
   onPress: () => void;
 }) {
+  // The GSTIN was a chip of its own; it is an identifier, not a status, so it
+  // belongs on the identifier line beside the mobile number.
   return (
-    <Card onPress={onPress} elevation="base">
-      <HStack gap={14} align="center">
-        <Avatar name={customer.name} size={46} />
-        <VStack gap={4} flex={1}>
-          <Text variant="label-lg" tone="primary" numberOfLines={1}>
-            {customer.name}
-          </Text>
-          <HStack gap={6} align="center">
-            {customer.mobile ? (
-              <>
-                <Phone
-                  size={13}
-                  color={palette.text.tertiary}
-                  strokeWidth={1.9}
-                />
-                <Text variant="body-sm" tone="tertiary">
-                  {customer.mobile}
-                </Text>
-              </>
-            ) : (
-              <Text variant="body-sm" tone="tertiary">
-                No mobile
-              </Text>
-            )}
-          </HStack>
-          {customer.gstin ? (
-            <StatusChip label={`GSTIN ${customer.gstin}`} tone="neutral" />
-          ) : null}
-        </VStack>
-        <ChevronRight size={18} color={palette.text.tertiary} strokeWidth={2} />
-      </HStack>
-    </Card>
+    <ListRow
+      title={customer.name}
+      subtitle={[customer.mobile || "No mobile", customer.gstin]
+        .filter(Boolean)
+        .join(" · ")}
+      onPress={onPress}
+    />
   );
 }
