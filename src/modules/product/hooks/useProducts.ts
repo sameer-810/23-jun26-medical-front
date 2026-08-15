@@ -45,6 +45,24 @@ export const useCreateProduct = () => {
   });
 };
 
+/**
+ * Removes a product from the Low Stock list by clearing its reorder level.
+ *
+ * Invalidates the stock queries as well as products, because the row the user
+ * just acted on lives on the Inventory screen and has to disappear from it.
+ */
+export const useStopReordering = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => productApi.stopReordering(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["stock"] });
+      qc.invalidateQueries({ queryKey: ["stock-value"] });
+    },
+  });
+};
+
 export const useUpdateProduct = (id: string) => {
   const qc = useQueryClient();
   return useMutation({

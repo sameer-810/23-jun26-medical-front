@@ -41,6 +41,22 @@ export const productApi = {
     );
     return res.data.data;
   },
+  /**
+   * Take a product off the reorder list.
+   *
+   * A reorder level of zero is what "low stock" is measured against, so
+   * clearing it removes the product from that list without touching its stock,
+   * its batches or its history. Deliberately a separate call from `update`,
+   * which takes a whole product payload — this one must not be able to carry
+   * anything else along with it.
+   */
+  stopReordering: async (id: string) => {
+    const res = await apiClient.patch<{ success: boolean; data: Product }>(
+      `/products/${id}`,
+      { reorderLevel: 0 },
+    );
+    return res.data.data;
+  },
   remove: async (id: string) => {
     const res = await apiClient.delete(`/products/${id}`);
     return res.data;

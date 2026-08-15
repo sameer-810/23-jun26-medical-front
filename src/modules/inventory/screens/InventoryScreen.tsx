@@ -8,16 +8,21 @@ import {
   CalendarSearch,
 } from "lucide-react-native";
 import { useStock, useStockValue } from "@modules/inventory/hooks/useInventory";
+import { useStopReordering } from "@modules/product/hooks/useProducts";
+import { useAuthStore } from "@shared/store/useAuthStore";
+import { PERMISSIONS } from "@shared/permissions";
 import { StockSummaryItem } from "@modules/inventory/types";
 import { palette, layout, numeric } from "@shared/designSystem";
 import {
   Screen,
   Text,
   VStack,
+  HStack,
   Button,
   StatRow,
   StatusChip,
   Banner,
+  ConfirmDialog,
   ListRow,
   ChipsRow,
   Pagination,
@@ -53,6 +58,16 @@ export default function InventoryScreen() {
   }
 
   const { data: value } = useStockValue();
+  /**
+   * Removing a product from the reorder list edits the product, so it is gated
+   * on the same permission as editing one. A counter assistant who cannot
+   * change a product must not be able to make it stop being reordered either.
+   */
+  const canManage = useAuthStore((st) => st.hasPermission)(
+    PERMISSIONS.PRODUCTS_MANAGE,
+  );
+  const stopReordering = useStopReordering();
+  const [confirmItem, setConfirmItem] = useState<StockSummaryItem | null>(null);
   const unpricedLots = value?.missingCostLots ?? 0;
   const unpricedProducts = value?.missingPriceProducts ?? 0;
   const params: {
@@ -177,11 +192,28 @@ export default function InventoryScreen() {
     {
       key: "status",
       header: "",
-      width: 130,
+      width: 190,
       align: "right",
+      /**
+       * "Remove" clears the reorder level, which is what Low Stock is measured
+       * against — the product drops off this list and nothing else about it
+       * changes. It appears only on low rows, and only for someone allowed to
+       * edit products.
+       */
       render: (s) =>
         s.isLow ? (
-          <StatusChip label="Low stock" tone="warning" />
+          <HStack gap={8} align="center" justify="flex-end">
+            <StatusChip label="Low stock" tone="warning" />
+            {canManage ? (
+              <Button
+                label="Remove"
+                size="xs"
+                variant="secondary"
+                fullWidth={false}
+                onPress={() => setConfirmItem(s)}
+              />
+            ) : null}
+          </HStack>
         ) : (
           <ChevronRight
             size={18}
@@ -300,7 +332,15 @@ export default function InventoryScreen() {
           rows={list}
           keyExtractor={(s) => s.productId}
           onRowPress={open}
-          mobileCard={(s) => <StockRow item={s} onPress={() => open(s)} />}
+          mobileCard={(s) => (
+            <StockRow
+              item={s}
+              onPress={() => open(s)}
+              onRemove={
+                canManage && s.isLow ? () => setConfirmItem(s) : undefined
+              }
+            />
+          )}
           emptyIcon={filter === "low" ? PackageX : Boxes}
           emptyTitle={
             isLoading
@@ -329,10 +369,33 @@ export default function InventoryScreen() {
           </View>
         ) : null}
       </View>
+
+      {/*
+        Explicit about what it does and does not do. "Remove" next to a stock
+        figure invites the reading that stock is being deleted; it is not, and
+        the pharmacist has to know that before they tap it.
+      */}
+      <ConfirmDialog
+        visible={Boolean(confirmItem)}
+        title="Remove from low stock?"
+        message={
+          confirmItem
+            ? `${confirmItem.name} will stop appearing in the low-stock list. Its stock, batches and history are not changed. You can put it back by setting a reorder level on the product.`
+            : ""
+        }
+        confirmLabel="Remove"
+        loading={stopReordering.isPending}
+        onCancel={() => setConfirmItem(null)}
+        onConfirm={() => {
+          if (!confirmItem) return;
+          stopReordering.mutate(confirmItem.productId, {
+            onSettled: () => setConfirmItem(null),
+          });
+        }}
+      />
     </Screen>
   );
 }
-
 /**
  * The phone rendering of a stock line.
  *
@@ -345,9 +408,12 @@ export default function InventoryScreen() {
 function StockRow({
   item,
   onPress,
+  onRemove,
 }: {
   item: StockSummaryItem;
   onPress: () => void;
+  /** Omitted when the user may not edit products. */
+  onRemove?: () => void;
 }) {
   return (
     <ListRow
@@ -358,7 +424,20 @@ function StockRow({
       value={`${item.available}/${item.onHand}`}
       valueHint={item.baseUnit}
       right={
-        item.isLow ? <StatusChip label="Low stock" tone="warning" /> : undefined
+        item.isLow ? (
+          <HStack gap={6} align="center">
+            <StatusChip label="Low stock" tone="warning" />
+            {onRemove ? (
+              <Button
+                label="Remove"
+                size="xs"
+                variant="secondary"
+                fullWidth={false}
+                onPress={onRemove}
+              />
+            ) : null}
+          </HStack>
+        ) : undefined
       }
       onPress={onPress}
     />
