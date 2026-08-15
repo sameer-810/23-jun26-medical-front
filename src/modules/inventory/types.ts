@@ -11,6 +11,14 @@ export interface StockSummaryItem {
   reserved: number;
   available: number;
   costValue: number;
+  /**
+   * How many lots of this product hold stock with no purchase price recorded.
+   *
+   * `costValue` cannot distinguish "cost nothing" from "nobody entered a
+   * cost" — both come back as 0. When this is above zero the row's cost is
+   * incomplete and must not be rendered as a confident ₹0.
+   */
+  unpricedLots: number;
   sellValue: number;
   batches: number;
   locations: number;
@@ -22,6 +30,10 @@ export interface StockValue {
   sellValue: number;
   totalUnits: number;
   products: number;
+  /** Lots holding stock with no purchase price — `costValue` is short by these. */
+  missingCostLots?: number;
+  /** Products holding stock with no selling price — `sellValue` is short by these. */
+  missingPriceProducts?: number;
 }
 
 export interface BatchLocation {

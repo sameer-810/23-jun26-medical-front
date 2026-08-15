@@ -4,6 +4,8 @@ export interface AdminOverview {
   suspendedOrgs: number;
   totalUsers: number;
   catalogProducts: number;
+  /** Registrations waiting on a quotation — somebody is locked out until 0. */
+  pendingOrgs?: number;
 }
 
 export interface AdminOrgOwner {
@@ -43,6 +45,21 @@ export interface AdminOrg {
   industry: string;
   isActive: boolean;
   status: "active" | "suspended";
+  /**
+   * The onboarding gate, separate from `status` above.
+   *
+   * A pharmacy can be `isActive` and still `pending` — registered but never
+   * approved, and therefore unable to log in. The console must not read one
+   * from the other.
+   */
+  approvalStatus: "pending" | "approved" | "rejected";
+  approvalRequestedAt: string | null;
+  approvalDecidedAt: string | null;
+  approvalDecidedBy: string;
+  approvalNote: string;
+  /** Who to ring about the quotation, as opposed to the shop's own details. */
+  contactPersonalEmail: string;
+  contactPhone: string;
   owner: AdminOrgOwner | null;
   stats: { users: number; products: number; sales: number };
   settings?: AdminOrgSettings | null;

@@ -26,8 +26,28 @@ export interface SignupPayload {
   firstName: string;
   lastName?: string;
   email: string;
-  phone?: string;
+  /** Required now — sales rings this about the quotation. */
+  phone: string;
+  /** The owner's own address, distinct from the shop's shared login email. */
+  personalEmail: string;
   password: string;
+}
+
+/**
+ * What /auth/signup returns now.
+ *
+ * Deliberately NOT an `AuthResponse`: registration creates a workspace queued
+ * for approval and issues no session, so there are no tokens to hand back. A
+ * shared type would have let a caller read `data.accessToken`, get `undefined`,
+ * and sign in with a blank token.
+ */
+export interface SignupResponse {
+  success: boolean;
+  data: {
+    user: User;
+    organization: Organization;
+    pendingApproval: boolean;
+  };
 }
 
 export interface ForgotPasswordPayload {

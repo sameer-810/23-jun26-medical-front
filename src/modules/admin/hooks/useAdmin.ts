@@ -66,6 +66,29 @@ export function useSetSuspended() {
   });
 }
 
+/**
+ * Approve or decline a registration waiting on a quotation.
+ *
+ * Separate hook from `useSetSuspended` because they are different decisions
+ * with different consequences: approving opens an account for the first time,
+ * suspending closes one that has been trading.
+ */
+export function useSetApproval() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      approve,
+      note,
+    }: {
+      id: string;
+      approve: boolean;
+      note?: string;
+    }) => (approve ? adminApi.approve(id) : adminApi.reject(id, note)),
+    onSuccess: () => invalidate(qc),
+  });
+}
+
 // ---- Pharmacy users ----
 export function useOrgUsers(id: string | undefined) {
   return useQuery({

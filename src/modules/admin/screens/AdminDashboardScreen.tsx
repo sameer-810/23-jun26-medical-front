@@ -34,11 +34,22 @@ export default function AdminDashboardScreen() {
   const navigation = useNavigation<any>();
 
   const [search, setSearch] = useState("");
+  /**
+   * Set by the "Awaiting approval" tile. Undefined shows everything; tapping
+   * the tile again clears it, so the filter can't strand an operator on an
+   * empty list with no visible way back.
+   */
+  const [status, setStatus] = useState<"pending" | undefined>(undefined);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
 
   const { data: overview } = useAdminOverview();
-  const { data, isLoading } = useAdminOrganizations({ page, limit, search });
+  const { data, isLoading } = useAdminOrganizations({
+    page,
+    limit,
+    search,
+    status,
+  });
   const orgs = data?.data ?? [];
   const meta = data?.meta;
 
@@ -71,6 +82,22 @@ export default function AdminDashboardScreen() {
           {
             label: "Total pharmacies",
             value: String(overview?.totalOrgs ?? "—"),
+          },
+          /**
+           * Leads the row when there is a queue.
+           *
+           * These are people who registered and cannot log in until somebody
+           * here clicks approve — the one figure on this dashboard with a
+           * person waiting behind it. It only takes an accent when non-zero,
+           * so a cleared queue does not sit there glowing amber.
+           */
+          {
+            label: "Awaiting approval",
+            value: String(overview?.pendingOrgs ?? 0),
+            accent:
+              (overview?.pendingOrgs ?? 0) > 0 ? accents.amber : undefined,
+            onPress: () =>
+              setStatus((cur) => (cur === "pending" ? undefined : "pending")),
           },
           { label: "Active", value: String(overview?.activeOrgs ?? "—") },
           {

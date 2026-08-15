@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react-native";
 import { useLogin } from "@modules/auth/hooks/useAuth";
 import { loginSchema } from "@modules/auth/auth.validation";
-import { apiErrorMessage } from "@api/apiClient";
+import { apiErrorMessage, apiErrorCode } from "@api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
 import { Text, VStack, HStack, Button } from "@shared/ui";
@@ -16,6 +16,12 @@ type Nav = { navigate: (s: string) => void };
 export default function LoginScreen({ navigation }: { navigation: Nav }) {
   const [show, setShow] = useState(false);
   const mut = useLogin();
+  // WORKSPACE_REJECTED reads the same way to the applicant — neither is a
+  // credential problem, and both are resolved by talking to us, not retrying.
+  const errCode = apiErrorCode(mut.error);
+  const isPending =
+    errCode === "WORKSPACE_PENDING_APPROVAL" ||
+    errCode === "WORKSPACE_REJECTED";
   // onTouched: validate a field once it's blurred, then keep it live — the same
   // "don't scold mid-type" UX, now via the maintained standard library.
   const { control, handleSubmit } = useForm({
@@ -34,13 +40,35 @@ export default function LoginScreen({ navigation }: { navigation: Nav }) {
       subtitle="Sign in to your Plusveda workspace"
     >
       <VStack gap={16}>
-        {mut.isError && (
+        {/*
+          A registration still in the queue is not a failed sign-in.
+          
+          It renders as a calm amber notice rather than a red error, because
+          the person did nothing wrong and there is nothing for them to retry —
+          telling them "invalid credentials" in red would send them round the
+          password-reset loop for an account that is simply not open yet.
+        */}
+        {mut.isError && isPending ? (
+          <View style={pendingBox}>
+            <VStack gap={4}>
+              <Text variant="label" tone="primary">
+                Your registration is under review
+              </Text>
+              <Text variant="body-sm" tone="secondary">
+                {apiErrorMessage(
+                  mut.error,
+                  "You'll receive an email once your workspace is approved.",
+                )}
+              </Text>
+            </VStack>
+          </View>
+        ) : mut.isError ? (
           <View style={errorBox}>
             <Text variant="body-sm" tone="danger">
               {apiErrorMessage(mut.error, "Invalid email or password")}
             </Text>
           </View>
-        )}
+        ) : null}
 
         <ControlledTextField
           control={control}
@@ -124,4 +152,12 @@ const errorBox = {
   backgroundColor: palette.danger.bg,
   borderWidth: 1,
   borderColor: palette.danger.border,
+} as const;
+
+const pendingBox = {
+  backgroundColor: palette.warning.bg,
+  borderColor: palette.warning.border,
+  borderWidth: 1,
+  borderRadius: radius.md,
+  padding: 14,
 } as const;

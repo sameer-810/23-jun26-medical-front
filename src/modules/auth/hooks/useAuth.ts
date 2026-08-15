@@ -24,10 +24,18 @@ export const useLogin = () =>
     onSuccess: applyAuth,
   });
 
+/**
+ * Registering no longer signs you in.
+ *
+ * `applyAuth` used to run here, storing whatever came back and dropping the
+ * user straight into the dashboard. The workspace is now queued for approval
+ * and the response carries no tokens, so applying it would have written a null
+ * session over a real one. The screen reads `isSuccess` and shows the
+ * "awaiting approval" state instead.
+ */
 export const useSignup = () =>
   useMutation({
     mutationFn: (payload: SignupPayload) => authApi.signup(payload),
-    onSuccess: applyAuth,
   });
 
 export const useForgotPassword = () =>

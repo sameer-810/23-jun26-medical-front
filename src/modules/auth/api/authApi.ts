@@ -5,6 +5,7 @@ import {
   MessageResponse,
   LoginPayload,
   SignupPayload,
+  SignupResponse,
   ForgotPasswordPayload,
   SessionList,
   ResetPasswordPayload,
@@ -20,13 +21,12 @@ export const authApi = {
     });
     return res.data;
   },
-  signup: async (payload: SignupPayload): Promise<AuthResponse> => {
-    const deviceId = await getDeviceId();
-    const res = await apiClient.post<AuthResponse>("/auth/signup", {
-      ...payload,
-      deviceId,
-      deviceName: getDeviceName(),
-    });
+  /**
+   * Registers a workspace. Does NOT sign you in — the account is queued for
+   * admin approval and login is refused until then.
+   */
+  signup: async (payload: SignupPayload): Promise<SignupResponse> => {
+    const res = await apiClient.post<SignupResponse>("/auth/signup", payload);
     return res.data;
   },
   forgotPassword: async (

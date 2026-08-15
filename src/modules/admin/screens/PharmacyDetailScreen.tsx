@@ -15,6 +15,7 @@ import {
   useOrgSessions,
   useRevokeOrgSessions,
   useSetSuspended,
+  useSetApproval,
   useArchivePharmacy,
   useAssignPlan,
   usePlans,
@@ -46,6 +47,7 @@ export default function PharmacyDetailScreen() {
   const revoke = useRevokeOrgSessions(id);
   const { data: plans } = usePlans(false);
   const setSuspended = useSetSuspended();
+  const setApproval = useSetApproval();
   const archive = useArchivePharmacy();
   const assignPlan = useAssignPlan(id);
 
@@ -107,10 +109,22 @@ export default function PharmacyDetailScreen() {
                     </Text>
                   </VStack>
                 </HStack>
-                <StatusChip
-                  label={org.status === "active" ? "Active" : "Suspended"}
-                  tone={org.status === "active" ? "success" : "danger"}
-                />
+                {/*
+                  Approval outranks suspension in what an operator needs to
+                  see. A workspace can be `isActive` and still be pending —
+                  showing "Active" for somebody who cannot log in is the
+                  single most misleading thing this page could say.
+                */}
+                {org.approvalStatus === "pending" ? (
+                  <StatusChip label="Awaiting approval" tone="warning" />
+                ) : org.approvalStatus === "rejected" ? (
+                  <StatusChip label="Declined" tone="danger" />
+                ) : (
+                  <StatusChip
+                    label={org.status === "active" ? "Active" : "Suspended"}
+                    tone={org.status === "active" ? "success" : "danger"}
+                  />
+                )}
               </HStack>
 
               {org.owner ? (
@@ -307,10 +321,12 @@ export default function PharmacyDetailScreen() {
             </VStack>
           </Card>
 
-          {(setSuspended.isError || archive.isError) && (
+          {(setSuspended.isError || archive.isError || setApproval.isError) && (
             <View style={styles.errorBox}>
               <Text variant="body-sm" tone="danger">
-                {apiErrorMessage(setSuspended.error || archive.error)}
+                {apiErrorMessage(
+                  setSuspended.error || archive.error || setApproval.error,
+                )}
               </Text>
             </View>
           )}
@@ -353,6 +369,66 @@ export default function PharmacyDetailScreen() {
                 />
               </View>
             </HStack>
+
+            {/*
+              The approval decision, shown only while one is outstanding.
+              
+              Placed above suspend/archive because for a pending pharmacy it is
+              the ONLY action that matters — everything below it operates on an
+              account nobody can log into yet.
+            */}
+            {org.approvalStatus === "pending" ? (
+              <View style={pendingPanel}>
+                <VStack gap={10}>
+                  <VStack gap={2}>
+                    <Text variant="label" tone="primary">
+                      Waiting for your decision
+                    </Text>
+                    <Text variant="body-sm" tone="secondary">
+                      Registered{" "}
+                      {org.approvalRequestedAt
+                        ? new Date(org.approvalRequestedAt).toLocaleDateString(
+                            "en-IN",
+                          )
+                        : "recently"}
+                      . They cannot sign in until this is approved.
+                    </Text>
+                  </VStack>
+                  {org.contactPersonalEmail || org.contactPhone ? (
+                    <Text variant="body-sm" tone="tertiary">
+                      Contact: {org.contactPhone || "—"}
+                      {org.contactPersonalEmail
+                        ? ` · ${org.contactPersonalEmail}`
+                        : ""}
+                    </Text>
+                  ) : null}
+                  <HStack gap={8} wrap>
+                    <Button
+                      label="Approve & activate"
+                      size="sm"
+                      fullWidth={false}
+                      icon={
+                        <CheckCircle2
+                          size={16}
+                          color="#FFFFFF"
+                          strokeWidth={2}
+                        />
+                      }
+                      loading={setApproval.isPending}
+                      onPress={() => setApproval.mutate({ id, approve: true })}
+                    />
+                    <Button
+                      label="Decline"
+                      size="sm"
+                      variant="secondary"
+                      fullWidth={false}
+                      loading={setApproval.isPending}
+                      onPress={() => setApproval.mutate({ id, approve: false })}
+                    />
+                  </HStack>
+                </VStack>
+              </View>
+            ) : null}
 
             {org.status === "active" ? (
               <Button
@@ -430,3 +506,11 @@ const styles = StyleSheet.create({
     borderColor: palette.danger.border,
   },
 });
+
+const pendingPanel = {
+  backgroundColor: palette.warning.bg,
+  borderColor: palette.warning.border,
+  borderWidth: 1,
+  borderRadius: radius.md,
+  padding: 14,
+} as const;

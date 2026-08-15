@@ -63,6 +63,19 @@ function fieldLabel(path: (string | number)[]) {
   return idx >= 0 ? `Line ${Number(parts[idx]) + 1} ${name}` : String(name);
 }
 
+/**
+ * The server's machine-readable error code, when it sent one.
+ *
+ * Screens branch on this rather than on the message text — a pending workspace
+ * needs a calm "we're reviewing it" panel and a wrong password needs a red
+ * error, and matching on wording breaks the first time somebody rewrites the
+ * sentence.
+ */
+export function apiErrorCode(err: unknown): string | undefined {
+  return (err as { response?: { data?: { error?: { code?: string } } } })
+    ?.response?.data?.error?.code;
+}
+
 export function apiErrorMessage(
   err: unknown,
   fallback = "Something went wrong",

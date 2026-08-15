@@ -17,6 +17,7 @@ import {
   Button,
   StatRow,
   StatusChip,
+  Banner,
   ListRow,
   ChipsRow,
   Pagination,
@@ -52,6 +53,8 @@ export default function InventoryScreen() {
   }
 
   const { data: value } = useStockValue();
+  const unpricedLots = value?.missingCostLots ?? 0;
+  const unpricedProducts = value?.missingPriceProducts ?? 0;
   const params: {
     search?: string;
     lowStockOnly?: boolean;
@@ -151,11 +154,25 @@ export default function InventoryScreen() {
       align: "right",
       sortable: true,
       sortValue: (s) => s.costValue,
-      render: (s) => (
-        <Text variant="label" tone="primary">
-          {money(s.costValue)}
-        </Text>
-      ),
+      /**
+       * An unpriced lot shows a dash, not ₹0.
+       *
+       * Stock received without a purchase price contributes nothing to the
+       * total, so the row read "₹0" for a medicine plainly sitting on the
+       * shelf — which says "this was free" when it means "nobody recorded what
+       * it cost". A dash is the honest rendering, and it is also the one that
+       * prompts someone to go and fix the batch.
+       */
+      render: (s) =>
+        s.unpricedLots > 0 ? (
+          <Text variant="label" tone="tertiary">
+            —
+          </Text>
+        ) : (
+          <Text variant="label" tone="primary" style={numeric}>
+            {money(s.costValue)}
+          </Text>
+        ),
     },
     {
       key: "status",
@@ -209,10 +226,16 @@ export default function InventoryScreen() {
           {
             label: "Stock value (cost)",
             value: money(value?.costValue ?? 0),
+            hint: unpricedLots
+              ? `excludes ${unpricedLots} unpriced lot${unpricedLots === 1 ? "" : "s"}`
+              : undefined,
           },
           {
             label: "Retail value",
             value: money(value?.sellValue ?? 0),
+            hint: unpricedProducts
+              ? `excludes ${unpricedProducts} unpriced item${unpricedProducts === 1 ? "" : "s"}`
+              : undefined,
           },
           {
             label: "Units in stock",
@@ -220,6 +243,38 @@ export default function InventoryScreen() {
           },
         ]}
       />
+
+      {/*
+        Say why the totals are short, rather than letting someone add up the
+        column and find it doesn't reach the card.
+
+        These two figures used to be quietly incomplete in two different ways:
+        they counted stock belonging to deleted products that no row showed
+        (fixed in stock.repository), and they silently skip any lot received
+        without a purchase price. The first was a defect; the second is missing
+        data the pharmacy has to go and enter, so the number says so out loud
+        and points at the filter that lists them.
+      */}
+      {unpricedLots || unpricedProducts ? (
+        <Banner
+          tone="warning"
+          title="Some stock has no price recorded"
+          message={
+            [
+              unpricedLots
+                ? `${unpricedLots} lot${unpricedLots === 1 ? "" : "s"} with no purchase price`
+                : null,
+              unpricedProducts
+                ? `${unpricedProducts} product${unpricedProducts === 1 ? "" : "s"} with no selling price`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") +
+            ". Those are left out of the totals above, so the figures are lower than your real stock value."
+          }
+          style={{ marginTop: 10 }}
+        />
+      ) : null}
 
       <View style={{ marginTop: 12 }}>
         <SearchInput
@@ -299,7 +354,7 @@ function StockRow({
       title={item.name}
       subtitle={`${item.sku} · ${item.batches} batch${
         item.batches === 1 ? "" : "es"
-      } · ${money(item.costValue)} cost`}
+      } · ${item.unpricedLots > 0 ? "cost not set" : `${money(item.costValue)} cost`}`}
       value={`${item.available}/${item.onHand}`}
       valueHint={item.baseUnit}
       right={

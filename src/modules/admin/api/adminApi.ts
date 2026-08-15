@@ -22,7 +22,8 @@ export interface ListOrgsParams {
   page?: number;
   limit?: number;
   search?: string;
-  status?: "active" | "suspended";
+  /** Mirrors the server filter, which also accepts the approval queue. */
+  status?: "active" | "suspended" | "pending" | "rejected";
 }
 
 export interface ListParams {
@@ -95,6 +96,18 @@ export const adminApi = {
     adminApiClient
       .post(`/organizations/${id}/sessions/revoke`, body)
       .then((r) => r.data.data as { signedOut: number; message: string }),
+
+  /** Activate a registration that is waiting on a quotation. */
+  approve: (id: string) =>
+    adminApiClient
+      .post(`/organizations/${id}/approve`)
+      .then((r) => r.data.data as AdminOrg),
+
+  /** Decline a registration. `note` is shown to the applicant. */
+  reject: (id: string, note?: string) =>
+    adminApiClient
+      .post(`/organizations/${id}/reject`, note ? { note } : {})
+      .then((r) => r.data.data as AdminOrg),
 
   suspend: (id: string) =>
     adminApiClient
