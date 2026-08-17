@@ -11,10 +11,10 @@ import { printHtml } from "@shared/print";
  *
  * A pharmacy prints its own label at receive time and sticks it on the medicine,
  * because Indian strips carry no reliable scannable code of their own. The label
- * holds the shop name, product, batch, expiry and MRP, plus the opaque label
- * code as a Code128 barcode — the symbology the cheap ₹1200 laser scanner every
- * shop owns reads, and which the in-app camera scanner also accepts. Scanning it
- * resolves the exact lot at the till; see `resolveScan` on the backend.
+ * holds the shop name, product, batch, expiry and MRP, plus the SAME opaque
+ * label code as both a Code128 barcode (for the cheap ₹1200 laser scanner every
+ * shop owns) and a QR (for 2D scanners and phone cameras). Either scan resolves
+ * the exact lot at the till — see `resolveScan` on the backend.
  */
 
 export interface LabelSpec {
@@ -33,13 +33,43 @@ export interface LabelSpec {
 // matches the media. When they DON'T match, the print system rotates the label
 // and scales it to fit the roll — which is how a 25mm design ended up printing
 // sideways across two-and-a-half 15mm stickers.
-//
-// Change these if the shop's roll differs. Above ~20mm of height there is room
-// to add a QR beside the text again; at 15mm there is not (see .barcode below).
 const LABEL_W_MM = 38;
 const LABEL_H_MM = 15;
 // Hard cap so a fat-fingered quantity can't spool a thousand labels.
 const MAX_LABELS = 300;
+
+/*
+ * WHY THE LAYOUT IS SHAPED THE WAY IT IS
+ *
+ * 38x15mm has to carry two symbols, and on a 203dpi head (8 dots/mm, the
+ * resolution of nearly every Indian pharmacy label printer) both are close to
+ * their floor. Denso Wave — who invented QR — recommend 4+ printer dots per
+ * module for stable printing, i.e. a 0.5mm module, i.e. a 10.5mm symbol for the
+ * 21x21 version-1 QR our 9-character code needs. That does not fit UNDER the
+ * text. It does fit BESIDE it:
+ *
+ *   +--------------------------------------+
+ *   | [QR]  MedStock Demo Pharmacy         |   QR beside a 4-row text column
+ *   | [QR]  HUMAN ACTRAPID 40IU VIAL...    |
+ *   | [QR]  BATCH B-70955  EXP 03/28       |
+ *   | [QR]  MRP Rs 18.13                   |
+ *   | |||| ||| |||| || ||| |||| || ||||||  |   Code128 across the FULL width
+ *   |             B00000112                |
+ *   +--------------------------------------+
+ *
+ * Stacking them would have starved both. Side-by-side, the QR gets the whole
+ * height of the upper band and the Code128 keeps the whole width of the label —
+ * which matters more for a 1D symbol, because its width IS its data. The cost
+ * is the product-name column, now ~25mm instead of 35mm; a long name truncates
+ * sooner. That is the trade the geometry forces, and the name is the one field
+ * on here that a human can recover by looking at the box.
+ *
+ * Measured on the rendered output at 203dpi: QR module ~2.5 dots, Code128
+ * X-dimension ~0.30mm (~2.4 dots). Both decode (there is a decode test in the
+ * scratchpad rig), but neither has margin to spare — so if you grow a font or
+ * add a row here, re-run a real scan before shipping it. On a 300dpi printer
+ * the same artwork lands near 4 dots per module and is comfortable.
+ */
 
 const esc = (s: string) =>
   String(s ?? "").replace(
@@ -63,35 +93,51 @@ function expMonthYear(expiry: string | null): string {
   return `${m}/${y.slice(2)}`;
 }
 
-/**
- * The Code128 symbol for one code, as an inline-able SVG string.
- *
- * There is no QR: at 15mm tall, after the shop name, product, batch/expiry, MRP
- * and the barcode itself, the largest square that fits is about 4.5mm. A 21x21
- * module QR at 4.5mm on a 203dpi head gives under two dots per module, and a
- * symbol that coarse does not decode — it would print a black smudge that looks
- * scannable and isn't. The Code128 carries the same code, and every scanner in
- * play (laser guns, 2D imagers, the in-app camera) reads it.
- */
-async function barcodeSvg(code: string): Promise<string> {
-  const svg = await bwipjs.toSVG({
-    bcid: "code128",
-    text: code,
-    height: 7,
-    includetext: false,
-    paddingwidth: 0,
-    paddingheight: 0,
-  });
+/** Both symbologies of one code, as inline-able SVG strings. */
+async function codeSvgs(
+  code: string,
+): Promise<{ barcode: string; qr: string }> {
+  const [barcode, qr] = await Promise.all([
+    bwipjs.toSVG({
+      bcid: "code128",
+      text: code,
+      height: 7,
+      includetext: false,
+      paddingwidth: 0,
+      paddingheight: 0,
+    }),
+    // No eclevel here on purpose. BWIPP picks the SMALLEST version that holds
+    // the data and then spends whatever room is left over on error correction,
+    // so a "B" + 8-digit code comes out as a 21x21 version 1 at level H — the
+    // smallest symbol AND the toughest, which is exactly what a 7.2mm square on
+    // thermal paper needs. Asking for a specific eclevel cannot improve on that
+    // and a lower one would only throw away redundancy at the same size.
+    // The constraint that DOES matter is code LENGTH: version 1 carries this
+    // format with room to spare, but a materially longer labelCode would push
+    // the symbol to 25x25 and shrink every module by a fifth, below the print
+    // floor. If the code format ever changes, re-run the decode test.
+    bwipjs.toSVG({ bcid: "qrcode", text: code }),
+  ]);
   // preserveAspectRatio="none" lets the barcode fill the label's full width.
-  // Left at the default it is letterboxed to fit the ~5mm height, which shrinks
+  // Left at the default it is letterboxed to fit the ~4mm height, which shrinks
   // the bars to roughly half the width they should be — and a laser scanner
   // simply won't read bars that narrow. Stretching only the HEIGHT is safe:
   // every bar scales by the same horizontal factor, so their ratios (the thing
   // the scanner actually decodes) are untouched.
-  return svg.replace("<svg ", '<svg preserveAspectRatio="none" ');
+  //
+  // The QR gets NO such treatment: it is data in two dimensions, so a
+  // non-uniform stretch corrupts it outright. It stays square (see .qr svg).
+  return {
+    barcode: barcode.replace("<svg ", '<svg preserveAspectRatio="none" '),
+    qr,
+  };
 }
 
-function labelHtml(spec: LabelSpec, shopName: string, barcode: string): string {
+function labelHtml(
+  spec: LabelSpec,
+  shopName: string,
+  svgs: { barcode: string; qr: string },
+): string {
   const exp = expMonthYear(spec.expiry);
   // "BATCH", not "B:" — a "B:" prefix reads like the B00000000 scan code under
   // the barcode, and people typed the wrong one.
@@ -100,14 +146,16 @@ function labelHtml(spec: LabelSpec, shopName: string, barcode: string): string {
     : "";
   return `
     <div class="label">
-      <div class="shop">${esc(shopName)}</div>
-      <div class="name">${esc(spec.productName)}</div>
-      <div class="meta">
-        ${batch}${exp ? `<span class="exp">EXP ${exp}</span>` : ""}
-        <span class="mrp">MRP ${money(spec.mrp)}</span>
+      <div class="top">
+        <div class="qr">${svgs.qr}</div>
+        <div class="info">
+          <div class="shop">${esc(shopName)}</div>
+          <div class="name">${esc(spec.productName)}</div>
+          <div class="meta">${batch}${exp ? `<span class="exp">EXP ${exp}</span>` : ""}</div>
+          <div class="mrp">MRP ${money(spec.mrp)}</div>
+        </div>
       </div>
-      <div class="barcode">${barcode}</div>
-      <div class="code">${esc(spec.labelCode)}</div>
+      <div class="barcode">${svgs.barcode}</div>
     </div>`;
 }
 
@@ -124,10 +172,10 @@ export async function buildLabelSheetHtml(
 ): Promise<string> {
   // One barcode render per DISTINCT code, then repeated — a 100-unit lot
   // shouldn't pay for 100 identical renders.
-  const svgByCode = new Map<string, string>();
+  const svgByCode = new Map<string, { barcode: string; qr: string }>();
   for (const s of specs) {
     if (!svgByCode.has(s.labelCode)) {
-      svgByCode.set(s.labelCode, await barcodeSvg(s.labelCode));
+      svgByCode.set(s.labelCode, await codeSvgs(s.labelCode));
     }
   }
 
@@ -151,39 +199,66 @@ export async function buildLabelSheetHtml(
        the end of every run. */
     .label {
       width: ${LABEL_W_MM}mm; height: ${LABEL_H_MM}mm;
-      padding: .6mm 1.4mm .5mm; overflow: hidden;
+      padding: .8mm 1.4mm .5mm 1.5mm; overflow: hidden;
       display: flex; flex-direction: column;
       page-break-inside: avoid; page-break-after: always;
     }
     .label:last-child { page-break-after: auto; }
-    /* Every line below is sized so the fixed rows total ~9mm, leaving the
-       barcode (flex: 1) the remaining ~5mm. Growing any font here shrinks the
-       barcode, so check a live scan before you do. */
-    .shop { font-size: 5pt; font-weight: 700; letter-spacing: .1px; text-align: center;
-            line-height: 1; border-bottom: .25mm solid #000; padding-bottom: .25mm; }
-    .name { font-size: 5.5pt; font-weight: 700; line-height: 1.1; margin-top: .4mm;
+
+    /* Upper band: QR on the left, the four text rows on the right. It takes
+       whatever the barcode band below does not, which is ~9.1mm.
+       EVERY line-height here is 1.2, not 1.1. Arial's glyphs need ~1.15em of
+       line box; at 1.1 the ascenders and descenders were being sliced off by
+       the overflow:hidden that keeps long names in bounds — the label looked
+       like a printer fault when it was pure CSS. */
+    .top { flex: 1; display: flex; gap: 1.5mm; min-height: 0; }
+
+    /* 7.2mm across 21 modules is a 0.34mm module — about 2.8 dots on a 203dpi
+       head. Below this it stops decoding; above it, the text column gets too
+       narrow to name the medicine. The box is wider than the symbol on purpose:
+       the QUIET ZONE. A QR needs 4 clear modules (~1.4mm) on every side, and
+       without it a scanner cannot find the symbol's edges at all. Here that
+       white comes from the box being 8.6mm around a 7.2mm symbol, plus the
+       label's own padding — so never set a background or border on .qr. */
+    .qr { flex: none; width: 8.6mm; display: flex; align-items: center; justify-content: center; }
+    /* Square, always. A QR carries data in both axes, so a non-uniform stretch
+       corrupts it — height and width must scale together. */
+    .qr svg { width: 7.2mm; height: 7.2mm; display: block; }
+
+    .info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+    .shop { font-size: 4pt; font-weight: 700; letter-spacing: .1px; line-height: 1.2;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            border-bottom: .25mm solid #000; padding-bottom: .15mm; }
+    .name { font-size: 5pt; font-weight: 700; line-height: 1.2; margin-top: .2mm;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    /* Batch, expiry and MRP share one line, and 38mm will not always hold all
-       three. The shrink order encodes what a pharmacy may lose: the BATCH is
-       the only truncatable field (it is recoverable by scanning), so it alone
-       gets flex-shrink and an ellipsis. EXPIRY and MRP never shrink and never
-       clip — an expiry silently cut off a medicine sticker is a safety problem,
-       and a half-printed price is a billing dispute. */
-    .meta { display: flex; align-items: baseline; gap: 1.2mm;
-            margin-top: .3mm; line-height: 1.1; }
-    .batch { font-size: 4.5pt; min-width: 0; white-space: nowrap;
+    /* Batch and expiry share a line; 25mm will not always hold both. The shrink
+       order encodes what a pharmacy may lose: the BATCH is the only truncatable
+       field (it is recoverable by scanning), so it alone gets an ellipsis. The
+       EXPIRY never shrinks and never clips — an expiry silently cut off a
+       medicine sticker is a safety problem, not a cosmetic one. */
+    .meta { display: flex; align-items: baseline; gap: 1.2mm; margin-top: .15mm; line-height: 1.2; }
+    .batch { font-size: 4pt; min-width: 0; white-space: nowrap;
              overflow: hidden; text-overflow: ellipsis; }
-    .exp { font-size: 4.5pt; flex: none; white-space: nowrap; }
-    .mrp { font-size: 7pt; font-weight: 700; flex: none; margin-left: auto; white-space: nowrap; }
-    /* 2mm of white each side is the QUIET ZONE. Code128 is unreadable without
+    .exp { font-size: 4pt; flex: none; white-space: nowrap; }
+    /* MRP gets its own row rather than sharing with batch/expiry: in a 25mm
+       column the two together overflow, and the price is what the counter reads
+       off the sticker, so it keeps the larger type. */
+    .mrp { font-size: 6pt; font-weight: 700; line-height: 1.2; margin-top: .1mm; white-space: nowrap; }
+
+    /* The Code128 keeps the FULL width of the label, because for a 1D symbol
+       width IS data — the same code squeezed into a column beside the QR would
+       drop the X-dimension to ~1.3 dots and stop scanning. At full width it
+       lands near 0.30mm (~2.4 dots), which decodes.
+       2mm of white each side is its QUIET ZONE. Code128 is unreadable without
        one — the scanner needs blank space to find where the symbol starts and
        ends. This was missing, and is a classic cause of "the scanner won't
-       read it". flex: 1 hands the barcode whatever height the text rows didn't
-       use, so the label absorbs a long product name by losing bar height
-       instead of overflowing onto the next sticker. */
-    .barcode { flex: 1; min-height: 3.5mm; padding: .4mm 2mm 0; }
+       read it".
+       There is no human-readable code line under the bars any more: adding the
+       QR cost ~1.5mm of height, and of everything on here the printed
+       "B00000112" was the only field already carried by BOTH symbols. It was
+       the right thing to spend. */
+    .barcode { flex: none; height: 4.6mm; padding: .45mm 2mm 0; }
     .barcode svg { width: 100%; height: 100%; display: block; }
-    .code { font-size: 4.5pt; text-align: center; letter-spacing: .3mm; line-height: 1; }
   </style></head>
   <body>${cells.join("")}</body></html>`;
 }
