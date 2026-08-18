@@ -51,6 +51,7 @@ import {
   ScannedBill,
 } from "@modules/inventory/types";
 import { printLabels, LabelSpec } from "@modules/inventory/label";
+import { LabelPrintSettings } from "@modules/inventory/components/LabelPrintSettings";
 import {
   emptyLine,
   linesFromScan,
@@ -566,19 +567,22 @@ export default function ReceiveStockScreen() {
               </Text>
             </HStack>
             {done.lines.some((l) => l.labelCode) && (
-              <Button
-                label="Print labels"
-                variant="secondary"
-                fullWidth={false}
-                onPress={() => printReceiptLabels(done)}
-                icon={
-                  <Printer
-                    size={15}
-                    color={palette.text.primary}
-                    strokeWidth={2}
-                  />
-                }
-              />
+              <HStack gap={8} align="center" wrap>
+                <LabelPrintSettings />
+                <Button
+                  label="Print labels"
+                  variant="secondary"
+                  fullWidth={false}
+                  onPress={() => printReceiptLabels(done)}
+                  icon={
+                    <Printer
+                      size={15}
+                      color={palette.text.primary}
+                      strokeWidth={2}
+                    />
+                  }
+                />
+              </HStack>
             )}
           </HStack>
         </Banner>

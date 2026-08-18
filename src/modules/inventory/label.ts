@@ -4,7 +4,7 @@
 // path we never use (we only ever call toSVG), and touches no DOM at import
 // time, so it is safe on native, web and node alike.
 import bwipjs from "bwip-js/browser";
-import { printHtml } from "@shared/print";
+import { printHtml, getLabelScale } from "@shared/print";
 
 /**
  * Shelf-label printing.
@@ -35,6 +35,16 @@ export interface LabelSpec {
 // sideways across two-and-a-half 15mm stickers.
 const LABEL_W_MM = 38;
 const LABEL_H_MM = 15;
+/**
+ * The same size, handed to the printer itself rather than only to the CSS.
+ *
+ * @page alone is a REQUEST: the browser honours it if the driver offers a
+ * matching paper, and quietly scales to fit if it doesn't. That scaling is not
+ * cosmetic — at 80% the barcode drops under the resolution of a 203dpi head and
+ * the label stops scanning. The desktop and native print paths take this and set
+ * the page size on the print job, where it is not negotiable.
+ */
+export const LABEL_PAGE_MM = { widthMm: LABEL_W_MM, heightMm: LABEL_H_MM };
 // Hard cap so a fat-fingered quantity can't spool a thousand labels.
 const MAX_LABELS = 300;
 
@@ -144,8 +154,11 @@ function labelHtml(
   const batch = spec.batchNumber
     ? `<span class="batch">BATCH ${esc(spec.batchNumber)}</span>`
     : "";
+  // .page is the sheet the printer advances; .label is the artwork on it. They
+  // are separate because calibration scales the artwork inside a page that
+  // grows with it — see labelDocument().
   return `
-    <div class="label">
+    <div class="page"><div class="label">
       <div class="top">
         <div class="qr">${svgs.qr}</div>
         <div class="info">
@@ -156,7 +169,7 @@ function labelHtml(
         </div>
       </div>
       <div class="barcode">${svgs.barcode}</div>
-    </div>`;
+    </div></div>`;
 }
 
 /**
@@ -169,6 +182,7 @@ function labelHtml(
 export async function buildLabelSheetHtml(
   specs: LabelSpec[],
   shopName: string,
+  scale = 1,
 ): Promise<string> {
   // One barcode render per DISTINCT code, then repeated — a 100-unit lot
   // shouldn't pay for 100 identical renders.
@@ -188,22 +202,50 @@ export async function buildLabelSheetHtml(
     }
   }
 
+  return labelDocument(cells.join(""), scale);
+}
+
+/**
+ * Wrap finished labels in the print document.
+ *
+ * `scale` is the calibration factor from `getLabelScale()`, and it pre-enlarges
+ * BOTH the page and the artwork so that a pipeline which shrinks by 1/scale
+ * lands on a physically correct 38x15mm sticker. The page has to grow with the
+ * artwork — scaling the content alone inside a fixed page would just push it
+ * over the edge and get it clipped, since a browser scales the whole page box,
+ * not the content within it. At the default scale of 1 both multiplications are
+ * no-ops and this is the plain, uncalibrated document.
+ *
+ * The artwork itself is never re-laid-out: it stays authored at exactly 38x15mm
+ * and gets a transform. That keeps every millimetre in the stylesheet below
+ * meaning a real millimetre on the sticker, which is the only way the barcode
+ * geometry stays reviewable.
+ */
+function labelDocument(cells: string, scale: number): string {
+  const s = Number.isFinite(scale) && scale > 0 ? scale : 1;
+  const pageW = +(LABEL_W_MM * s).toFixed(3);
+  const pageH = +(LABEL_H_MM * s).toFixed(3);
+
   return `<!doctype html><html><head><meta charset="utf-8"/>
   <style>
-    @page { size: ${LABEL_W_MM}mm ${LABEL_H_MM}mm; margin: 0; }
+    @page { size: ${pageW}mm ${pageH}mm; margin: 0; }
     * { box-sizing: border-box; }
     body { margin: 0; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact; color: #000; }
     /* One sticker per page. The explicit break keeps a label from being split
        across two stickers when a browser rounds 15mm to a fractionally taller
        box; the :last-child reset stops the roll advancing one blank label at
        the end of every run. */
+    .page {
+      width: ${pageW}mm; height: ${pageH}mm; overflow: hidden;
+      page-break-inside: avoid; page-break-after: always;
+    }
+    .page:last-child { page-break-after: auto; }
     .label {
       width: ${LABEL_W_MM}mm; height: ${LABEL_H_MM}mm;
       padding: .8mm 1.4mm .5mm 1.5mm; overflow: hidden;
       display: flex; flex-direction: column;
-      page-break-inside: avoid; page-break-after: always;
+      transform: scale(${s}); transform-origin: top left;
     }
-    .label:last-child { page-break-after: auto; }
 
     /* Upper band: QR on the left, the four text rows on the right. It takes
        whatever the barcode band below does not, which is ~9.1mm.
@@ -260,7 +302,46 @@ export async function buildLabelSheetHtml(
     .barcode { flex: none; height: 4.6mm; padding: .45mm 2mm 0; }
     .barcode svg { width: 100%; height: 100%; display: block; }
   </style></head>
-  <body>${cells.join("")}</body></html>`;
+  <body>${cells}</body></html>`;
+}
+
+/** The nominal length of the measuring bar on the calibration label. */
+export const CALIBRATION_BAR_MM = 30;
+
+/**
+ * A single test sticker whose only job is to be measured with a ruler.
+ *
+ * The bar is exactly 30mm as designed, with end ticks so there is no doubt
+ * where it starts and stops. Whatever the shop measures off the printed sticker
+ * tells us precisely what the print path did to the artwork — no guessing about
+ * margins, paper sizes or driver settings, which is what made the original
+ * fault so hard to pin down from a photo.
+ */
+export function buildCalibrationLabelHtml(scale = 1): string {
+  const cell = `
+    <div class="page"><div class="label cal">
+      <div class="cal-title">LABEL SIZE TEST</div>
+      <div class="cal-bar"><span class="tick"></span><span class="tick"></span></div>
+      <div class="cal-note">Measure the bar above. It should be exactly ${CALIBRATION_BAR_MM} mm.</div>
+    </div></div>`;
+
+  return labelDocument(cell, scale).replace(
+    "</style>",
+    `
+    .cal { justify-content: space-between; }
+    .cal-title { font-size: 4.5pt; font-weight: 700; letter-spacing: .2mm; line-height: 1.2; }
+    /* Exactly ${CALIBRATION_BAR_MM}mm wide as authored. The ticks drop below the
+       bar so a ruler can be lined up against its true ends. */
+    .cal-bar {
+      width: ${CALIBRATION_BAR_MM}mm; height: 1.6mm; background: #000;
+      position: relative; margin: .4mm 0;
+    }
+    .cal-bar .tick { position: absolute; top: 100%; width: .3mm; height: 1.2mm; background: #000; }
+    .cal-bar .tick:first-child { left: 0; }
+    .cal-bar .tick:last-child { right: 0; }
+    .cal-note { font-size: 4pt; line-height: 1.2; }
+    </style>`,
+  );
 }
 
 /** Renders and hands the label sheet to the OS print dialog / label printer. */
@@ -268,6 +349,27 @@ export async function printLabels(
   specs: LabelSpec[],
   shopName: string,
 ): Promise<void> {
-  const html = await buildLabelSheetHtml(specs, shopName);
-  await printHtml(html);
+  const scale = getLabelScale();
+  const html = await buildLabelSheetHtml(specs, shopName, scale);
+  await printHtml(html, scaledPage(scale));
+}
+
+/** Prints the one test sticker the calibration flow asks the shop to measure. */
+export async function printCalibrationLabel(): Promise<void> {
+  const scale = getLabelScale();
+  await printHtml(buildCalibrationLabelHtml(scale), scaledPage(scale));
+}
+
+/**
+ * The page size to put on the print job.
+ *
+ * On the paths that accept an exact page size (desktop, native) the artwork is
+ * already correct and `scale` should be 1 — but if a shop has calibrated anyway,
+ * the job's page must grow with it or the enlarged artwork gets cropped.
+ */
+function scaledPage(scale: number) {
+  return {
+    widthMm: LABEL_W_MM * scale,
+    heightMm: LABEL_H_MM * scale,
+  };
 }
