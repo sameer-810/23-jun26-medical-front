@@ -4,7 +4,12 @@
 // path we never use (we only ever call toSVG), and touches no DOM at import
 // time, so it is safe on native, web and node alike.
 import bwipjs from "bwip-js/browser";
-import { printHtml, getLabelScale } from "@shared/print";
+import {
+  printHtml,
+  getLabelScale,
+  isPlainBrowser,
+  openPdfForPrint,
+} from "@shared/print";
 
 /**
  * Shelf-label printing.
@@ -344,12 +349,31 @@ export function buildCalibrationLabelHtml(scale = 1): string {
   );
 }
 
-/** Renders and hands the label sheet to the OS print dialog / label printer. */
+/**
+ * Print the labels, by whichever route this device can do exactly.
+ *
+ * In a plain browser that means a PDF, not an HTML print: a browser adds a
+ * header and footer — date, title, full URL — that no page can suppress, and on
+ * a 15mm sticker those spill onto the labels above and below, wasting three
+ * stickers to print one. A PDF has no such furniture. Everywhere else (the
+ * desktop shell, the native apps) the print job takes an exact page size
+ * directly, so the HTML path is already exact and keeps working.
+ */
 export async function printLabels(
   specs: LabelSpec[],
   shopName: string,
 ): Promise<void> {
   const scale = getLabelScale();
+
+  if (isPlainBrowser()) {
+    // Imported lazily: jsPDF and the canvas renderer are a few hundred KB that
+    // a phone opening the sales screen has no reason to download.
+    const { buildLabelPdf } = await import("@modules/inventory/labelPdf");
+    const pdf = await buildLabelPdf(specs, shopName, scale, MAX_LABELS);
+    openPdfForPrint(pdf, "labels.pdf");
+    return;
+  }
+
   const html = await buildLabelSheetHtml(specs, shopName, scale);
   await printHtml(html, scaledPage(scale));
 }
@@ -357,6 +381,14 @@ export async function printLabels(
 /** Prints the one test sticker the calibration flow asks the shop to measure. */
 export async function printCalibrationLabel(): Promise<void> {
   const scale = getLabelScale();
+
+  if (isPlainBrowser()) {
+    const { buildCalibrationPdf } = await import("@modules/inventory/labelPdf");
+    const pdf = await buildCalibrationPdf(CALIBRATION_BAR_MM, scale);
+    openPdfForPrint(pdf, "label-size-test.pdf");
+    return;
+  }
+
   await printHtml(buildCalibrationLabelHtml(scale), scaledPage(scale));
 }
 

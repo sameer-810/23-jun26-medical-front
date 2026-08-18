@@ -57,6 +57,42 @@ export function canPrintExact(): boolean {
 }
 
 /**
+ * Is this a plain browser, with no desktop shell behind it?
+ *
+ * The one case where an HTML print is the WRONG tool: the browser will wrap the
+ * document in a header and footer that no page can suppress. Callers with a
+ * PDF to offer should offer it here.
+ */
+export function isPlainBrowser(): boolean {
+  return Platform.OS === "web" && typeof document !== "undefined" && !desktop();
+}
+
+/**
+ * Hand a finished PDF to the user for printing.
+ *
+ * Opened in a tab rather than downloaded, because that lands the operator on
+ * the viewer's own print button with the document already open — and a PDF
+ * print carries no browser header, footer or URL, which is the entire reason
+ * this path exists. Falls back to a download when a popup blocker gets in the
+ * way, since a blocked tab would otherwise look like nothing happened.
+ */
+export function openPdfForPrint(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const tab = window.open(url, "_blank");
+  if (!tab) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  // Revoking immediately would pull the document out from under the viewer;
+  // the delay is long enough for the tab to have taken its own reference.
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/**
  * Which printer the desktop shell should send labels to.
  *
  * Remembered per machine because the counter PC usually has two printers — an
