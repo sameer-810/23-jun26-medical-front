@@ -366,6 +366,11 @@ export async function printLabels(
   const scale = getLabelScale();
 
   if (isPlainBrowser()) {
+    // A Zebra reachable through Browser Print beats every other route: the
+    // bytes go to the printer, so no dialog, driver, paper size or scale
+    // setting gets a say. Falls through to the PDF when it isn't installed.
+    if (await printLabelsViaZebra(specs, shopName)) return;
+
     // Imported lazily: jsPDF and the canvas renderer are a few hundred KB that
     // a phone opening the sales screen has no reason to download.
     const { buildLabelPdf } = await import("@modules/inventory/labelPdf");
@@ -378,11 +383,52 @@ export async function printLabels(
   await printHtml(html, scaledPage(scale));
 }
 
+/**
+ * Try the direct route to a Zebra. True if the labels are on their way.
+ *
+ * Everything is loaded lazily and every failure returns false rather than
+ * throwing: a shop without Browser Print installed must land on the PDF path
+ * without ever seeing an error about a service it has never heard of.
+ */
+async function printLabelsViaZebra(
+  specs: LabelSpec[],
+  shopName: string,
+): Promise<boolean> {
+  try {
+    const { findZebraPrinter, sendZpl } =
+      await import("@shared/zebraBrowserPrint");
+    const link = await findZebraPrinter();
+    if (!link) return false;
+    const { buildLabelZpl } = await import("@modules/inventory/labelZpl");
+    return await sendZpl(
+      link,
+      await buildLabelZpl(specs, shopName, MAX_LABELS),
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** Prints the one test sticker the calibration flow asks the shop to measure. */
 export async function printCalibrationLabel(): Promise<void> {
   const scale = getLabelScale();
 
   if (isPlainBrowser()) {
+    // Same route as a real label, or the shop would be measuring one pipeline
+    // and printing through another.
+    try {
+      const { findZebraPrinter, sendZpl } =
+        await import("@shared/zebraBrowserPrint");
+      const link = await findZebraPrinter();
+      if (link) {
+        const { buildCalibrationZpl } =
+          await import("@modules/inventory/labelZpl");
+        if (await sendZpl(link, buildCalibrationZpl(CALIBRATION_BAR_MM)))
+          return;
+      }
+    } catch {
+      // Fall through to the PDF.
+    }
     const { buildCalibrationPdf } = await import("@modules/inventory/labelPdf");
     const pdf = await buildCalibrationPdf(CALIBRATION_BAR_MM, scale);
     openPdfForPrint(pdf, "label-size-test.pdf");

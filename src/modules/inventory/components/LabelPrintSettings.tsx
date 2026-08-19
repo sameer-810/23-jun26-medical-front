@@ -41,6 +41,7 @@ export function LabelPrintSettings() {
   );
   const [asking, setAsking] = useState(false);
   const [scale, setScale] = useState(getLabelScale());
+  const [zebra, setZebra] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -53,6 +54,15 @@ export function LabelPrintSettings() {
         })),
       );
     });
+    // Is a Zebra reachable directly? If so the labels bypass the print dialog
+    // entirely and there is nothing left to calibrate, which is worth saying
+    // out loud — the shop has been fighting print settings.
+    void import("@shared/zebraBrowserPrint")
+      .then((m) => m.findZebraPrinter())
+      .then((link) => {
+        if (alive && link) setZebra(link.device.name || "Zebra printer");
+      })
+      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -60,9 +70,10 @@ export function LabelPrintSettings() {
 
   const startTest = () => {
     void printCalibrationLabel();
-    // Ask only after the sticker is on its way — there is nothing to measure
-    // until it has come out of the printer.
-    setAsking(true);
+    // On a direct Zebra the sticker is exact by construction, so the test is
+    // just a "does it print" check — asking for a measurement there would
+    // invite someone to correct a size that is already right.
+    if (!zebra) setAsking(true);
   };
 
   const applyMeasurement = (raw: string) => {
@@ -99,14 +110,26 @@ export function LabelPrintSettings() {
       ) : null}
 
       <Button
-        label={off ? "Re-check label size" : "Check label size"}
+        label={
+          zebra
+            ? "Print test label"
+            : off
+              ? "Re-check label size"
+              : "Check label size"
+        }
         variant="secondary"
         fullWidth={false}
         onPress={startTest}
         icon={<Ruler size={15} color={palette.text.primary} strokeWidth={2} />}
       />
 
-      {off ? (
+      {/* Direct printing is exact by construction, so there is nothing to
+          correct and no reason to send the pharmacist looking for a ruler. */}
+      {zebra ? (
+        <Text variant="caption" tone="secondary">
+          Printing direct to {zebra} — no print dialog
+        </Text>
+      ) : off ? (
         <Text variant="caption" tone="secondary">
           Size corrected by {Math.round(scale * 100)}%
         </Text>
@@ -115,14 +138,18 @@ export function LabelPrintSettings() {
       <PromptDialog
         visible={asking}
         title="Measure the test label"
-        message={`A test sticker has been sent to the printer. Measure the black bar on it with a ruler and enter its length. It should be ${CALIBRATION_BAR_MM} mm — if it isn't, every label will be resized to match from now on.`}
-        label={`Measured length (mm)`}
-        placeholder={String(CALIBRATION_BAR_MM)}
+        message={`A test sticker has been sent to the printer. On it is one black bar — measure ONLY that bar with a ruler and type its length as a number. It should be ${CALIBRATION_BAR_MM} mm. If it isn't, every label is resized to match from now on.`}
+        label={`Length of the black bar, in mm`}
+        placeholder={`e.g. ${CALIBRATION_BAR_MM}`}
         keyboardType="decimal-pad"
         confirmLabel="Apply"
         validate={(v) => {
           const n = Number(v.replace(",", "."));
-          if (!Number.isFinite(n) || n <= 0) return "Enter the length in mm.";
+          // People type the label size here ("38mm*15mm") because that is the
+          // number they have been thinking about all week. Say what is wanted.
+          if (!Number.isFinite(n) || n <= 0) {
+            return `Type just the bar's length as a number, e.g. ${CALIBRATION_BAR_MM}`;
+          }
           // Outside this the wrong thing was measured — the label itself, say,
           // or inches — and applying it would make the next print far worse.
           if (n < CALIBRATION_BAR_MM / 3 || n > CALIBRATION_BAR_MM * 2) {
