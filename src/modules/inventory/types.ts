@@ -192,10 +192,16 @@ export interface ReceiptDetail extends ReceiptListItem {
     mfgDate: string | null;
     expiryDate: string | null;
     purchasePrice: number;
+    /** PER BASE UNIT, like `purchasePrice` — not the price on the pack. */
     mrp: number;
     unit: string;
+    /** Paid quantity, in `unit` — i.e. a count of PACKS, not base units. */
     quantity: number;
+    /** Total received in base units, free goods included. */
     baseQuantity: number;
+    /** Scheme goods, in `unit`. Already counted inside `baseQuantity`. */
+    freeQuantity: number;
+    freeBaseQuantity: number;
     locationCode: string;
     lineValue: number;
     discountPct: number;

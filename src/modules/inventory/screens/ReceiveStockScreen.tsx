@@ -469,21 +469,40 @@ export default function ReceiveStockScreen() {
   const needsShortConfirm = soonLines.length > 0 && !confirmShort;
 
   /**
-   * Print a shelf label for every unit just received. One label per unit is the
-   * usual want — you sticker each strip/bottle as you shelve it — so copies
-   * default to the received quantity; the label module caps a runaway total.
+   * Print a shelf label for every PACK just received.
+   *
+   * Both figures here are per-pack, and both used to be per-base-unit, which
+   * produced two wrong labels off one bill line:
+   *
+   *   copies — a sticker goes on the thing you put on the shelf. One 10ml vial
+   *     is one sticker, not ten; `baseQuantity` counts millilitres, so a QTY of
+   *     1 spooled ten labels.
+   *   mrp — the server stores MRP per base unit so that stock valuation, which
+   *     multiplies by a base-unit quantity, comes out right (see the conversion
+   *     in `receiveDraft.ts`). A shelf label is the opposite case: it has to
+   *     show what a customer pays for the vial in their hand. A ₹181.33 vial
+   *     was printing as ₹18.13 — the per-millilitre price, on a sticker stuck
+   *     to the whole vial.
+   *
+   * The pack factor is recovered from the line rather than assumed, and free
+   * goods count as packs because they get shelved and stickered like any other.
    */
   const printReceiptLabels = (receipt: ReceiptDetail) => {
     const specs: LabelSpec[] = receipt.lines
       .filter((l) => l.labelCode)
-      .map((l) => ({
-        labelCode: l.labelCode!,
-        productName: l.productName,
-        batchNumber: l.batchNumber,
-        expiry: l.expiryDate,
-        mrp: l.mrp,
-        copies: Math.max(1, Math.round(l.baseQuantity)),
-      }));
+      .map((l) => {
+        const packs = (l.quantity || 0) + (l.freeQuantity || 0);
+        // baseQuantity includes free goods, so it divides by the same total.
+        const factor = packs > 0 ? l.baseQuantity / packs : 1;
+        return {
+          labelCode: l.labelCode!,
+          productName: l.productName,
+          batchNumber: l.batchNumber,
+          expiry: l.expiryDate,
+          mrp: l.mrp * (factor > 0 ? factor : 1),
+          copies: Math.max(1, Math.round(packs)),
+        };
+      });
     if (specs.length) void printLabels(specs, shopName);
   };
 
