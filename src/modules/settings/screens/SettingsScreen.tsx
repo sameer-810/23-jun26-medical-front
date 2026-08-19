@@ -2,10 +2,16 @@ import React, { useEffect, useRef, useState } from "react";
 import { View, Switch, Image, Platform } from "react-native";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Building2, Receipt, BellRing } from "lucide-react-native";
+import {
+  Building2,
+  Receipt,
+  BellRing,
+  DatabaseBackup,
+} from "lucide-react-native";
 import {
   useSettings,
   useUpdateSettings,
+  useEmailBackup,
 } from "@modules/settings/hooks/useSettings";
 import { settingsSchema } from "@modules/settings/settings.validation";
 import { useAuthStore } from "@shared/store/useAuthStore";
@@ -44,6 +50,7 @@ function SwitchRow({ control, name }: { control: any; name: string }) {
 export default function SettingsScreen() {
   const { data, isLoading, refetch, isRefetching } = useSettings();
   const mut = useUpdateSettings();
+  const backupMut = useEmailBackup();
   const org = useAuthStore((s) => s.organization);
 
   const { control, handleSubmit, reset } = useForm({
@@ -436,6 +443,40 @@ export default function SettingsScreen() {
             price={data?.alertPricing?.smsMonthly ?? 0}
             currency={data?.alertPricing?.currency || "INR"}
           />
+        </VStack>
+      </Card>
+
+      {/* Data backup */}
+      <SectionHeader
+        icon={DatabaseBackup}
+        title="Data backup"
+        subtitle="A copy of everything, sent to your email"
+      />
+      <Card style={{ marginBottom: 24 }}>
+        <VStack gap={12}>
+          <Text variant="body-sm" tone="secondary">
+            Emails a zip with all your data — products, stock, sales, purchases,
+            customers and suppliers — as a spreadsheet plus restore files. Save
+            it to your Google Drive or keep it anywhere safe.
+          </Text>
+          <Button
+            label="Email my backup"
+            variant="secondary"
+            fullWidth={false}
+            loading={backupMut.isPending}
+            onPress={() => backupMut.mutate()}
+          />
+          {backupMut.isSuccess && (
+            <Text variant="body-sm" tone="success">
+              Backup sent to {backupMut.data.emailedTo}. Check your inbox (it
+              can take a minute to arrive).
+            </Text>
+          )}
+          {backupMut.isError && (
+            <Text variant="body-sm" tone="danger">
+              {apiErrorMessage(backupMut.error)}
+            </Text>
+          )}
         </VStack>
       </Card>
 

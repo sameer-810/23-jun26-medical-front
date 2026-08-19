@@ -12,3 +12,6 @@ export const useUpdateSettings = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }),
   });
 };
+
+export const useEmailBackup = () =>
+  useMutation({ mutationFn: () => settingsApi.emailBackup() });
