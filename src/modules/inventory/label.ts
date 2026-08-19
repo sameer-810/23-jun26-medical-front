@@ -384,6 +384,27 @@ export async function printLabels(
 }
 
 /**
+ * Set the Zebra up for this roll: media type, orientation, and a gap measure.
+ *
+ * Needed once per printer — or after a driver has written its own settings into
+ * it, which is what left the first ZPL run printing upside down and straddling
+ * two stickers. Feeds a few labels while the printer measures the gap.
+ */
+export async function setupZebraPrinter(): Promise<boolean> {
+  try {
+    const { findZebraPrinter, sendZpl } =
+      await import("@shared/zebraBrowserPrint");
+    const link = await findZebraPrinter();
+    if (!link) return false;
+    const { buildPrinterSetupZpl } =
+      await import("@modules/inventory/labelZpl");
+    return await sendZpl(link, buildPrinterSetupZpl());
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Try the direct route to a Zebra. True if the labels are on their way.
  *
  * Everything is loaded lazily and every failure returns false rather than

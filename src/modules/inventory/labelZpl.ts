@@ -74,10 +74,27 @@ function zplForBitmap(canvas: HTMLCanvasElement, copies: number): string {
   const qty = Math.max(1, Math.floor(copies));
   return [
     "^XA",
+    // A printer REMEMBERS its settings, and this one arrived configured by the
+    // EPL driver. Every line here states something the format must not inherit:
+    //
+    //   ^PON  normal orientation. The printer had ^POI stored, so the first
+    //         ZPL run came out upside down — correct artwork, rotated 180.
+    //   ^MNY  media tracking by web/gap sensing. Die-cut stock has a gap
+    //         between stickers; without this the printer treats the roll as
+    //         continuous, never learns where a label ends, and lets one label
+    //         straddle two stickers with blanks in between.
+    //   ^MTD  direct thermal. The GC420d has no ribbon; saying so stops it
+    //         waiting on one.
+    //   ^LH/^LT/^LS  origin, top offset and shift all zeroed, so the artwork
+    //         starts hard at the label's corner and nothing nudges it.
+    "^PON",
+    "^MNY",
+    "^MTD",
     `^PW${canvas.width}`,
     `^LL${canvas.height}`,
     "^LH0,0",
     "^LT0",
+    "^LS0",
     `^FO0,0^GFA,${total},${total},${stride},${hex(rows)}^FS`,
     // Quantity handled by the printer: one format down the wire, N stickers
     // out, rather than repeating a 4.5KB graphic for every copy.
@@ -86,6 +103,36 @@ function zplForBitmap(canvas: HTMLCanvasElement, copies: number): string {
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+/**
+ * One-time printer setup: teach it the media, then have it measure the gap.
+ *
+ * `~JC` makes the printer feed a few labels and find the gap between them
+ * itself. That measurement is what stops a label straddling two stickers, and
+ * it cannot be done from artwork — the printer has to see the roll. It is
+ * separate from printing because it wastes a few labels and only needs doing
+ * when the roll or the printer changes.
+ *
+ * `^JUS` saves the settings so they survive a power cycle, which matters: the
+ * wrong ones were persisted by the EPL driver in the first place.
+ */
+export function buildPrinterSetupZpl(): string {
+  return [
+    "^XA",
+    "^PON",
+    "^MNY",
+    "^MTD",
+    `^PW${LABEL_DOTS.width}`,
+    `^LL${LABEL_DOTS.height}`,
+    "^LH0,0",
+    "^LT0",
+    "^LS0",
+    "^JUS",
+    "^XZ",
+    // Media calibration is its own command, outside a label format.
+    "~JC",
+  ].join("\n");
 }
 
 /**

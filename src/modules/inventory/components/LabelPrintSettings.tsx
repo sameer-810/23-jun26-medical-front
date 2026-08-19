@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View } from "react-native";
-import { Ruler } from "lucide-react-native";
+import { Ruler, Settings2 } from "lucide-react-native";
 import { Select, SelectOption } from "@shared/ui/Select";
 import { Button } from "@shared/ui/Button";
 import { PromptDialog } from "@shared/ui/PromptDialog";
@@ -16,6 +16,7 @@ import {
 } from "@shared/print";
 import {
   printCalibrationLabel,
+  setupZebraPrinter,
   CALIBRATION_BAR_MM,
 } from "@modules/inventory/label";
 
@@ -42,6 +43,9 @@ export function LabelPrintSettings() {
   const [asking, setAsking] = useState(false);
   const [scale, setScale] = useState(getLabelScale());
   const [zebra, setZebra] = useState<string | null>(null);
+  const [setup, setSetup] = useState<"idle" | "running" | "done" | "failed">(
+    "idle",
+  );
 
   useEffect(() => {
     let alive = true;
@@ -123,11 +127,38 @@ export function LabelPrintSettings() {
         icon={<Ruler size={15} color={palette.text.primary} strokeWidth={2} />}
       />
 
+      {/* The printer has to MEASURE the gap between stickers itself — no
+          artwork can tell it where a label ends. Offered next to the test
+          print because "it prints across two labels" is what sends someone
+          looking for this. */}
+      {zebra ? (
+        <Button
+          label="Set up printer"
+          variant="secondary"
+          fullWidth={false}
+          onPress={() => {
+            setSetup("running");
+            void setupZebraPrinter().then((ok) =>
+              setSetup(ok ? "done" : "failed"),
+            );
+          }}
+          icon={
+            <Settings2 size={15} color={palette.text.primary} strokeWidth={2} />
+          }
+        />
+      ) : null}
+
       {/* Direct printing is exact by construction, so there is nothing to
           correct and no reason to send the pharmacist looking for a ruler. */}
       {zebra ? (
         <Text variant="caption" tone="secondary">
-          Printing direct to {zebra} — no print dialog
+          {setup === "running"
+            ? `Setting up ${zebra} — it will feed a few labels…`
+            : setup === "done"
+              ? "Printer set up. Print a test label to check."
+              : setup === "failed"
+                ? "Could not reach the printer."
+                : `Printing direct to ${zebra} — no print dialog`}
         </Text>
       ) : off ? (
         <Text variant="caption" tone="secondary">
