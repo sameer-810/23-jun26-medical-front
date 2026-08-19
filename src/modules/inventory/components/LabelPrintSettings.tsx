@@ -18,6 +18,7 @@ import {
   printCalibrationLabel,
   setupZebraPrinter,
   CALIBRATION_BAR_MM,
+  LABEL_PAGE_MM,
 } from "@modules/inventory/label";
 
 /**
@@ -43,6 +44,7 @@ export function LabelPrintSettings() {
   const [asking, setAsking] = useState(false);
   const [scale, setScale] = useState(getLabelScale());
   const [zebra, setZebra] = useState<string | null>(null);
+  const [probed, setProbed] = useState(false);
   const [setup, setSetup] = useState<"idle" | "running" | "done" | "failed">(
     "idle",
   );
@@ -61,12 +63,18 @@ export function LabelPrintSettings() {
     // Is a Zebra reachable directly? If so the labels bypass the print dialog
     // entirely and there is nothing left to calibrate, which is worth saying
     // out loud — the shop has been fighting print settings.
+    //
+    // And if it ISN'T, say THAT out loud too. This used to fail silently into
+    // the PDF path, so a shop could spend days fighting Chrome's scale setting
+    // without ever learning that the exact route exists or what it needs.
     void import("@shared/zebraBrowserPrint")
       .then((m) => m.findZebraPrinter())
       .then((link) => {
-        if (alive && link) setZebra(link.device.name || "Zebra printer");
+        if (!alive) return;
+        setZebra(link ? link.device.name || "Zebra printer" : null);
+        setProbed(true);
       })
-      .catch(() => {});
+      .catch(() => alive && setProbed(true));
     return () => {
       alive = false;
     };
@@ -163,6 +171,16 @@ export function LabelPrintSettings() {
       ) : off ? (
         <Text variant="caption" tone="secondary">
           Size corrected by {Math.round(scale * 100)}%
+        </Text>
+      ) : probed ? (
+        // The honest state of affairs, rather than a silent fallback. Both
+        // routes are named because a shop can fix this either way: install the
+        // bridge, or give the driver a 38x15mm stock so the print dialog has a
+        // correct paper to choose.
+        <Text variant="caption" tone="secondary">
+          Printing via PDF — for exact labels install Zebra Browser Print, or
+          set a {LABEL_PAGE_MM.widthMm} × {LABEL_PAGE_MM.heightMm} mm label size
+          in the printer&apos;s Windows preferences and print at 100% scale.
         </Text>
       ) : null}
 
