@@ -29,6 +29,7 @@ export const settingsSchema = z.object({
   alertInApp: z.boolean(),
   alertEmail: z.boolean(),
   alertSms: z.boolean(),
+  backupEmail: optionalEmail,
 });
 
 export type SettingsFormValues = z.infer<typeof settingsSchema>;

@@ -74,6 +74,7 @@ export default function SettingsScreen() {
       alertInApp: true,
       alertEmail: false,
       alertSms: false,
+      backupEmail: "",
     },
   });
 
@@ -139,6 +140,7 @@ export default function SettingsScreen() {
         alertInApp: data.alertChannels.inApp,
         alertEmail: data.alertChannels.email,
         alertSms: data.alertChannels.sms,
+        backupEmail: data.backupEmail || "",
       });
     }
   }, [data, reset]);
@@ -169,6 +171,7 @@ export default function SettingsScreen() {
         email: f.alertEmail,
         sms: f.alertSms,
       },
+      backupEmail: f.backupEmail,
     }),
   );
 
@@ -458,6 +461,18 @@ export default function SettingsScreen() {
             Emails a zip with all your data — products, stock, sales, purchases,
             customers and suppliers — as a spreadsheet plus restore files. Save
             it to your Google Drive or keep it anywhere safe.
+          </Text>
+          <ControlledTextField
+            control={control}
+            name="backupEmail"
+            label="Send backups to (email)"
+            placeholder="Leave empty to use your login email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <Text variant="caption" tone="tertiary">
+            Backups go to this address. Tap Save settings after changing it —
+            the button below uses the saved address.
           </Text>
           <Button
             label="Email my backup"

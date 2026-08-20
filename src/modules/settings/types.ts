@@ -37,6 +37,8 @@ export interface Settings {
   };
   units: string[];
   defaultReorderLevel: number;
+  /** Where "Email my backup" sends the archive. Empty = the admin's login email. */
+  backupEmail: string;
   updatedAt: string;
 }
 
@@ -48,4 +50,5 @@ export type SettingsPatch = {
   alertChannels?: Partial<Settings["alertChannels"]>;
   units?: string[];
   defaultReorderLevel?: number;
+  backupEmail?: string;
 };
