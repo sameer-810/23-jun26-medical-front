@@ -49,15 +49,22 @@ export default function SupplierFormScreen() {
       });
   }, [supplier, reset]);
 
+  /**
+   * PATCH drops `undefined`, so an emptied field would keep its old value —
+   * and a wrong mobile would keep holding the org-unique slot. In edit mode an
+   * empty box is sent as "" , which the API treats as "clear this".
+   */
+  const clearable = (v: string) => (editing ? v.trim() : v.trim() || undefined);
+
   const submit = handleSubmit((f) =>
     mut.mutate(
       {
         name: f.name.trim(),
-        contactPerson: f.contactPerson.trim() || undefined,
-        mobile: f.mobile.trim() || undefined,
-        email: f.email.trim() || undefined,
-        address: f.address.trim() || undefined,
-        gstin: f.gstin.trim() || undefined,
+        contactPerson: clearable(f.contactPerson),
+        mobile: clearable(f.mobile),
+        email: clearable(f.email),
+        address: clearable(f.address),
+        gstin: clearable(f.gstin),
       },
       { onSuccess: () => navigation.goBack() },
     ),

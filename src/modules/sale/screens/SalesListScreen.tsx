@@ -5,6 +5,8 @@ import { Plus, Receipt } from "lucide-react-native";
 import { useSales } from "@modules/sale/hooks/useSales";
 import { SaleListItem } from "@modules/sale/types";
 import { layout } from "@shared/designSystem";
+import { fmtInt, fmtMoney, fmtDate } from "@shared/format";
+import { useDebouncedValue } from "@shared/hooks";
 import {
   Screen,
   Text,
@@ -23,7 +25,6 @@ import {
   ErrorState,
 } from "@shared/ui";
 
-const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const STATUS_TONE = {
   completed: "success",
   partially_returned: "warning",
@@ -38,13 +39,15 @@ export default function SalesListScreen() {
       ? layout.screenPadding
       : layout.screenPaddingPhone;
   const [search, setSearch] = useState("");
+  // One request per pause, like every other search in the app.
+  const term = useDebouncedValue(search.trim(), 350);
   const [status, setStatus] = useState("all");
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
 
   // Filter change → back to page 1 (adjusted during render, not in an effect).
-  const filterKey = `${search}|${status}|${limit}`;
+  const filterKey = `${term}|${status}|${limit}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
@@ -57,10 +60,13 @@ export default function SalesListScreen() {
     page: number;
     limit: number;
   } = { page, limit };
-  if (search.trim()) params.search = search.trim();
+  if (term) params.search = term;
   if (status !== "all") params.status = status;
   const { data, isLoading, isError, error, refetch, isRefetching } =
     useSales(params);
+  // The debounce gap is still "searching" — otherwise the list reads as a
+  // result for what's on screen when it is a result for the previous query.
+  const searching = isRefetching || isLoading || search.trim() !== term;
   const sales = data?.data ?? [];
   const total = data?.meta?.total ?? 0;
   const totalPages = data?.meta?.pages ?? 1;
@@ -103,7 +109,7 @@ export default function SalesListScreen() {
       sortValue: (s) => s.saleDate,
       render: (s) => (
         <Text variant="body-sm" tone="tertiary">
-          {new Date(s.saleDate).toLocaleDateString("en-IN")}
+          {fmtDate(s.saleDate)}
         </Text>
       ),
     },
@@ -148,11 +154,11 @@ export default function SalesListScreen() {
       render: (s) => (
         <VStack gap={1} align="flex-end">
           <Text variant="label" tone="primary">
-            {money(s.grandTotal)}
+            {fmtMoney(s.grandTotal)}
           </Text>
           {s.totalReturned > 0 ? (
             <Text variant="caption" tone="danger">
-              -{money(s.totalReturned)}
+              -{fmtMoney(s.totalReturned)}
             </Text>
           ) : null}
         </VStack>
@@ -165,8 +171,8 @@ export default function SalesListScreen() {
       back="Back to billing"
       overline="Sales"
       title="Invoices"
-      subtitle={isError ? undefined : `${total.toLocaleString("en-IN")} sales`}
-      refreshing={isRefetching || isLoading}
+      subtitle={isError ? undefined : `${fmtInt(total)} sales`}
+      refreshing={searching}
       onRefresh={refetch}
       right={
         <Button
@@ -275,15 +281,15 @@ function SaleRow({
       title={sale.invoiceNo}
       subtitle={[
         sale.customerName,
-        new Date(sale.saleDate).toLocaleDateString(),
+        fmtDate(sale.saleDate),
         `${sale.itemCount} item${sale.itemCount === 1 ? "" : "s"}`,
         sale.paymentMode,
       ]
         .filter(Boolean)
         .join(" · ")}
-      value={money(sale.grandTotal)}
+      value={fmtMoney(sale.grandTotal)}
       valueHint={
-        sale.totalReturned > 0 ? `−${money(sale.totalReturned)}` : undefined
+        sale.totalReturned > 0 ? `−${fmtMoney(sale.totalReturned)}` : undefined
       }
       right={
         <StatusChip

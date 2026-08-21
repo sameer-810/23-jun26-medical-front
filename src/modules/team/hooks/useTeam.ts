@@ -5,7 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { teamApi } from "@modules/team/api/teamApi";
-import { CreateUserPayload } from "@modules/team/types";
+import { CreateUserPayload, UpdateMemberPayload } from "@modules/team/types";
 
 export const useTeamUsers = (params?: { search?: string; role?: string }) =>
   useQuery({
@@ -31,6 +31,18 @@ export const useCreateUser = () => {
   return useMutation({
     mutationFn: (payload: CreateUserPayload) => teamApi.create(payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["team-users"] }),
+  });
+};
+
+export const useUpdateMember = (id: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: UpdateMemberPayload) =>
+      teamApi.updateMember(id, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["team-users"] });
+      qc.invalidateQueries({ queryKey: ["team-user", id] });
+    },
   });
 };
 

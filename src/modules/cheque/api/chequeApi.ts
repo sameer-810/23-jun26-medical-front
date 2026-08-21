@@ -1,3 +1,4 @@
+import { encode as base64encode } from "base-64";
 import { apiClient } from "@api/apiClient";
 import {
   Cheque,
@@ -95,5 +96,30 @@ export const chequeApi = {
       timeout: 45000,
     });
     return res.data.data;
+  },
+
+  /**
+   * The attached photo, as a data URI.
+   *
+   * The endpoint answers either with the bytes (inline store) or a 302 to a
+   * short-lived signed CDN link; the HTTP layer follows the redirect, so both
+   * land here as bytes. Returned as a data URI rather than a blob/object URL
+   * because `<Image source={{uri}}>` takes the same string on web and native,
+   * and the Authorization header can't ride on an <img src>.
+   */
+  image: async (id: string) => {
+    const res = await apiClient.get<ArrayBuffer>(`/cheques/${id}/image`, {
+      responseType: "arraybuffer",
+      timeout: 30000,
+    });
+    const bytes = new Uint8Array(res.data);
+    // Chunked: String.fromCharCode(...bytes) blows the argument limit on a
+    // 150 KB photo.
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 8192)
+      binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    const mime =
+      (res.headers as Record<string, string>)?.["content-type"] || "image/jpeg";
+    return `data:${mime};base64,${base64encode(binary)}`;
   },
 };

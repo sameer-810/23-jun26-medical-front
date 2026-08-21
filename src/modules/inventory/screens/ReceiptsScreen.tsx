@@ -12,6 +12,7 @@ import { ReceiptListItem } from "@modules/inventory/types";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { downloadBlob } from "@shared/download";
 import { apiErrorMessage } from "@api/apiClient";
+import { fmtDate } from "@shared/format";
 import { palette } from "@shared/designSystem";
 import {
   Screen,
@@ -92,10 +93,20 @@ export default function ReceiptsScreen() {
       width: 150,
       sortable: true,
       sortValue: (r) => r.receiptNo,
+      // A voided GRN keeps its row but contributes nothing, so it has to be
+      // distinguishable from a live one at a glance.
       render: (r) => (
-        <Text variant="label" tone="primary">
-          {r.receiptNo}
-        </Text>
+        <HStack gap={6} align="center">
+          <Text
+            variant="label"
+            tone={r.status === "void" ? "tertiary" : "primary"}
+          >
+            {r.receiptNo}
+          </Text>
+          {r.status === "void" ? (
+            <StatusChip label="Void" tone="danger" />
+          ) : null}
+        </HStack>
       ),
     },
     {
@@ -315,13 +326,21 @@ function ReceiptRow({
       <HStack gap={14} align="center">
         <PackageCheck size={22} color={palette.teal[600]} strokeWidth={1.9} />
         <VStack gap={4} flex={1}>
-          <Text variant="label-lg" tone="primary">
-            {receipt.receiptNo}
-          </Text>
+          <HStack gap={6} align="center">
+            <Text
+              variant="label-lg"
+              tone={receipt.status === "void" ? "tertiary" : "primary"}
+            >
+              {receipt.receiptNo}
+            </Text>
+            {receipt.status === "void" ? (
+              <StatusChip label="Void" tone="danger" />
+            ) : null}
+          </HStack>
           <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
             {[
               receipt.supplierName || "No supplier",
-              new Date(receipt.receivedAt).toLocaleDateString(),
+              fmtDate(receipt.receivedAt),
               receipt.receivedByName,
             ]
               .filter(Boolean)

@@ -77,6 +77,17 @@ export const supplierApi = {
     return res.data;
   },
 
+  /**
+   * Undo a deactivation. Deactivating soft-deletes, which hides the record from
+   * the update route too, so this cannot be a PATCH.
+   */
+  restore: async (id: string) => {
+    const res = await apiClient.post<{ success: boolean; data: Supplier }>(
+      `/suppliers/${id}/restore`,
+    );
+    return res.data.data;
+  },
+
   /** Supplier account statement — credit purchases + payments + running balance. */
   statement: async (id: string, params?: { page?: number; limit?: number }) => {
     const res = await apiClient.get<SupplierStatement>(

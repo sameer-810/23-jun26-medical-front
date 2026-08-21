@@ -44,6 +44,7 @@ import { useCreateSale, useInvoiceProfile } from "@modules/sale/hooks/useSales";
 import { useCreateReminder } from "@modules/reminder/hooks/useReminders";
 import { SaleLineInput } from "@modules/sale/types";
 import { apiErrorMessage } from "@api/apiClient";
+import { fmtMoney, fmtMoneyExact, fmtDate } from "@shared/format";
 import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
@@ -97,14 +98,20 @@ const prettyExp = (iso: string | null | undefined) => {
  */
 const REFILL_LEAD_DAYS = 3;
 
-const money = (n: number) =>
-  `₹${(Math.round(n * 100) / 100).toLocaleString("en-IN")}`;
-/** Always two decimals — for the figures that must reconcile to the paisa. */
-const moneyExact = (n: number) =>
-  `₹${(Number(n) || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+/**
+ * The server caps discountPct and taxRatePct at 100 and clamps an absolute
+ * discount to the line's gross. Keep the box inside those bounds: a value the
+ * server rejects comes back as "Validation error" naming no field, with a queue
+ * waiting. Blank and half-typed values pass through untouched.
+ */
+const clampInput = (v: string, max: number, min = 0) => {
+  if (v.trim() === "") return v;
+  const n = Number(v);
+  if (Number.isNaN(n)) return v;
+  if (n < min) return String(min);
+  if (n > max) return String(Math.round(max * 100) / 100);
+  return v;
+};
 
 export default function NewSaleScreen() {
   const navigation = useNavigation<any>();
@@ -247,7 +254,7 @@ export default function NewSaleScreen() {
     value: p.id,
     label: p.name,
     sublabel: p.saltComposition || p.sku,
-    right: `${money(p.sellingPrice)}/${p.baseUnit}`,
+    right: `${fmtMoneyExact(p.sellingPrice)}/${p.baseUnit}`,
   }));
   const customerOptions = (customers?.data || []).map((c) => ({
     value: c.id,
@@ -535,10 +542,11 @@ export default function NewSaleScreen() {
     const unitPrice = l.unitPrice === "" ? fallback : Number(l.unitPrice) || 0;
     const gross = unitPrice * qty;
     const discountInput = Number(l.discount) || 0;
+    // Same clamp the server applies, so the preview is what gets charged.
     const discount =
       l.discountMode === "pct"
-        ? (gross * Math.min(discountInput, 100)) / 100
-        : discountInput;
+        ? (gross * Math.min(Math.max(discountInput, 0), 100)) / 100
+        : Math.min(Math.max(discountInput, 0), gross);
     const net = Math.max(gross - discount, 0);
     const rate = l.taxRate === "" ? p?.taxRatePct || 0 : Number(l.taxRate) || 0;
     // Mirror the server: when prices are tax-inclusive, the net already contains
@@ -608,6 +616,8 @@ export default function NewSaleScreen() {
   const itemCount = lines.length;
   const qtyCount = lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
 
+  // Sent values are clamped again here: the boxes bound what can be typed, this
+  // bounds what can leave the screen, whatever route put the value there.
   const validLines: SaleLineInput[] = lines
     .filter((l) => l.productId && Number(l.quantity) > 0)
     .map((l) => ({
@@ -615,16 +625,20 @@ export default function NewSaleScreen() {
       batchId: l.batchId || undefined,
       unit: l.unit || undefined,
       quantity: Number(l.quantity),
-      unitPrice: l.unitPrice === "" ? undefined : Number(l.unitPrice),
+      unitPrice:
+        l.unitPrice === "" ? undefined : Math.max(Number(l.unitPrice) || 0, 0),
       discountAmount:
         l.discountMode === "amount" && l.discount !== ""
-          ? Number(l.discount)
+          ? Math.min(Math.max(Number(l.discount) || 0, 0), calc(l).gross)
           : undefined,
       discountPct:
         l.discountMode === "pct" && l.discount !== ""
-          ? Number(l.discount)
+          ? Math.min(Math.max(Number(l.discount) || 0, 0), 100)
           : undefined,
-      taxRatePct: l.taxRate === "" ? undefined : Number(l.taxRate),
+      taxRatePct:
+        l.taxRate === ""
+          ? undefined
+          : Math.min(Math.max(Number(l.taxRate) || 0, 0), 100),
     }));
 
   // `!mut.isPending` belongs in canSubmit, not only on the button: the Ctrl+Enter
@@ -883,12 +897,14 @@ export default function NewSaleScreen() {
                       <DiscCell
                         w={COL.disc}
                         line={line}
+                        gross={c.gross}
                         onValue={(v) => setLine(i, { discount: v })}
                         onMode={(m) => setLine(i, { discountMode: m })}
                       />
                       <Cell
                         w={COL.gst}
                         value={line.taxRate}
+                        max={100}
                         onChangeText={(v) => setLine(i, { taxRate: v })}
                         align="center"
                       />
@@ -897,7 +913,7 @@ export default function NewSaleScreen() {
                         tone="primary"
                         style={{ width: COL.amount, textAlign: "right" }}
                       >
-                        {money(c.total)}
+                        {fmtMoneyExact(c.total)}
                       </Text>
                       <Pressable
                         onPress={() => removeLine(i)}
@@ -1042,6 +1058,7 @@ export default function NewSaleScreen() {
                         <DiscCell
                           w={120}
                           line={line}
+                          gross={c.gross}
                           onValue={(v) => setLine(i, { discount: v })}
                           onMode={(m) => setLine(i, { discountMode: m })}
                         />
@@ -1050,6 +1067,7 @@ export default function NewSaleScreen() {
                         <Cell
                           w={56}
                           value={line.taxRate}
+                          max={100}
                           onChangeText={(v) => setLine(i, { taxRate: v })}
                           align="center"
                         />
@@ -1059,7 +1077,7 @@ export default function NewSaleScreen() {
                           Amount
                         </Text>
                         <Text variant="label-lg" tone="primary">
-                          {money(c.total)}
+                          {fmtMoneyExact(c.total)}
                         </Text>
                       </View>
                     </HStack>
@@ -1172,34 +1190,34 @@ export default function NewSaleScreen() {
       <VStack gap={6}>
         <Row
           label={`Subtotal · ${itemCount} item${itemCount === 1 ? "" : "s"}`}
-          value={money(totals.subtotal)}
+          value={fmtMoneyExact(totals.subtotal)}
         />
         {totals.discount > 0 && (
-          <Row label="Discount" value={`- ${money(totals.discount)}`} />
+          <Row label="Discount" value={`- ${fmtMoneyExact(totals.discount)}`} />
         )}
-        <Row label="Taxable" value={money(totals.taxable)} />
+        <Row label="Taxable" value={fmtMoneyExact(totals.taxable)} />
         {taxType === "intra" ? (
           <>
-            <Row label="CGST" value={money(totals.tax / 2)} muted />
+            <Row label="CGST" value={fmtMoneyExact(totals.tax / 2)} muted />
             <Row
               label="SGST"
-              value={money(
+              value={fmtMoneyExact(
                 totals.tax - Math.round((totals.tax / 2) * 100) / 100,
               )}
               muted
             />
           </>
         ) : (
-          <Row label="IGST" value={money(totals.tax)} muted />
+          <Row label="IGST" value={fmtMoneyExact(totals.tax)} muted />
         )}
         {/* The exact figure and the round-off, both stated. Showing only the
             rounded total made 20 paise disappear with nothing to account for
             them — the discrepancy the audit reported. */}
-        <Row label="Total amt" value={moneyExact(exactTotal)} />
+        <Row label="Total amt" value={fmtMoneyExact(exactTotal)} />
         {roundOff !== 0 ? (
           <Row
             label="Round off"
-            value={`${roundOff > 0 ? "+" : "−"}${moneyExact(Math.abs(roundOff))}`}
+            value={`${roundOff > 0 ? "+" : "−"}${fmtMoneyExact(Math.abs(roundOff))}`}
             muted
           />
         ) : null}
@@ -1209,7 +1227,7 @@ export default function NewSaleScreen() {
             To pay
           </Text>
           <Text variant="display-sm" tone="accent">
-            {money(grand)}
+            {fmtMoney(grand)}
           </Text>
         </HStack>
         <Text variant="caption" tone="tertiary">
@@ -1272,7 +1290,9 @@ export default function NewSaleScreen() {
         />
       ) : null}
       <Button
-        label={grand > 0 ? `Complete sale · ${money(grand)}` : "Complete sale"}
+        label={
+          grand > 0 ? `Complete sale · ${fmtMoney(grand)}` : "Complete sale"
+        }
         size="lg"
         loading={mut.isPending}
         disabled={!canSubmit}
@@ -1417,7 +1437,7 @@ export default function NewSaleScreen() {
           createReminder.mutate(
             {
               title: `Refill call — ${followUp.customerName}${followUp.medicine ? ` · ${followUp.medicine}` : ""}`,
-              notes: `Course of ${followUp.days} units sold on ${new Date().toLocaleDateString("en-IN")}.`,
+              notes: `Course of ${followUp.days} units sold on ${fmtDate(new Date())}.`,
               dueAt: due.toISOString(),
               priority: "normal",
               // The number travels as data, so Reminders can dial it.
@@ -1561,7 +1581,7 @@ function SubstitutePanel({
                 </Text>
                 <Text variant="caption" tone="tertiary" numberOfLines={1}>
                   {alt.brandName ? `${alt.brandName} · ` : ""}
-                  {alt.available} in stock · {money(alt.sellingPrice)}/
+                  {alt.available} in stock · {fmtMoneyExact(alt.sellingPrice)}/
                   {alt.baseUnit}
                 </Text>
               </View>
@@ -1628,17 +1648,20 @@ function Cell({
   onChangeText,
   align = "left",
   error,
+  max = Number.MAX_SAFE_INTEGER,
 }: {
   w: number;
   value: string;
   onChangeText: (v: string) => void;
   align?: "left" | "center" | "right";
   error?: boolean;
+  /** Server-side ceiling for this field; negatives are always refused. */
+  max?: number;
 }) {
   return (
     <TextInput
       value={value}
-      onChangeText={onChangeText}
+      onChangeText={(v) => onChangeText(clampInput(v, max))}
       keyboardType="decimal-pad"
       selectTextOnFocus
       style={[
@@ -1658,19 +1681,23 @@ function Cell({
 function DiscCell({
   w,
   line,
+  gross,
   onValue,
   onMode,
 }: {
   w: number;
   line: DraftLine;
+  /** The line's gross — the ceiling for a discount entered in rupees. */
+  gross: number;
   onValue: (v: string) => void;
   onMode: (m: "amount" | "pct") => void;
 }) {
+  const ceiling = (mode: "amount" | "pct") => (mode === "pct" ? 100 : gross);
   return (
     <View style={[styles.discWrap, { width: w }]}>
       <TextInput
         value={line.discount}
-        onChangeText={onValue}
+        onChangeText={(v) => onValue(clampInput(v, ceiling(line.discountMode)))}
         keyboardType="decimal-pad"
         placeholder="0"
         placeholderTextColor={palette.text.tertiary}
@@ -1684,7 +1711,12 @@ function DiscCell({
           return (
             <Pressable
               key={m}
-              onPress={() => onMode(m)}
+              onPress={() => {
+                // A value that was legal in the old mode can exceed the new
+                // mode's ceiling — 150 is fine in rupees, not as a percent.
+                onValue(clampInput(line.discount, ceiling(m)));
+                onMode(m);
+              }}
               style={[styles.discToggleBtn, active && styles.discToggleBtnOn]}
               accessibilityRole="button"
               accessibilityLabel={

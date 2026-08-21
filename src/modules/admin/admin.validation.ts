@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  requiredText,
+  freeText,
+  optionalNonNegative,
+} from "@shared/form/fields";
 
 export const adminLoginSchema = z.object({
   email: z
@@ -36,3 +41,52 @@ export const createPharmacySchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 export type CreatePharmacyValues = z.infer<typeof createPharmacySchema>;
+
+/** Whole count; "" means not set. */
+const optionalWhole = z
+  .string()
+  .trim()
+  .refine((v) => v === "" || /^\d+$/.test(v), "Enter a whole number");
+
+/** "" -> undefined so the server keeps its own default instead of storing 0. */
+export const optionalNumber = (v: string) =>
+  v.trim() === "" ? undefined : Number(v);
+
+/**
+ * A shared-catalogue entry. Every pharmacy imports from this, so a coerced
+ * `Number("12..5") || 0` writing ₹0 MRP is not an acceptable failure mode —
+ * non-numeric input is refused rather than rounded to nothing.
+ *
+ * packUnit/packQty/baseUnit/hsnCode feed product.service.createFromCatalog:
+ * without them an imported product has no pack hierarchy, a "pcs" base unit
+ * and a blank HSN on every invoice line.
+ */
+export const catalogProductSchema = z.object({
+  sku: requiredText("SKU"),
+  name: requiredText("Name"),
+  saltComposition: freeText,
+  manufacturerName: freeText,
+  mrp: optionalNonNegative,
+  productForm: freeText,
+  packLabel: freeText,
+  packUnit: freeText,
+  packQty: optionalWhole,
+  baseUnit: freeText,
+  hsnCode: freeText,
+  prescriptionRequired: z.boolean(),
+});
+
+export type CatalogProductValues = z.infer<typeof catalogProductSchema>;
+
+export const planSchema = z.object({
+  name: requiredText("Plan name"),
+  code: requiredText("Code"),
+  description: freeText,
+  priceMonthly: optionalNonNegative,
+  priceYearly: optionalNonNegative,
+  maxUsers: optionalWhole,
+  maxProducts: optionalWhole,
+  features: freeText,
+});
+
+export type PlanValues = z.infer<typeof planSchema>;

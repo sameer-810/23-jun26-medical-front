@@ -7,13 +7,19 @@ import {
   Receipt,
   BellRing,
   DatabaseBackup,
+  Boxes,
 } from "lucide-react-native";
 import {
   useSettings,
   useUpdateSettings,
   useEmailBackup,
 } from "@modules/settings/hooks/useSettings";
-import { settingsSchema } from "@modules/settings/settings.validation";
+import {
+  settingsSchema,
+  parseDays,
+  parseUnits,
+  SETTINGS_FIELD_LABELS,
+} from "@modules/settings/settings.validation";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { apiErrorMessage } from "@api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
@@ -25,6 +31,7 @@ import {
   HStack,
   Card,
   Button,
+  Banner,
   StatusChip,
   ConfirmDialog,
 } from "@shared/ui";
@@ -59,6 +66,7 @@ export default function SettingsScreen() {
     defaultValues: {
       legalName: "",
       addressLine1: "",
+      addressLine2: "",
       city: "",
       state: "",
       pincode: "",
@@ -71,12 +79,19 @@ export default function SettingsScreen() {
       defaultRatePct: "12",
       invoicePrefix: "INV",
       priceIncludesTax: false,
+      currency: "INR",
+      expiryAlertDays: "90, 60, 30",
+      units: "",
+      defaultReorderLevel: "0",
       alertInApp: true,
       alertEmail: false,
       alertSms: false,
       backupEmail: "",
     },
   });
+
+  /** Fields that blocked the last submit. The Save button is four screens above them. */
+  const [invalidFields, setInvalidFields] = useState<string[]>([]);
 
   /**
    * The signature lives outside react-hook-form.
@@ -125,6 +140,7 @@ export default function SettingsScreen() {
       reset({
         legalName: data.company.legalName,
         addressLine1: data.company.addressLine1,
+        addressLine2: data.company.addressLine2 || "",
         city: data.company.city,
         state: data.company.state,
         pincode: data.company.pincode,
@@ -137,6 +153,10 @@ export default function SettingsScreen() {
         defaultRatePct: String(data.tax.defaultRatePct),
         invoicePrefix: data.tax.invoicePrefix,
         priceIncludesTax: data.tax.priceIncludesTax,
+        currency: data.currency || "INR",
+        expiryAlertDays: (data.expiryAlertDays || []).join(", "),
+        units: (data.units || []).join(", "),
+        defaultReorderLevel: String(data.defaultReorderLevel ?? 0),
         alertInApp: data.alertChannels.inApp,
         alertEmail: data.alertChannels.email,
         alertSms: data.alertChannels.sms,
@@ -145,34 +165,45 @@ export default function SettingsScreen() {
     }
   }, [data, reset]);
 
-  const save = handleSubmit((f) =>
-    mut.mutate({
-      company: {
-        legalName: f.legalName,
-        addressLine1: f.addressLine1,
-        city: f.city,
-        state: f.state,
-        pincode: f.pincode,
-        phone: f.phone,
-        email: f.email,
-        drugLicenseNo: f.drugLicenseNo,
-        gstin: f.gstin,
-        signatureLabel: f.signatureLabel,
-        signatureImage: signature,
-      },
-      tax: {
-        enabled: f.taxEnabled,
-        defaultRatePct: Number(f.defaultRatePct) || 0,
-        invoicePrefix: f.invoicePrefix,
-        priceIncludesTax: f.priceIncludesTax,
-      },
-      alertChannels: {
-        inApp: f.alertInApp,
-        email: f.alertEmail,
-        sms: f.alertSms,
-      },
-      backupEmail: f.backupEmail,
-    }),
+  const save = handleSubmit(
+    (f) => {
+      setInvalidFields([]);
+      mut.mutate({
+        company: {
+          legalName: f.legalName,
+          addressLine1: f.addressLine1,
+          addressLine2: f.addressLine2,
+          city: f.city,
+          state: f.state,
+          pincode: f.pincode,
+          phone: f.phone,
+          email: f.email,
+          drugLicenseNo: f.drugLicenseNo,
+          gstin: f.gstin,
+          signatureLabel: f.signatureLabel,
+          signatureImage: signature,
+        },
+        tax: {
+          enabled: f.taxEnabled,
+          defaultRatePct: Number(f.defaultRatePct) || 0,
+          invoicePrefix: f.invoicePrefix,
+          priceIncludesTax: f.priceIncludesTax,
+        },
+        currency: f.currency,
+        expiryAlertDays: parseDays(f.expiryAlertDays),
+        units: parseUnits(f.units),
+        defaultReorderLevel: Number(f.defaultReorderLevel),
+        alertChannels: {
+          inApp: f.alertInApp,
+          email: f.alertEmail,
+          sms: f.alertSms,
+        },
+        backupEmail: f.backupEmail,
+      });
+    },
+    // A zod failure otherwise fires nothing at all, and the only sign is an
+    // inline error far below the sticky Save button.
+    (errors) => setInvalidFields(Object.keys(errors)),
   );
 
   return (
@@ -195,6 +226,16 @@ export default function SettingsScreen() {
         />
       }
     >
+      {invalidFields.length > 0 && (
+        <Banner
+          tone="danger"
+          title="Not saved — some fields need fixing"
+          message={invalidFields
+            .map((f) => SETTINGS_FIELD_LABELS[f] || f)
+            .join(", ")}
+          style={{ marginBottom: 16 }}
+        />
+      )}
       {mut.isError && (
         <View style={errorBox}>
           <Text variant="body-sm" tone="danger">
@@ -227,8 +268,15 @@ export default function SettingsScreen() {
           <ControlledTextField
             control={control}
             name="addressLine1"
-            label="Address"
+            label="Address line 1"
             placeholder="Street, area"
+          />
+          {/* Prints as the second address line on the GST invoice. */}
+          <ControlledTextField
+            control={control}
+            name="addressLine2"
+            label="Address line 2 (optional)"
+            placeholder="Landmark, building"
           />
           <HStack gap={12}>
             <View style={{ flex: 1 }}>
@@ -392,6 +440,15 @@ export default function SettingsScreen() {
                 autoCapitalize="characters"
               />
             </View>
+            <View style={{ flex: 1 }}>
+              <ControlledTextField
+                control={control}
+                name="currency"
+                label="Currency code"
+                autoCapitalize="characters"
+                placeholder="INR"
+              />
+            </View>
           </HStack>
           <HStack align="center" justify="space-between">
             <VStack gap={2} flex={1}>
@@ -415,11 +472,24 @@ export default function SettingsScreen() {
       />
       <Card style={{ marginBottom: 24 }}>
         <VStack gap={16}>
-          <HStack gap={8} wrap>
-            {(data?.expiryAlertDays || [90, 60, 30]).map((d) => (
-              <StatusChip key={d} label={`${d} days`} tone="info" />
-            ))}
-          </HStack>
+          <VStack gap={6}>
+            <ControlledTextField
+              control={control}
+              name="expiryAlertDays"
+              label="Alert thresholds (days before expiry)"
+              placeholder="90, 60, 30"
+              keyboardType="numbers-and-punctuation"
+            />
+            {/* Saved thresholds, so an unsaved edit is visibly an edit. */}
+            <HStack gap={8} wrap>
+              {(data?.expiryAlertDays || []).map((d) => (
+                <StatusChip key={d} label={`${d} days`} tone="info" />
+              ))}
+            </HStack>
+            <Text variant="caption" tone="tertiary">
+              Comma separated, up to 6 thresholds between 1 and 365 days.
+            </Text>
+          </VStack>
           {/*
             In-app alerts are free and behave like any other switch. Email and
             SMS cost the platform real money per message, so turning one on is a
@@ -445,6 +515,36 @@ export default function SettingsScreen() {
             label="SMS alerts"
             price={data?.alertPricing?.smsMonthly ?? 0}
             currency={data?.alertPricing?.currency || "INR"}
+          />
+        </VStack>
+      </Card>
+
+      {/* Stock defaults */}
+      <SectionHeader
+        icon={Boxes}
+        title="Stock defaults"
+        subtitle="Units offered on products, and the fallback reorder level"
+      />
+      <Card style={{ marginBottom: 24 }}>
+        <VStack gap={16}>
+          <VStack gap={6}>
+            <ControlledTextField
+              control={control}
+              name="units"
+              label="Units"
+              placeholder="pcs, strip, bottle, box"
+              autoCapitalize="none"
+            />
+            <Text variant="caption" tone="tertiary">
+              Comma separated. These are the units offered when adding a
+              product.
+            </Text>
+          </VStack>
+          <ControlledTextField
+            control={control}
+            name="defaultReorderLevel"
+            label="Default reorder level"
+            keyboardType="number-pad"
           />
         </VStack>
       </Card>

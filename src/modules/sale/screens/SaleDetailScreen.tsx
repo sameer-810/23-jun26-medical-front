@@ -7,6 +7,7 @@ import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { printInvoice } from "@modules/sale/invoice";
 import { sendWhatsApp } from "@shared/whatsapp";
+import { fmtMoneyExact, fmtDate, fmtDateTime } from "@shared/format";
 import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
@@ -20,8 +21,6 @@ import {
 } from "@shared/ui";
 import { ReturnModal } from "@modules/sale/components/ReturnModal";
 
-const money = (n: number) =>
-  `₹${(Math.round(n * 100) / 100).toLocaleString("en-IN")}`;
 const STATUS_TONE = {
   completed: "success",
   partially_returned: "warning",
@@ -75,12 +74,12 @@ export default function SaleDetailScreen() {
     const items = sale.lines
       .map(
         (l) =>
-          `• ${l.productName} × ${l.quantity} ${l.unit} = ${money(l.lineTotal)}`,
+          `• ${l.productName} × ${l.quantity} ${l.unit} = ${fmtMoneyExact(l.lineTotal)}`,
       )
       .join("\n");
-    return `*${shopName}*\nInvoice ${sale.invoiceNo}\n${new Date(
+    return `*${shopName}*\nInvoice ${sale.invoiceNo}\n${fmtDate(
       sale.saleDate,
-    ).toLocaleDateString("en-IN")}\n\n${items}\n\n*Total: ${money(
+    )}\n\n${items}\n\n*Total: ${fmtMoneyExact(
       sale.grandTotal,
     )}*\nThank you for your visit!`;
   };
@@ -90,7 +89,7 @@ export default function SaleDetailScreen() {
       back="Back to sales"
       overline={`Invoice · ${sale.status.replace("_", " ")}`}
       title={sale.invoiceNo}
-      subtitle={new Date(sale.saleDate).toLocaleString()}
+      subtitle={fmtDateTime(sale.saleDate)}
     >
       <HStack
         justify="space-between"
@@ -187,13 +186,15 @@ export default function SaleDetailScreen() {
                   </Text>
                 </VStack>
                 <Text variant="label-lg" tone="primary">
-                  {money(l.lineTotal)}
+                  {fmtMoneyExact(l.lineTotal)}
                 </Text>
               </HStack>
               <Text variant="body-sm" tone="secondary">
-                {l.quantity} {l.unit} × {money(l.unitPrice)}
-                {l.discountAmount ? ` − ${money(l.discountAmount)} disc` : ""} ·
-                GST {l.taxRatePct}%
+                {l.quantity} {l.unit} × {fmtMoneyExact(l.unitPrice)}
+                {l.discountAmount
+                  ? ` − ${fmtMoneyExact(l.discountAmount)} disc`
+                  : ""}{" "}
+                · GST {l.taxRatePct}%
               </Text>
               {/* FEFO batch allocations */}
               <HStack gap={6} wrap>
@@ -224,21 +225,24 @@ export default function SaleDetailScreen() {
       {/* Totals */}
       <Card style={{ marginTop: 16 }}>
         <VStack gap={8}>
-          <Row label="Subtotal" value={money(sale.subtotal)} />
+          <Row label="Subtotal" value={fmtMoneyExact(sale.subtotal)} />
           {sale.totalDiscount > 0 && (
-            <Row label="Discount" value={`- ${money(sale.totalDiscount)}`} />
+            <Row
+              label="Discount"
+              value={`- ${fmtMoneyExact(sale.totalDiscount)}`}
+            />
           )}
-          <Row label="Taxable" value={money(sale.totalTaxable)} />
+          <Row label="Taxable" value={fmtMoneyExact(sale.totalTaxable)} />
           {intra ? (
             <>
-              <Row label="CGST" value={money(sale.totalCgst)} muted />
-              <Row label="SGST" value={money(sale.totalSgst)} muted />
+              <Row label="CGST" value={fmtMoneyExact(sale.totalCgst)} muted />
+              <Row label="SGST" value={fmtMoneyExact(sale.totalSgst)} muted />
             </>
           ) : (
-            <Row label="IGST" value={money(sale.totalIgst)} muted />
+            <Row label="IGST" value={fmtMoneyExact(sale.totalIgst)} muted />
           )}
           {sale.roundOff !== 0 && (
-            <Row label="Round off" value={money(sale.roundOff)} muted />
+            <Row label="Round off" value={fmtMoneyExact(sale.roundOff)} muted />
           )}
           <View
             style={{
@@ -252,11 +256,14 @@ export default function SaleDetailScreen() {
               Grand total
             </Text>
             <Text variant="h2" tone="accent">
-              {money(sale.grandTotal)}
+              {fmtMoneyExact(sale.grandTotal)}
             </Text>
           </HStack>
           {sale.totalReturned > 0 && (
-            <Row label="Refunded" value={`- ${money(sale.totalReturned)}`} />
+            <Row
+              label="Refunded"
+              value={`- ${fmtMoneyExact(sale.totalReturned)}`}
+            />
           )}
         </VStack>
       </Card>
@@ -280,12 +287,12 @@ export default function SaleDetailScreen() {
                       {r.returnNo}
                     </Text>
                     <Text variant="caption" tone="tertiary">
-                      {new Date(r.createdAt).toLocaleDateString()}
+                      {fmtDate(r.createdAt)}
                       {r.reason ? ` · ${r.reason}` : ""}
                     </Text>
                   </VStack>
                   <Text variant="label-lg" tone="danger">
-                    - {money(r.totalRefund)}
+                    - {fmtMoneyExact(r.totalRefund)}
                   </Text>
                 </HStack>
               </Card>

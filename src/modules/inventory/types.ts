@@ -172,12 +172,18 @@ export interface ReceiptListItem {
   receivedByName: string;
   totalQuantity: number;
   totalValue: number;
+  /** A voided GRN had its stock and batch costs reversed; it counts towards
+   *  nothing, but stays in the history. */
+  status: "active" | "void";
   lineCount: number;
   createdAt: string;
 }
 
 export interface ReceiptDetail extends ReceiptListItem {
   notes: string;
+  voidedAt: string | null;
+  voidedByName: string;
+  voidReason: string;
   /** The foot of the supplier's bill, stored so the note can be reconciled. */
   taxType: "intra" | "inter";
   totalDiscount: number;

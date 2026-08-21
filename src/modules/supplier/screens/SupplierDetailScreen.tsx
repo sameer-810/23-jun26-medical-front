@@ -10,13 +10,16 @@ import {
   PackageCheck,
   Trash2,
   Wallet,
+  RotateCcw,
 } from "lucide-react-native";
 import {
   useSupplier,
   useSupplierPurchases,
+  useUpdateSupplier,
   useRemoveSupplier,
 } from "@modules/supplier/hooks/useSuppliers";
 import { supplierApi } from "@modules/supplier/api/supplierApi";
+import { apiErrorMessage } from "@api/apiClient";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { palette, accents, numeric } from "@shared/designSystem";
@@ -47,7 +50,16 @@ export default function SupplierDetailScreen() {
   const id = route.params?.id as string;
   const { data: supplier } = useSupplier(id);
   const { data: purchases } = useSupplierPurchases(id);
+  const updateMut = useUpdateSupplier(id);
   const removeMut = useRemoveSupplier();
+  // Not a PATCH: deactivation soft-deletes, which hides the record from update.
+  const restoreMut = useMutation({
+    mutationFn: () => supplierApi.restore(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["supplier", id] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+    },
+  });
   const canManage = useAuthStore((s) => s.hasPermission)(
     PERMISSIONS.SUPPLIERS_MANAGE,
   );
@@ -71,6 +83,10 @@ export default function SupplierDetailScreen() {
       queryClient.invalidateQueries({
         queryKey: ["supplier", "statement", id],
       });
+      // A payment moves the dashboard's payables too — both of its queries,
+      // since neither refetches on focus.
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "finance"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
     },
   });
 
@@ -295,15 +311,35 @@ export default function SupplierDetailScreen() {
         </View>
       ) : null}
 
-      {canManage && supplier?.isActive && (
-        <Button
-          label="Deactivate supplier"
-          variant="destructive"
-          icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2} />}
-          style={{ marginTop: 20 }}
-          loading={removeMut.isPending}
-          onPress={() => setRemoveOpen(true)}
-        />
+      {canManage &&
+        (supplier?.isActive ? (
+          <Button
+            label="Deactivate supplier"
+            variant="destructive"
+            icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2} />}
+            style={{ marginTop: 20 }}
+            loading={removeMut.isPending}
+            onPress={() => setRemoveOpen(true)}
+          />
+        ) : (
+          /* The deactivate dialog promises this; without it the promise is empty. */
+          <Button
+            label="Reactivate supplier"
+            icon={<RotateCcw size={16} color="#FFFFFF" strokeWidth={2} />}
+            style={{ marginTop: 20 }}
+            loading={restoreMut.isPending}
+            onPress={() => restoreMut.mutate()}
+          />
+        ))}
+      {restoreMut.isError && (
+        <Text variant="caption" tone="danger" style={{ marginTop: 8 }}>
+          {apiErrorMessage(restoreMut.error)}
+        </Text>
+      )}
+      {updateMut.isError && (
+        <Text variant="caption" tone="danger" style={{ marginTop: 8 }}>
+          {apiErrorMessage(updateMut.error)}
+        </Text>
       )}
 
       <PromptDialog

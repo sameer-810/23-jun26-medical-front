@@ -34,6 +34,7 @@ import {
   StatRow,
   Select,
   ConfirmDialog,
+  PromptDialog,
   Skeleton,
 } from "@shared/ui";
 
@@ -55,6 +56,7 @@ export default function PharmacyDetailScreen() {
   const [confirmAction, setConfirmAction] = useState<
     "suspend" | "archive" | null
   >(null);
+  const [declineOpen, setDeclineOpen] = useState(false);
 
   const planOptions = (plans ?? []).map((p) => ({
     value: p.code,
@@ -417,13 +419,15 @@ export default function PharmacyDetailScreen() {
                       loading={setApproval.isPending}
                       onPress={() => setApproval.mutate({ id, approve: true })}
                     />
+                    {/* Sits one tap from "Approve & activate" and cannot be
+                        undone, so it confirms like Suspend and Archive do. */}
                     <Button
                       label="Decline"
                       size="sm"
                       variant="secondary"
                       fullWidth={false}
                       loading={setApproval.isPending}
-                      onPress={() => setApproval.mutate({ id, approve: false })}
+                      onPress={() => setDeclineOpen(true)}
                     />
                   </HStack>
                 </VStack>
@@ -492,6 +496,25 @@ export default function PharmacyDetailScreen() {
             archive.mutate(id, { onSuccess: () => navigation.goBack() });
         }}
         onCancel={() => setConfirmAction(null)}
+      />
+
+      {/* The note reaches the applicant, so it is asked for here rather than
+          left as an API field nothing fills. */}
+      <PromptDialog
+        visible={declineOpen}
+        title={`Decline ${org?.name || "this registration"}?`}
+        message="They will not be able to sign in. Add a short reason if you want them to know why."
+        label="Reason shown to the applicant (optional)"
+        placeholder="e.g. Drug licence number could not be verified"
+        confirmLabel="Decline registration"
+        loading={setApproval.isPending}
+        onSubmit={(note) =>
+          setApproval.mutate(
+            { id, approve: false, note: note.trim() || undefined },
+            { onSuccess: () => setDeclineOpen(false) },
+          )
+        }
+        onCancel={() => setDeclineOpen(false)}
       />
     </Screen>
   );

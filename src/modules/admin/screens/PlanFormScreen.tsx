@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Trash2 } from "lucide-react-native";
 import {
   usePlans,
@@ -9,6 +10,7 @@ import {
   useUpdatePlan,
   useDeletePlan,
 } from "@modules/admin/hooks/useAdmin";
+import { planSchema, optionalNumber } from "@modules/admin/admin.validation";
 import { apiErrorMessage } from "@shared/api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
@@ -29,6 +31,8 @@ export default function PlanFormScreen() {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { control, handleSubmit, reset } = useForm({
+    resolver: zodResolver(planSchema),
+    mode: "onTouched",
     defaultValues: {
       name: "",
       code: "",
@@ -60,10 +64,12 @@ export default function PlanFormScreen() {
     const body = {
       name: f.name.trim(),
       description: f.description.trim(),
-      priceMonthly: Number(f.priceMonthly) || 0,
-      priceYearly: Number(f.priceYearly) || 0,
-      maxUsers: Number(f.maxUsers) || 0,
-      maxProducts: Number(f.maxProducts) || 0,
+      // A price typo must not coerce to ₹0 — the schema refuses non-numbers,
+      // and a blank box leaves the field to the server's own default.
+      priceMonthly: optionalNumber(f.priceMonthly),
+      priceYearly: optionalNumber(f.priceYearly),
+      maxUsers: optionalNumber(f.maxUsers),
+      maxProducts: optionalNumber(f.maxProducts),
       features: f.features
         .split(",")
         .map((s) => s.trim())

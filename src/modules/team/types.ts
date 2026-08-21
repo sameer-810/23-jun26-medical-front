@@ -24,6 +24,14 @@ export interface CreateUserPayload {
   permissions?: string[];
 }
 
+/** What PATCH /users/:id accepts — contact details only; privileges have their own endpoints. */
+export interface UpdateMemberPayload {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+}
+
 export interface PermissionCatalogue {
   permissions: string[];
   suggestedLabels: string[];

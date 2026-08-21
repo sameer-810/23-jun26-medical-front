@@ -1,8 +1,9 @@
 import { Sale, InvoiceProfile } from "@modules/sale/types";
 import { printHtml } from "@shared/print";
+import { fmtMoneyExact, fmtDateTime } from "@shared/format";
 
-const money = (n: number) =>
-  `₹${(Math.round(n * 100) / 100).toLocaleString("en-IN")}`;
+/** Every figure on a tax invoice carries its paisa: ₹64.50, not ₹64.5. */
+const money = fmtMoneyExact;
 const esc = (s: string) =>
   String(s || "").replace(
     /[&<>]/g,
@@ -67,7 +68,7 @@ export function invoiceHtml(sale: Sale, profile?: InvoiceProfile): string {
       <div class="inv">
         <div style="font-size:14px;font-weight:700">TAX INVOICE</div>
         <div class="muted">${esc(sale.invoiceNo)}</div>
-        <div class="muted">${new Date(sale.saleDate).toLocaleString()}</div>
+        <div class="muted">${fmtDateTime(sale.saleDate)}</div>
       </div>
     </div>
 

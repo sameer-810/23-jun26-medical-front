@@ -2,6 +2,7 @@ import { apiClient } from "@api/apiClient";
 import {
   TeamUser,
   CreateUserPayload,
+  UpdateMemberPayload,
   PermissionCatalogue,
   ActivityLog,
   Paginated,
@@ -22,6 +23,14 @@ export const teamApi = {
   create: async (payload: CreateUserPayload) => {
     const res = await apiClient.post<{ success: boolean; data: TeamUser }>(
       "/users",
+      payload,
+    );
+    return res.data.data;
+  },
+  /** Admin-side correction of a member's contact details (PATCH /users/:id). */
+  updateMember: async (id: string, payload: UpdateMemberPayload) => {
+    const res = await apiClient.patch<{ success: boolean; data: TeamUser }>(
+      `/users/${id}`,
       payload,
     );
     return res.data.data;

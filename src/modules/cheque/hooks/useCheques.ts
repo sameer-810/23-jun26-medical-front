@@ -23,7 +23,8 @@ export function useUpcomingPdc() {
   });
 }
 
-function useInvalidate() {
+/** Also exported: attaching a photo lands after create's own invalidation. */
+export function useInvalidateCheques() {
   const qc = useQueryClient();
   return () => {
     qc.invalidateQueries({ queryKey: KEY });
@@ -32,7 +33,7 @@ function useInvalidate() {
 }
 
 export function useCreateCheque() {
-  const invalidate = useInvalidate();
+  const invalidate = useInvalidateCheques();
   return useMutation({
     mutationFn: (payload: ChequePayload) => chequeApi.create(payload),
     onSuccess: invalidate,
@@ -40,7 +41,7 @@ export function useCreateCheque() {
 }
 
 export function useSetChequeStatus() {
-  const invalidate = useInvalidate();
+  const invalidate = useInvalidateCheques();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: ChequeStatus }) =>
       chequeApi.setStatus(id, status),
@@ -49,7 +50,7 @@ export function useSetChequeStatus() {
 }
 
 export function useRemoveCheque() {
-  const invalidate = useInvalidate();
+  const invalidate = useInvalidateCheques();
   return useMutation({
     mutationFn: (id: string) => chequeApi.remove(id),
     onSuccess: invalidate,

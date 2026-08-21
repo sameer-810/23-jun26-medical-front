@@ -104,6 +104,15 @@ export const inventoryApi = {
     return res.data.data;
   },
 
+  /** Reverse a GRN: takes its stock back out and restores each batch's cost. */
+  voidReceipt: async (id: string, reason: string) => {
+    const res = await apiClient.post<{ success: boolean; data: ReceiptDetail }>(
+      `/inventory/receipts/${id}/void`,
+      { reason },
+    );
+    return res.data.data;
+  },
+
   /** Medicine ledger — running-balance transaction history for a product. */
   productLedger: async (
     id: string,

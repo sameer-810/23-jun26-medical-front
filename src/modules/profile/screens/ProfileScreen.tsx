@@ -71,6 +71,9 @@ export default function ProfileScreen() {
     profileMut.mutate({
       firstName: f.firstName.trim(),
       lastName: f.lastName.trim(),
+      // Omitted when empty rather than sent as "": the server's `phone` rule
+      // (user.validation.js) has no empty-string escape, so "" is rejected and
+      // a cleared number cannot be saved until it gains one.
       phone: f.phone.trim() || undefined,
     }),
   );

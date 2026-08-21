@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Switch, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Trash2 } from "lucide-react-native";
 import {
   useCatalogProduct,
@@ -9,6 +10,10 @@ import {
   useUpdateCatalog,
   useDeleteCatalog,
 } from "@modules/admin/hooks/useAdmin";
+import {
+  catalogProductSchema,
+  optionalNumber,
+} from "@modules/admin/admin.validation";
 import { apiErrorMessage } from "@shared/api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
@@ -36,6 +41,8 @@ export default function CatalogFormScreen() {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { control, handleSubmit, reset } = useForm({
+    resolver: zodResolver(catalogProductSchema),
+    mode: "onTouched",
     defaultValues: {
       sku: "",
       name: "",
@@ -44,6 +51,10 @@ export default function CatalogFormScreen() {
       mrp: "",
       productForm: "",
       packLabel: "",
+      packUnit: "",
+      packQty: "",
+      baseUnit: "",
+      hsnCode: "",
       prescriptionRequired: false,
     },
   });
@@ -58,6 +69,10 @@ export default function CatalogFormScreen() {
         mrp: String(product.mrp ?? ""),
         productForm: product.productForm,
         packLabel: product.packLabel,
+        packUnit: product.packUnit || "",
+        packQty: product.packQty ? String(product.packQty) : "",
+        baseUnit: product.baseUnit || "",
+        hsnCode: product.hsnCode || "",
         prescriptionRequired: product.prescriptionRequired,
       });
   }, [product, reset]);
@@ -68,9 +83,13 @@ export default function CatalogFormScreen() {
       name: f.name.trim(),
       saltComposition: f.saltComposition.trim(),
       manufacturerName: f.manufacturerName.trim(),
-      mrp: Number(f.mrp) || 0,
+      mrp: optionalNumber(f.mrp),
       productForm: f.productForm.trim(),
       packLabel: f.packLabel.trim(),
+      packUnit: f.packUnit.trim(),
+      packQty: optionalNumber(f.packQty),
+      baseUnit: f.baseUnit.trim(),
+      hsnCode: f.hsnCode.trim(),
       prescriptionRequired: f.prescriptionRequired,
     };
     const opts = {
@@ -139,6 +158,42 @@ export default function CatalogFormScreen() {
             name="packLabel"
             label="Pack (e.g. strip of 10 tablets)"
           />
+          {/* Pack hierarchy and HSN: without these an imported product cannot
+              be sold by strip and prints a blank HSN on every invoice line. */}
+          <HStack gap={12}>
+            <View style={{ flex: 1 }}>
+              <ControlledTextField
+                control={control}
+                name="packUnit"
+                label="Pack unit (Strip / Bottle)"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ControlledTextField
+                control={control}
+                name="packQty"
+                label="Base units per pack"
+                keyboardType="number-pad"
+              />
+            </View>
+          </HStack>
+          <HStack gap={12}>
+            <View style={{ flex: 1 }}>
+              <ControlledTextField
+                control={control}
+                name="baseUnit"
+                label="Base unit (defaults to pcs)"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ControlledTextField
+                control={control}
+                name="hsnCode"
+                label="HSN code"
+                keyboardType="number-pad"
+              />
+            </View>
+          </HStack>
           <Controller
             control={control}
             name="prescriptionRequired"

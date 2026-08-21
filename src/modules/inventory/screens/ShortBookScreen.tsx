@@ -13,6 +13,7 @@ import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { ShortbookItem } from "@modules/inventory/types";
 import { apiErrorMessage } from "@api/apiClient";
 import { useAuthStore } from "@shared/store/useAuthStore";
+import { useDebouncedValue } from "@shared/hooks";
 import { PERMISSIONS } from "@shared/permissions";
 import { palette } from "@shared/designSystem";
 import {
@@ -34,16 +35,22 @@ import {
   ConfirmDialog,
 } from "@shared/ui";
 
+/** The list endpoint's ceiling; 10 pages of it is 2,000 lines of reorder. */
+const SEED_PAGE_SIZE = 200;
+const SEED_MAX_PAGES = 10;
+
 export default function ShortBookScreen() {
   const navigation = useNavigation<any>();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  // One request per pause, not per keystroke.
+  const term = useDebouncedValue(search.trim(), 350);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
 
   const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
-    queryKey: ["inventory", "shortbook", search, page, limit],
-    queryFn: () => inventoryApi.shortbook({ search, page, limit }),
+    queryKey: ["inventory", "shortbook", term, page, limit],
+    queryFn: () => inventoryApi.shortbook({ search: term, page, limit }),
   });
 
   const items = data?.data ?? [];
@@ -108,18 +115,42 @@ export default function ShortBookScreen() {
     }
   };
 
-  const createOrder = () =>
-    navigation.navigate("Orders", {
-      screen: "OrderForm",
-      params: {
-        seedLines: items.map((it) => ({
-          productId: it.productId,
-          productName: it.name,
-          sku: it.sku,
-          quantity: it.suggested || it.need || 1,
-        })),
-      },
-    });
+  const [seeding, setSeeding] = useState(false);
+  /**
+   * Seeds every row matching the current search, not the page on screen —
+   * `items` holds one page. The list endpoint caps `limit` at 200, so walk it.
+   */
+  const createOrder = async () => {
+    setSeeding(true);
+    setNote(null);
+    try {
+      const all: ShortbookItem[] = [];
+      for (let p = 1; p <= SEED_MAX_PAGES; p += 1) {
+        const res = await inventoryApi.shortbook({
+          search: term,
+          page: p,
+          limit: SEED_PAGE_SIZE,
+        });
+        all.push(...(res.data ?? []));
+        if (p >= (res.meta?.pages ?? 1)) break;
+      }
+      navigation.navigate("Orders", {
+        screen: "OrderForm",
+        params: {
+          seedLines: all.map((it) => ({
+            productId: it.productId,
+            productName: it.name,
+            sku: it.sku,
+            quantity: it.suggested || it.need || 1,
+          })),
+        },
+      });
+    } catch (e) {
+      setNote(apiErrorMessage(e));
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const columns: Column<ShortbookItem>[] = [
     {
@@ -234,11 +265,16 @@ export default function ShortBookScreen() {
       subtitle="Items to reorder"
       right={
         items.length > 0 ? (
+          // The count is on the button: it says how many lines the order will
+          // hold, which is not the number of rows on this page.
           <Button
-            label="Create order"
+            label={
+              meta?.total ? `Create order · ${meta.total}` : "Create order"
+            }
             size="sm"
+            loading={seeding}
             icon={<ShoppingBag size={16} color="#FFFFFF" strokeWidth={2.2} />}
-            onPress={createOrder}
+            onPress={() => void createOrder()}
           />
         ) : undefined
       }

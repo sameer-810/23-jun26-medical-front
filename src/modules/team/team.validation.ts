@@ -21,3 +21,17 @@ export const addUserSchema = z.object({
 });
 
 export type AddUserFormValues = z.infer<typeof addUserSchema>;
+
+/** Mirrors the server's updateMemberSchema — contact details only, no password. */
+export const editMemberSchema = z.object({
+  firstName: z.string().trim().min(2, "Enter at least 2 characters"),
+  lastName: freeText,
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email"),
+  phone: optionalPhone,
+});
+
+export type EditMemberFormValues = z.infer<typeof editMemberSchema>;

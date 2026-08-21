@@ -4,6 +4,7 @@ import {
   ReceiptLineInput,
   ScannedBill,
 } from "@modules/inventory/types";
+import { fmtDate } from "@shared/format";
 
 /**
  * Goods-received draft rules.
@@ -345,7 +346,7 @@ export function scanSummary(bill: ScannedBill): string {
 /** Re-receiving an invoice doubles the stock — this is the sentence that warns. */
 export function duplicateWarning(bill: ScannedBill): string | null {
   if (!bill.duplicate) return null;
-  const when = new Date(bill.duplicate.receivedAt).toLocaleDateString();
+  const when = fmtDate(bill.duplicate.receivedAt);
   return `Invoice ${bill.duplicate.referenceNo} was already received as ${bill.duplicate.receiptNo} on ${when}. Saving again will DOUBLE this stock.`;
 }
 

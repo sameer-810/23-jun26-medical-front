@@ -11,13 +11,16 @@ import {
   Trash2,
   Wallet,
   MessageCircle,
+  RotateCcw,
 } from "lucide-react-native";
 import {
   useCustomer,
+  useUpdateCustomer,
   useRemoveCustomer,
 } from "@modules/customer/hooks/useCustomers";
 import { customerApi } from "@modules/customer/api/customerApi";
 import { useSales } from "@modules/sale/hooks/useSales";
+import { apiErrorMessage } from "@api/apiClient";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { sendWhatsApp } from "@shared/whatsapp";
@@ -54,7 +57,16 @@ export default function CustomerDetailScreen() {
   const id = route.params?.id as string;
   const { data: customer } = useCustomer(id);
   const { data: sales } = useSales({ customerId: id });
+  const updateMut = useUpdateCustomer(id);
   const removeMut = useRemoveCustomer();
+  // Not a PATCH: deactivation soft-deletes, which hides the record from update.
+  const restoreMut = useMutation({
+    mutationFn: () => customerApi.restore(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customer", id] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+    },
+  });
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canManage = hasPermission(PERMISSIONS.CUSTOMERS_MANAGE);
   const shopName = useAuthStore((s) => s.organization?.name) || "our pharmacy";
@@ -78,6 +90,10 @@ export default function CustomerDetailScreen() {
       queryClient.invalidateQueries({
         queryKey: ["customer", "statement", id],
       });
+      // A collection moves the dashboard's receivables too — both of its
+      // queries, since neither refetches on focus.
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "finance"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
     },
   });
 
@@ -334,15 +350,35 @@ export default function CustomerDetailScreen() {
         </View>
       ) : null}
 
-      {canManage && customer?.isActive && (
-        <Button
-          label="Deactivate customer"
-          variant="destructive"
-          icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2} />}
-          style={{ marginTop: 20 }}
-          loading={removeMut.isPending}
-          onPress={() => setRemoveOpen(true)}
-        />
+      {canManage &&
+        (customer?.isActive ? (
+          <Button
+            label="Deactivate customer"
+            variant="destructive"
+            icon={<Trash2 size={16} color="#FFFFFF" strokeWidth={2} />}
+            style={{ marginTop: 20 }}
+            loading={removeMut.isPending}
+            onPress={() => setRemoveOpen(true)}
+          />
+        ) : (
+          /* The deactivate dialog promises this; without it the promise is empty. */
+          <Button
+            label="Reactivate customer"
+            icon={<RotateCcw size={16} color="#FFFFFF" strokeWidth={2} />}
+            style={{ marginTop: 20 }}
+            loading={restoreMut.isPending}
+            onPress={() => restoreMut.mutate()}
+          />
+        ))}
+      {updateMut.isError && (
+        <Text variant="caption" tone="danger" style={{ marginTop: 8 }}>
+          {apiErrorMessage(updateMut.error)}
+        </Text>
+      )}
+      {restoreMut.isError && (
+        <Text variant="caption" tone="danger" style={{ marginTop: 8 }}>
+          {apiErrorMessage(restoreMut.error)}
+        </Text>
       )}
 
       <PromptDialog

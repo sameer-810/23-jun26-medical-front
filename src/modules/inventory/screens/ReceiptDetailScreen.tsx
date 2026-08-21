@@ -1,8 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { View } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { Undo2 } from "lucide-react-native";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Undo2, Ban } from "lucide-react-native";
 import { useReceipt } from "@modules/inventory/hooks/useInventory";
+import { inventoryApi } from "@modules/inventory/api/inventoryApi";
+import { apiErrorMessage } from "@api/apiClient";
 import { fmtMoneyExact } from "@shared/format";
 import { palette } from "@shared/designSystem";
 import {
@@ -12,8 +15,10 @@ import {
   HStack,
   Card,
   Button,
+  Banner,
   StatusChip,
   Skeleton,
+  PromptDialog,
 } from "@shared/ui";
 
 /**
@@ -43,6 +48,29 @@ export default function ReceiptDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { data: r, isLoading } = useReceipt(route.params?.id);
+  const qc = useQueryClient();
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [voidError, setVoidError] = useState<string | null>(null);
+  const voided = r?.status === "void";
+
+  const voidMut = useMutation({
+    mutationFn: (reason: string) =>
+      inventoryApi.voidReceipt(route.params?.id, reason),
+    onSuccess: () => {
+      // The reversal moves stock and cost, so everything counting either is stale.
+      qc.invalidateQueries({ queryKey: ["receipt", route.params?.id] });
+      qc.invalidateQueries({ queryKey: ["receipts"] });
+      qc.invalidateQueries({ queryKey: ["stock"] });
+      qc.invalidateQueries({ queryKey: ["stock-value"] });
+      qc.invalidateQueries({ queryKey: ["product-inventory"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      setVoidOpen(false);
+    },
+    onError: (e) => {
+      setVoidError(apiErrorMessage(e));
+      setVoidOpen(false);
+    },
+  });
 
   return (
     <Screen
@@ -51,18 +79,36 @@ export default function ReceiptDetailScreen() {
       title={r?.receiptNo || "Receipt"}
       subtitle={r ? new Date(r.receivedAt).toLocaleString() : ""}
       right={
-        r ? (
-          <Button
-            label="Return to supplier"
-            size="sm"
-            variant="secondary"
-            icon={
-              <Undo2 size={16} color={palette.text.secondary} strokeWidth={2} />
-            }
-            onPress={() =>
-              navigation.navigate("PurchaseReturn", { id: route.params?.id })
-            }
-          />
+        r && !voided ? (
+          <HStack gap={8}>
+            <Button
+              label="Return to supplier"
+              size="sm"
+              variant="secondary"
+              icon={
+                <Undo2
+                  size={16}
+                  color={palette.text.secondary}
+                  strokeWidth={2}
+                />
+              }
+              onPress={() =>
+                navigation.navigate("PurchaseReturn", { id: route.params?.id })
+              }
+            />
+            {/* Correction for a mis-keyed GRN. A return is the right tool when
+                goods physically go back to the supplier; this is for a note
+                that should never have been entered. */}
+            <Button
+              label="Void GRN"
+              size="sm"
+              variant="secondary"
+              icon={
+                <Ban size={16} color={palette.danger.text} strokeWidth={2} />
+              }
+              onPress={() => setVoidOpen(true)}
+            />
+          </HStack>
         ) : undefined
       }
     >
@@ -89,6 +135,23 @@ export default function ReceiptDetailScreen() {
         </VStack>
       ) : (
         <>
+          {/* The figures below are what the note was written for; a voided GRN
+              no longer contributes any of them. */}
+          {voided ? (
+            <Banner
+              tone="danger"
+              title="This GRN was voided"
+              message={`${r.voidReason || "No reason recorded"}${r.voidedByName ? ` — ${r.voidedByName}` : ""}. Its stock was reversed and it counts towards nothing.`}
+              style={{ marginBottom: 16 }}
+            />
+          ) : null}
+          {voidError ? (
+            <Banner
+              tone="danger"
+              message={voidError}
+              style={{ marginBottom: 16 }}
+            />
+          ) : null}
           <Card style={{ marginBottom: 16 }}>
             <VStack gap={8}>
               <HStack justify="space-between">
@@ -203,6 +266,23 @@ export default function ReceiptDetailScreen() {
           </VStack>
         </>
       )}
+
+      <PromptDialog
+        visible={voidOpen}
+        title={`Void ${r?.receiptNo || "this GRN"}?`}
+        message="The stock this note added is taken back off the shelf and each batch's cost is restored. The GRN stays in the history, marked void. It cannot be undone — and it will be refused if any of the goods have already been sold or moved."
+        label="Why is this being voided?"
+        placeholder="e.g. entered twice, wrong supplier"
+        confirmLabel="Void GRN"
+        loading={voidMut.isPending}
+        validate={(v) =>
+          v.trim().length < 3
+            ? "Give a short reason — it is the only record of why."
+            : null
+        }
+        onSubmit={(reason) => voidMut.mutate(reason.trim())}
+        onCancel={() => setVoidOpen(false)}
+      />
     </Screen>
   );
 }

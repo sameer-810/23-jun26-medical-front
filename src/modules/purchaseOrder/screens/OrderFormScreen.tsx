@@ -12,16 +12,24 @@ import { X, Search, PackageSearch } from "lucide-react-native";
 import { purchaseOrderApi } from "@modules/purchaseOrder/api/purchaseOrderApi";
 import type { SeededLine } from "@modules/purchaseOrder/types";
 import { useProducts } from "@modules/product/hooks/useProducts";
+import {
+  useSuppliers,
+  useCreateSupplier,
+} from "@modules/supplier/hooks/useSuppliers";
+import { useAuthStore } from "@shared/store/useAuthStore";
+import { PERMISSIONS } from "@shared/permissions";
 import { apiErrorMessage } from "@api/apiClient";
 import { fmtMoney } from "@shared/format";
 import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
   Text,
+  VStack,
   HStack,
   Card,
   Button,
   TextField,
+  Select,
   Combobox,
   Banner,
   EmptyState,
@@ -40,6 +48,7 @@ export default function OrderFormScreen() {
   const route = useRoute<any>();
   const seed = (route.params?.seedLines as SeededLine[] | undefined) ?? [];
 
+  const [supplierId, setSupplierId] = useState<string | null>(null);
   const [supplierName, setSupplierName] = useState("");
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<Line[]>(
@@ -66,6 +75,16 @@ export default function OrderFormScreen() {
     limit: 8,
   });
   const productsLoading = isFetching || search.trim() !== term;
+
+  const { data: suppliers } = useSuppliers({ limit: 200 });
+  const createSupplier = useCreateSupplier();
+  const canManageSuppliers = useAuthStore((s) => s.hasPermission)(
+    PERMISSIONS.SUPPLIERS_MANAGE,
+  );
+  const supplierOptions = (suppliers?.data || []).map((s) => ({
+    value: s.id,
+    label: s.name,
+  }));
 
   const productsById = useMemo(() => {
     const map: Record<string, { id: string; name: string; sku: string }> = {};
@@ -107,7 +126,10 @@ export default function OrderFormScreen() {
   const mut = useMutation({
     mutationFn: (status: "draft" | "placed") =>
       purchaseOrderApi.create({
-        supplierName: supplierName.trim() || undefined,
+        // The server resolves the name from the id; free text is only for a
+        // distributor not on file yet.
+        supplierId: supplierId || undefined,
+        supplierName: supplierId ? undefined : supplierName.trim() || undefined,
         status,
         note: note.trim() || undefined,
         lines: lines
@@ -146,13 +168,37 @@ export default function OrderFormScreen() {
         />
       ) : null}
 
+      {/* A picked supplier is what carries the mobile number, and the mobile
+          number is what makes "Send on WhatsApp" appear on the order. Free text
+          also forks one distributor across spellings. */}
       <Card style={{ marginBottom: 12 }}>
-        <TextField
-          label="Supplier / distributor"
-          value={supplierName}
-          onChangeText={setSupplierName}
-          placeholder="Distributor name"
-        />
+        <VStack gap={12}>
+          <Select
+            label="Supplier / distributor"
+            placeholder="Select supplier"
+            value={supplierId}
+            options={supplierOptions}
+            onChange={setSupplierId}
+            onCreate={
+              canManageSuppliers
+                ? async (label) => {
+                    const s = await createSupplier.mutateAsync({ name: label });
+                    return { value: s.id, label: s.name };
+                  }
+                : undefined
+            }
+            allowClear
+            hint="Pick one to send this order on WhatsApp later."
+          />
+          {!supplierId ? (
+            <TextField
+              label="Or type a distributor not on file yet"
+              value={supplierName}
+              onChangeText={setSupplierName}
+              placeholder="Distributor name"
+            />
+          ) : null}
+        </VStack>
       </Card>
 
       <View style={{ marginBottom: 12, zIndex: 20 }}>

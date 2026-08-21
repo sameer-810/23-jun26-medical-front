@@ -112,6 +112,10 @@ export interface CatalogProduct {
   prescriptionRequired: boolean;
   productForm: string;
   packLabel: string;
+  /** Pack hierarchy consumed by product.service.createFromCatalog. */
+  packUnit: string;
+  packQty: number;
+  baseUnit: string;
   medicineType: string;
   countryOfOrigin: string;
   hsnCode: string;

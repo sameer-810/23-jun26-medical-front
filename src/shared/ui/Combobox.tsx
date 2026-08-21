@@ -34,7 +34,7 @@ interface Props {
   items: ComboItem[];
   loading?: boolean;
   onSelect: (value: string, item: ComboItem) => void;
-  /** Enter with nothing highlighted — e.g. a scanned/typed barcode. */
+  /** Enter with no result to take — e.g. a scanned/typed barcode. */
   onSubmitRaw?: (text: string) => void;
   leading?: React.ReactNode;
   autoFocus?: boolean;
@@ -96,6 +96,10 @@ export function Combobox({
       setHi((h) => Math.max(h - 1, 0));
     } else if (key === "Enter") {
       if (hi >= 0 && items[hi]) pick(hi);
+      // Type-and-Enter with nothing highlighted takes the top result. While
+      // `loading` the list still belongs to an earlier query — a scanner types
+      // faster than the debounce, so those Enters go to the raw handler.
+      else if (!loading && query.trim() && items.length > 0) pick(0);
       else if (onSubmitRaw && query.trim()) {
         onSubmitRaw(query.trim());
         onQueryChange("");

@@ -1,16 +1,22 @@
 import React, { useState } from "react";
 import { View, Switch } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { ShieldCheck, KeyRound, Trash2 } from "lucide-react-native";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { ShieldCheck, KeyRound, Trash2, Pencil } from "lucide-react-native";
 import {
   useTeamUser,
   usePermissionCatalogue,
+  useUpdateMember,
   useUpdatePermissions,
   useSetActive,
   useResetUserPassword,
   useRemoveUser,
 } from "@modules/team/hooks/useTeam";
+import { editMemberSchema } from "@modules/team/team.validation";
 import { apiErrorMessage } from "@api/apiClient";
+import { ControlledTextField } from "@shared/form/ControlledTextField";
+import { normalizePhone } from "@shared/form/fields";
 import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
@@ -36,6 +42,7 @@ export default function UserDetailScreen() {
   const { data: user } = useTeamUser(id);
   const { data: catalogue } = usePermissionCatalogue();
   const updateMut = useUpdatePermissions(id);
+  const memberMut = useUpdateMember(id);
   const activeMut = useSetActive(id);
   const resetMut = useResetUserPassword(id);
   const removeMut = useRemoveUser();
@@ -44,6 +51,15 @@ export default function UserDetailScreen() {
   const [permissions, setPermissions] = useState<string[]>([]);
   const [newPassword, setNewPassword] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [editingDetails, setEditingDetails] = useState(false);
+  /** Unsaved permission / role-label edits. */
+  const [dirty, setDirty] = useState(false);
+
+  const detailsForm = useForm({
+    resolver: zodResolver(editMemberSchema),
+    mode: "onTouched",
+    defaultValues: { firstName: "", lastName: "", email: "", phone: "" },
+  });
 
   // Sync the editable fields from the loaded user — adjusted during render when
   // the user reference changes (React's "reset state on prop change" pattern),
@@ -51,7 +67,9 @@ export default function UserDetailScreen() {
   const [syncedUser, setSyncedUser] = useState(user);
   if (user !== syncedUser) {
     setSyncedUser(user);
-    if (user) {
+    // Any refetch lands here — including the one the Active switch triggers —
+    // so unsaved permission edits must win over the server copy.
+    if (user && !dirty) {
       setRoleLabel(user.roleLabel || "");
       setPermissions(user.permissions || []);
     }
@@ -87,10 +105,40 @@ export default function UserDetailScreen() {
     key: l,
     label: l,
   }));
-  const toggle = (key: string) =>
+  const toggle = (key: string) => {
+    setDirty(true);
     setPermissions((cur) =>
       cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key],
     );
+  };
+  const pickLabel = (l: string) => {
+    setDirty(true);
+    setRoleLabel(l);
+  };
+
+  const openDetails = () => {
+    detailsForm.reset({
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      email: user.email || "",
+      phone: user.phone || "",
+    });
+    setEditingDetails(true);
+  };
+
+  const saveDetails = detailsForm.handleSubmit((f) =>
+    memberMut.mutate(
+      {
+        firstName: f.firstName.trim(),
+        lastName: f.lastName.trim(),
+        email: f.email.trim(),
+        // Omitted when empty: the server's `phone` rule has no empty-string
+        // escape, so "" is rejected rather than clearing the number.
+        ...(f.phone.trim() ? { phone: normalizePhone(f.phone) } : {}),
+      },
+      { onSuccess: () => setEditingDetails(false) },
+    ),
+  );
 
   return (
     <Screen
@@ -129,9 +177,81 @@ export default function UserDetailScreen() {
                 tone={user.isActive ? "success" : "danger"}
               />
             </HStack>
+            <Text variant="caption" tone="tertiary">
+              {[user.email, user.phone].filter(Boolean).join(" · ")}
+            </Text>
           </VStack>
+          {/* Contact details are not privileges, so this is offered for the
+              Admin too — the panel below only bars permission changes. */}
+          <Button
+            label="Edit details"
+            variant="secondary"
+            size="sm"
+            fullWidth={false}
+            icon={
+              <Pencil size={15} color={palette.text.primary} strokeWidth={2} />
+            }
+            onPress={openDetails}
+          />
         </HStack>
       </Card>
+
+      {editingDetails ? (
+        <Card style={{ marginBottom: 16 }}>
+          <VStack gap={12}>
+            {memberMut.isError && (
+              <Text variant="body-sm" tone="danger">
+                {apiErrorMessage(memberMut.error)}
+              </Text>
+            )}
+            <HStack gap={12}>
+              <View style={{ flex: 1 }}>
+                <ControlledTextField
+                  control={detailsForm.control}
+                  name="firstName"
+                  label="First name"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ControlledTextField
+                  control={detailsForm.control}
+                  name="lastName"
+                  label="Last name"
+                />
+              </View>
+            </HStack>
+            <ControlledTextField
+              control={detailsForm.control}
+              name="email"
+              label="Email"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <ControlledTextField
+              control={detailsForm.control}
+              name="phone"
+              label="Phone"
+              keyboardType="phone-pad"
+            />
+            <HStack gap={8} justify="flex-end">
+              <Button
+                label="Cancel"
+                variant="secondary"
+                size="sm"
+                fullWidth={false}
+                onPress={() => setEditingDetails(false)}
+              />
+              <Button
+                label="Save details"
+                size="sm"
+                fullWidth={false}
+                loading={memberMut.isPending}
+                onPress={saveDetails}
+              />
+            </HStack>
+          </VStack>
+        </Card>
+      ) : null}
 
       {isAdmin ? (
         <Card>
@@ -145,8 +265,8 @@ export default function UserDetailScreen() {
               This is the workspace Admin
             </Text>
             <Text variant="body-sm" tone="tertiary" align="center">
-              The Admin always holds every permission and cannot be edited,
-              disabled or removed.
+              The Admin always holds every permission and cannot be disabled or
+              removed. Contact details can still be corrected above.
             </Text>
           </VStack>
         </Card>
@@ -170,6 +290,12 @@ export default function UserDetailScreen() {
                 <Text variant="body-sm" tone="tertiary">
                   Disabled members cannot sign in.
                 </Text>
+                {/* A refused toggle silently snaps back without this. */}
+                {activeMut.isError && (
+                  <Text variant="caption" tone="danger">
+                    {apiErrorMessage(activeMut.error)}
+                  </Text>
+                )}
               </VStack>
               <Switch
                 value={user.isActive}
@@ -191,7 +317,7 @@ export default function UserDetailScreen() {
             <ChipsRow
               chips={labelChips}
               active={roleLabel}
-              onChange={setRoleLabel}
+              onChange={pickLabel}
             />
           </Card>
 
@@ -207,11 +333,21 @@ export default function UserDetailScreen() {
             />
           </Card>
 
+          {dirty && (
+            <Text variant="caption" tone="warning" style={{ marginBottom: 8 }}>
+              Unsaved permission changes.
+            </Text>
+          )}
           <Button
             label="Save changes"
             size="lg"
             loading={updateMut.isPending}
-            onPress={() => updateMut.mutate({ roleLabel, permissions })}
+            onPress={() =>
+              updateMut.mutate(
+                { roleLabel, permissions },
+                { onSuccess: () => setDirty(false) },
+              )
+            }
             style={{ marginBottom: 24 }}
           />
 
@@ -238,6 +374,11 @@ export default function UserDetailScreen() {
               {resetMut.isSuccess && (
                 <Text variant="caption" tone="success">
                   Password reset. Share the new password with the member.
+                </Text>
+              )}
+              {resetMut.isError && (
+                <Text variant="caption" tone="danger">
+                  {apiErrorMessage(resetMut.error)}
                 </Text>
               )}
               <Button

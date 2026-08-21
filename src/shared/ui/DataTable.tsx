@@ -5,7 +5,7 @@
  * pagination, and a mobile fallback that renders each row as a card. Replaces
  * the one hand-rolled Reports table and the copy-pasted card-row lists.
  */
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   ScrollView,
@@ -88,12 +88,37 @@ export function DataTable<T>({
     });
   }, [rows, sort, columns]);
 
-  const paged =
-    pageSize > 0
-      ? sorted.slice((page - 1) * pageSize, page * pageSize)
-      : sorted;
   const totalPages =
     pageSize > 0 ? Math.max(1, Math.ceil(rows.length / pageSize)) : 1;
+  /**
+   * Filtering while on page 5 leaves `page` past the end of a shorter list, and
+   * the slice returns nothing — a table with a header, no body and a pager
+   * claiming a page that doesn't exist. Clamp for this render, then settle the
+   * state (during render, not in an effect, so there is no blank frame).
+   */
+  const safePage = Math.min(page, totalPages);
+  if (page !== safePage) setPage(safePage);
+
+  const paged =
+    pageSize > 0
+      ? sorted.slice((safePage - 1) * pageSize, safePage * pageSize)
+      : sorted;
+
+  // Dev guard: `sortable` without `sortValue` sorts on `row[col.key]`, so a key
+  // that isn't a real row property silently does nothing when clicked.
+  const warnedKeys = useRef(new Set<string>());
+  useEffect(() => {
+    if (!__DEV__ || rows.length === 0) return;
+    const first = rows[0] as Record<string, unknown>;
+    for (const c of columns) {
+      if (!c.sortable || c.sortValue || c.key in first) continue;
+      if (warnedKeys.current.has(c.key)) continue;
+      warnedKeys.current.add(c.key);
+      console.warn(
+        `DataTable: column "${c.key}" is sortable but rows have no "${c.key}" property — clicking the header will do nothing. Give the column a sortValue.`,
+      );
+    }
+  }, [columns, rows]);
 
   const toggleSort = (key: string) =>
     setSort((s) =>
@@ -133,7 +158,7 @@ export function DataTable<T>({
         </ListGroup>
         {pageSize > 0 && rows.length > pageSize ? (
           <Pagination
-            page={page}
+            page={safePage}
             totalPages={totalPages}
             total={rows.length}
             limit={pageSize}
@@ -261,7 +286,7 @@ export function DataTable<T>({
       {pageSize > 0 && rows.length > pageSize ? (
         <View style={{ marginTop: 12 }}>
           <Pagination
-            page={page}
+            page={safePage}
             totalPages={totalPages}
             total={rows.length}
             limit={pageSize}

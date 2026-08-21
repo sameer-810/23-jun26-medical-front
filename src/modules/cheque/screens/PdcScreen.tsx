@@ -1,5 +1,13 @@
 import React, { useState } from "react";
-import { View, Platform } from "react-native";
+import { useQuery } from "@tanstack/react-query";
+import {
+  View,
+  Platform,
+  Modal,
+  Pressable,
+  Image,
+  ActivityIndicator,
+} from "react-native";
 import {
   CalendarClock,
   Plus,
@@ -11,6 +19,7 @@ import {
   Trash2,
   Camera,
   ScanText,
+  ImageIcon,
 } from "lucide-react-native";
 import {
   useCheques,
@@ -18,8 +27,14 @@ import {
   useCreateCheque,
   useSetChequeStatus,
   useRemoveCheque,
+  useInvalidateCheques,
 } from "@modules/cheque/hooks/useCheques";
-import { Cheque, ChequeStatus, ChequeRead } from "@modules/cheque/types";
+import {
+  Cheque,
+  ChequeStatus,
+  ChequeRead,
+  hasChequeImage,
+} from "@modules/cheque/types";
 import { chequeApi } from "@modules/cheque/api/chequeApi";
 import { useImageCapture, CapturedImage } from "@shared/useImageCapture";
 import { apiErrorMessage } from "@api/apiClient";
@@ -86,6 +101,8 @@ export default function PdcScreen() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [viewPhoto, setViewPhoto] = useState<Cheque | null>(null);
+  const invalidateCheques = useInvalidateCheques();
 
   // Camera capture: the photo is held until the cheque is saved, then attached
   // to it. Reading and storing are separate jobs — one fills the form, the
@@ -169,6 +186,8 @@ export default function PdcScreen() {
           if (photo && created?._id) {
             try {
               await chequeApi.attachImage(created._id, photo);
+              // The create mutation already invalidated; the photo landed after.
+              invalidateCheques();
             } catch (e) {
               setReadError(
                 `Cheque saved, but the photo didn't attach: ${apiErrorMessage(e)}`,
@@ -431,7 +450,32 @@ export default function PdcScreen() {
                     .join(" · ")}
                   value={money(c.amount)}
                   right={
-                    <StatusChip label={c.status} tone={STATUS_TONE[c.status]} />
+                    <HStack gap={8} align="center">
+                      {/* Indicator and opener in one: the only cheques with
+                          evidence are the ones showing this. */}
+                      {hasChequeImage(c) ? (
+                        <Pressable
+                          onPress={() => setViewPhoto(c)}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel={`View photo of cheque ${c.chequeNo || c.partyName}`}
+                          style={styles.photoBtn}
+                        >
+                          <ImageIcon
+                            size={14}
+                            color={palette.teal[700]}
+                            strokeWidth={2}
+                          />
+                          <Text variant="caption" style={styles.photoLabel}>
+                            Photo
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                      <StatusChip
+                        label={c.status}
+                        tone={STATUS_TONE[c.status]}
+                      />
+                    </HStack>
                   }
                 />
 
@@ -521,7 +565,88 @@ export default function PdcScreen() {
         }}
         onCancel={() => setDeleteId(null)}
       />
+
+      <ChequePhotoViewer
+        cheque={viewPhoto}
+        onClose={() => setViewPhoto(null)}
+      />
     </Screen>
+  );
+}
+
+/**
+ * The attached photo, full width.
+ *
+ * Fetched on open rather than with the register: the bytes are excluded from
+ * the list response, and pulling one photo per row would be the whole point of
+ * that exclusion undone.
+ */
+function ChequePhotoViewer({
+  cheque,
+  onClose,
+}: {
+  cheque: Cheque | null;
+  onClose: () => void;
+}) {
+  // Cached per cheque: reopening the same one should not refetch the bytes.
+  const {
+    data: uri,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["cheque-image", cheque?._id],
+    queryFn: () => chequeApi.image(cheque!._id),
+    enabled: Boolean(cheque),
+    staleTime: 5 * 60_000,
+  });
+
+  return (
+    <Modal
+      visible={cheque !== null}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <HStack align="center" justify="space-between">
+            <VStack gap={1} flex={1}>
+              <Text variant="label-lg" tone="primary" numberOfLines={1}>
+                {cheque?.partyName || "Cheque"}
+              </Text>
+              <Text variant="caption" tone="tertiary">
+                {[
+                  cheque?.chequeNo ? `#${cheque.chequeNo}` : null,
+                  cheque?.bankName,
+                  cheque ? money(cheque.amount) : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Text>
+            </VStack>
+            <Pressable onPress={onClose} hitSlop={8}>
+              <X size={20} color={palette.text.tertiary} strokeWidth={2} />
+            </Pressable>
+          </HStack>
+
+          <View style={styles.photoWell}>
+            {isError ? (
+              <Text variant="body-sm" tone="danger">
+                {apiErrorMessage(error)}
+              </Text>
+            ) : uri ? (
+              <Image
+                source={{ uri }}
+                style={{ width: "100%", height: 260 }}
+                resizeMode="contain"
+              />
+            ) : (
+              <ActivityIndicator color={palette.teal[600]} />
+            )}
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -530,6 +655,41 @@ const styles = {
   actions: {
     paddingHorizontal: 14,
     paddingBottom: 10,
+  },
+  photoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    backgroundColor: palette.teal[50],
+  },
+  photoLabel: { color: palette.teal[700] },
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  sheet: {
+    width: "100%",
+    maxWidth: 520,
+    gap: 12,
+    padding: 16,
+    borderRadius: radius.lg,
+    backgroundColor: palette.surface.primary,
+  },
+  photoWell: {
+    minHeight: 260,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: palette.border.default,
+    backgroundColor: palette.surface.secondary,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 8,
   },
 } as const;
 
