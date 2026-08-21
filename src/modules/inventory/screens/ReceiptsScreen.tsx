@@ -242,8 +242,6 @@ export default function ReceiptsScreen() {
         <Banner tone="info" message={note} style={{ marginBottom: 12 }} />
       ) : null}
 
-      {/* A failed register is not an empty one — "No receipts yet" would have a
-          pharmacist re-entering goods they already booked in. */}
       {isError ? (
         <ErrorState
           error={error}

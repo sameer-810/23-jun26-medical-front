@@ -103,32 +103,17 @@ export default function DashboardScreen() {
     queryFn: dashboardApi.finance,
   });
 
-  /** Pull-to-refresh has to mean the whole page, not just the half it started on. */
+  // The page is fed by two independent queries; refresh has to cover both.
   const refreshAll = () => {
     refetch();
     refetchFin();
   };
 
-  /**
-   * Money that failed to load must never render as zero.
-   *
-   * Every finance tile used to read `fin?.x ?? 0`, so one failed request — a
-   * cold backend, a timeout, a dropped connection — painted the whole panel
-   * "Need to collect ₹0 / Need to pay ₹0 / Sales ₹0" with no error anywhere on
-   * screen. A pharmacy reads that as "nobody owes me anything" and stops
-   * chasing it. An em dash says "not loaded"; ₹0 makes a false claim.
-   */
+  // Zero is a real figure on these tiles, so a query that didn't load renders "—".
   const finMissing = finError || (!fin && !finLoading);
   const fmtFin = (value: number | undefined, format: (n: number) => string) =>
     finMissing ? "—" : format(value ?? 0);
 
-  /**
-   * The same rule for the headline figures, which had the same bug.
-   *
-   * `data?.sales.todayAmount ?? 0` reads "Today's sales ₹0" when the summary
-   * request fails — and ₹0 at 6pm is a claim about the day's trade, not a
-   * missing value. Everything on this page that can't be loaded now says so.
-   */
   const sumMissing = sumError || (!data && !isLoading);
   const fmtSum = (value: number | undefined, format: (n: number) => string) =>
     sumMissing ? "—" : format(value ?? 0);
@@ -324,14 +309,14 @@ export default function DashboardScreen() {
         <View style={{ marginBottom: 12 }}>{actionBar}</View>
       ) : null}
 
-      {/* Same treatment the finance panel already had: name the failure above
-          the tiles, so the dashes below it have an explanation. */}
+      {/* Names the failure above the tiles, so the dashes below have an explanation. */}
       {sumMissing ? (
         <ErrorState
           error={sumErr}
           title="Couldn't load today's figures"
           onRetry={refreshAll}
-          retrying={isRefetching}
+          // Retry refetches both queries, so the spinner tracks both.
+          retrying={isRefetching || finRefetching}
           style={{ marginBottom: 10 }}
         />
       ) : null}
@@ -359,13 +344,7 @@ export default function DashboardScreen() {
 
       {/* Needs attention — the reason this page exists. */}
       <SectionHeader title="Needs attention" />
-      {/*
-        An empty attention list means one of two very different things, and this
-        used to render the reassuring one either way. "All clear — no low stock,
-        expiries or dues need action right now" is drawn from BOTH queries, so a
-        cold backend produced a green tick over a pharmacy that might have forty
-        expired batches and ₹80,000 uncollected. Silence is not all clear.
-      */}
+      {/* The all-clear is drawn from both queries, so it needs both to have loaded. */}
       {attn.length === 0 && (sumMissing || finMissing) ? (
         <ErrorState
           error={sumMissing ? sumErr : finErr}
@@ -422,8 +401,6 @@ export default function DashboardScreen() {
 
       {/* Finance */}
       <SectionHeader title="Finance" />
-      {/* Say it out loud, not just with a dash — these are the tiles someone
-          acts on, and silence looks identical to "nothing is owed". */}
       {finMissing ? (
         <ErrorState
           error={finErr}

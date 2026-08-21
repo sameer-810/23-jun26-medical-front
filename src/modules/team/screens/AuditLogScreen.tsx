@@ -128,9 +128,6 @@ export default function AuditLogScreen() {
         placeholder="Search actions, users or descriptions"
       />
 
-      {/* On a page whose subtitle promises an append-only, tamper-proof record,
-          "No activity yet" after a failed request is the worst possible thing
-          to show: it reads as a log that has been emptied. */}
       {isError ? (
         <ErrorState
           error={error}

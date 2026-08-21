@@ -181,13 +181,7 @@ function PharmacyRow({ org, onPress }: { org: AdminOrg; onPress: () => void }) {
               </Text>
             </VStack>
           </HStack>
-          {/*
-            Same three-way rule as the detail screen: approval outranks
-            suspension. Reading only `status` here meant every pharmacy in the
-            "Awaiting approval" queue wore a green Active chip — so the queue
-            looked already handled, and applicants who could not log in sat
-            waiting behind a screen that said they were fine.
-          */}
+          {/* Approval outranks suspension: a workspace can be active and still pending. */}
           {org.approvalStatus === "pending" ? (
             <StatusChip label="Awaiting approval" tone="warning" />
           ) : org.approvalStatus === "rejected" ? (

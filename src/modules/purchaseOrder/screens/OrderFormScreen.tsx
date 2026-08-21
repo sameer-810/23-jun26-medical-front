@@ -120,10 +120,7 @@ export default function OrderFormScreen() {
       }),
     onSuccess: () => {
       // The list screen stays mounted behind this form and focus-refetch is off
-      // globally, so without this the new order simply is not there when the
-      // form closes. It reads as a failed save, and the natural response is to
-      // key the whole order again — which is how a distributor ends up
-      // receiving the same 12-line order twice.
+      // globally, so the mutation has to invalidate the list itself.
       qc.invalidateQueries({ queryKey: ["orders"] });
       navigation.goBack();
     },

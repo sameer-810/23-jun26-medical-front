@@ -35,12 +35,8 @@ export default function PurchaseReturnScreen() {
     mutationFn: (payload: PurchaseReturnPayload) =>
       inventoryApi.purchaseReturn(payload),
     onSuccess: () => {
-      /**
-       * A return takes stock off the shelf, so everything that counts stock has
-       * to be told. Without this the goods still showed as on hand afterwards
-       * (focus-refetch is off globally), which reads as "the return did not
-       * save" — and the obvious next move is to file it a second time.
-       */
+      // Focus-refetch is disabled globally, so every list that counts stock has
+      // to be invalidated here or it keeps showing the returned goods on hand.
       qc.invalidateQueries({ queryKey: ["stock"] });
       qc.invalidateQueries({ queryKey: ["stock-value"] });
       qc.invalidateQueries({ queryKey: ["receipts"] });
@@ -56,14 +52,8 @@ export default function PurchaseReturnScreen() {
     if (!receipt) return;
     setServerError(null);
 
-    /**
-     * Say so when more is entered than was received, instead of quietly
-     * returning less.
-     *
-     * This used to `Math.min(n, l.baseQuantity)`, so typing 100 against a line
-     * of 24 submitted 24 with no warning — the supplier credit note then
-     * disagreed with what the shop believed it had sent back, by 76 units.
-     */
+    // A return cannot exceed what the bill received; the excess is reported
+    // rather than clamped, so the credit note matches what was sent back.
     const overs = receipt.lines
       .map((l, i) => ({
         i,
@@ -80,9 +70,8 @@ export default function PurchaseReturnScreen() {
       return;
     }
 
-    // A line the receipt never tied to a batch and a location cannot be
-    // returned: the server needs the exact stock cell to take the goods from,
-    // and guessing one would take them off a different lot.
+    // The server needs the exact (product, batch, location) cell to decrement,
+    // so a line without both keys cannot be returned automatically.
     const untraceable = receipt.lines
       .map((l, i) => ({ i, name: l.productName, l, n: Number(qty[i]) }))
       .filter((x) => x.n > 0 && (!x.l.batchId || !x.l.locationId));

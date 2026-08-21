@@ -76,8 +76,6 @@ export default function AuditScreen() {
     <Screen overline="Platform" title="Audit log">
       <AdminNav active="audit" />
 
-      {/* An audit trail that renders "No activity yet" when it failed to load
-          is worse than one that renders nothing — it makes a claim. */}
       {isError ? (
         <ErrorState
           error={error}

@@ -36,25 +36,17 @@ interface AdminState {
 /**
  * Platform-admin session storage.
  *
- * On web this uses sessionStorage, NOT localStorage. These tokens are the
- * control plane: they reach every tenant's data, and the refresh token is good
- * for seven days. In localStorage that credential outlives the browser session
- * on whatever machine an operator happened to use, and any script that ever
- * runs on the origin can read it.
- *
- * sessionStorage keeps the ergonomics that matter — a reload does not sign you
- * out — while scoping the credential to the tab it was created in and clearing
- * it when that tab closes. The tenant app deliberately keeps localStorage: a
- * pharmacy counter stays signed in all day by design, and it is not the control
- * plane. Native keeps SecureStore in both stores.
+ * Web uses sessionStorage, not localStorage: these tokens reach every tenant's
+ * data and the refresh token lasts seven days, so the credential is scoped to
+ * the tab and dropped when it closes. A reload still keeps the session. The
+ * tenant app keeps localStorage on purpose — a counter stays signed in all day.
+ * Native uses SecureStore in both stores.
  */
 const secureStorage: StateStorage = {
   getItem: async (name) => {
     if (Platform.OS === "web") {
-      // Purge any admin session an earlier build wrote to disk. Deliberately a
-      // purge rather than a migration: that token has been sitting in
-      // localStorage where a script could read it, so it should be retired, not
-      // carried forward. It costs the operator one sign-in.
+      // Purge, not migrate: an admin token an earlier build left in
+      // localStorage is retired rather than carried into the new session.
       try {
         if (localStorage.getItem(name)) localStorage.removeItem(name);
       } catch {
@@ -71,8 +63,7 @@ const secureStorage: StateStorage = {
   removeItem: async (name) => {
     if (Platform.OS === "web") {
       sessionStorage.removeItem(name);
-      // Clear anything a previous build left in localStorage, so an existing
-      // long-lived admin token stops sitting on disk after this deploy.
+      // Also clear the pre-sessionStorage key, so no admin token is left on disk.
       try {
         localStorage.removeItem(name);
       } catch {

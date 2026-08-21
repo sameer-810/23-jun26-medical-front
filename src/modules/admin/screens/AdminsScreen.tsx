@@ -90,7 +90,6 @@ export default function AdminsScreen() {
     >
       <AdminNav active="admins" />
 
-      {/* "No admins" is never true — someone is signed in reading this. */}
       {isError ? (
         <ErrorState
           error={error}

@@ -39,15 +39,8 @@ export default function ExpiryScreen() {
   const { data, isLoading, isError, error, refetch, isRefetching } =
     useExpiryReport();
 
-  /**
-   * A failed report is not a clean shelf.
-   *
-   * The three tiles read `fmtInt(data?.summary.expired)` and `money(… ?? 0)`, so
-   * a dead request painted "Expired 0 · Expiring soon 0 · Value at risk ₹0" over
-   * an empty body — the exact picture of a pharmacy with nothing to worry about,
-   * on the one screen whose job is to say what has to come off the shelf today.
-   * When the report is absent the tiles say "—" and the page says why.
-   */
+  // Zero is a real count here, so with no report loaded the tiles show "—" and
+  // the list is suppressed rather than falling through to the empty state.
   const missing = isError || (!data && !isLoading);
   const nothing = !isLoading && data && data.summary.total === 0;
 
@@ -55,15 +48,16 @@ export default function ExpiryScreen() {
     <Screen
       overline="Expiry Management"
       title="Expiry alerts"
-      subtitle={`Thresholds: ${(data?.thresholds || [90, 60, 30]).join(" / ")} days · FEFO never sells expired`}
+      // Thresholds are per-organisation, so state them only once they arrive:
+      // the default is a guess and would misreport a shop that changed them.
+      subtitle={
+        data?.thresholds
+          ? `Thresholds: ${data.thresholds.join(" / ")} days · FEFO never sells expired`
+          : "FEFO never sells expired"
+      }
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
     >
-      {/* One panel of three. The tiles used to carry a calendar/alarm icon each
-          and an accent regardless of the number — a red "Expired" card reading
-          0 is a false alarm sitting at the top of the page every morning. The
-          status dot is now earned: it appears only when there is something to
-          act on. */}
       {missing ? (
         <ErrorState
           error={error}
@@ -74,6 +68,7 @@ export default function ExpiryScreen() {
         />
       ) : null}
 
+      {/* Tiles take an accent only when the count is above zero. */}
       <StatRow
         stats={[
           {

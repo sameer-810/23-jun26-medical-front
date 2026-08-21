@@ -1,22 +1,12 @@
 /**
- * ErrorState — "this didn't load", said out loud, with a way to try again.
+ * ErrorState — a failed fetch, named, with a Retry.
  *
- * WHY THIS EXISTS. Every list screen branched on `items.length === 0` and
- * rendered its onboarding empty state, so a failed request was indistinguishable
- * from a brand-new pharmacy: 5,000 products became "No products yet — add your
- * first product", a short book full of stock-outs became "Nothing to reorder",
- * and a tamper-proof audit log became "No activity yet". The backend cold-starts
- * on Render and `retry: false` is set globally, so this was not an edge case —
- * it was the first thing a lot of people saw in the morning, and it made the app
- * lie about the state of the business.
+ * Use instead of EmptyState whenever a query errors: an empty state is a caption
+ * for a container that is legitimately empty, and `retry: false` is set globally
+ * so a single failed request would otherwise render the onboarding copy.
  *
- * Deliberately built on Banner rather than on EmptyState. An empty state is a
- * caption for a container that is legitimately empty; a failure is a status
- * message about the app, and the codebase already has one shape for those. The
- * dashboard's finance panel arrived at exactly this treatment by hand (a danger
- * Banner plus a Retry) — this is that pattern extracted, not a new idea, so the
- * error looks the same everywhere it appears. No illustration, no full-page
- * panel: it is three lines and a small button, at Banner's density.
+ * Built on Banner, not EmptyState, so it keeps the dense Banner treatment used
+ * for every other status message — no illustration, no full-page panel.
  */
 import React from "react";
 import { apiErrorMessage } from "../api/apiClient";
@@ -28,20 +18,16 @@ interface Props {
   error?: unknown;
   /** Name what failed: "Couldn't load your products". */
   title?: string;
-  /** Overrides the server's message. Rarely wanted — the server is specific. */
+  /** Overrides the server's message. */
   message?: string;
-  /** The query's `refetch`. Omit only when there is genuinely nothing to retry. */
+  /** The query's `refetch`. Omit when there is nothing to retry. */
   onRetry?: () => void;
   /** The query's `isFetching`, so Retry shows it is working. */
   retrying?: boolean;
   style?: object;
 }
 
-/**
- * The fallback matters as much as the message: most failures here are a dead
- * connection or a sleeping server, which produce no server message at all, and
- * "Something went wrong" tells a pharmacist nothing they can act on.
- */
+/** Used when the failure carried no server message — a dead connection or a cold start. */
 const FALLBACK =
   "The server didn't respond. Check your connection and try again.";
 

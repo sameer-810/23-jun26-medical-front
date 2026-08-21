@@ -117,8 +117,6 @@ export default function MedGuideScreen() {
         </View>
       ) : null}
 
-      {/* A failed lookup is not "no such medicine" — that distinction matters
-          when someone is standing at the counter deciding whether to order. */}
       {isError ? (
         <ErrorState
           error={error}

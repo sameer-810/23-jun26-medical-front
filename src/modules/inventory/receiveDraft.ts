@@ -353,7 +353,7 @@ export function duplicateWarning(bill: ScannedBill): string | null {
 const round4 = (n: number) =>
   Number.isFinite(n) ? Math.round(n * 10000) / 10000 : 0;
 
-/** A row the pharmacist has begun filling in — as opposed to a blank spare. */
+/** True once any field is filled in, which distinguishes a started row from a blank spare. */
 function isStarted(l: DraftLine): boolean {
   return Boolean(
     l.productId ||
@@ -365,13 +365,9 @@ function isStarted(l: DraftLine): boolean {
 }
 
 /**
- * Started rows that `toReceiptLines` would drop on the floor.
- *
- * Only complete lines get sent, which is right — but they used to be discarded
- * in silence: a 12-line bill with 3 unmatched products saved 9, reset the form
- * and reported success. Those goods were on the shelf and in no GRN, and the
- * receipt could never reconcile against the paper bill. Callers use this to
- * block the save and say exactly which rows still need work.
+ * Started rows that `toReceiptLines` would drop, with the fields each one is
+ * missing. A started row must be complete or the save is blocked — partial rows
+ * are never submitted.
  */
 export function incompleteLines(
   lines: DraftLine[],

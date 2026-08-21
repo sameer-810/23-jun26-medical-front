@@ -133,11 +133,7 @@ export default function ProfileScreen() {
       </Text>
       <Card style={{ marginBottom: 24 }}>
         <VStack gap={16}>
-          {/* This card announced success and said nothing at all on failure —
-              a rejected save (duplicate phone, validation, dead connection)
-              simply looked like nothing had happened, while the password card
-              six inches below it reported its errors properly. Same pattern,
-              same place: above the fields. */}
+          {/* Status line sits above the fields, matching the password card below. */}
           {profileMut.isError && (
             <Text variant="caption" tone="danger">
               {apiErrorMessage(profileMut.error)}
@@ -240,9 +236,8 @@ export default function ProfileScreen() {
       <Text variant="h3" tone="primary" style={{ marginBottom: 4 }}>
         Signed-in devices
       </Text>
-      {/* "Loading your devices…" was shown for every non-success state, so a
-          failed request left that line spinning forever with an empty card
-          under it — and the device cap is exactly what locks people out. */}
+      {/* "Loading" must not stand in for a failure: the device cap is what
+          locks people out, so the count has to be right or absent. */}
       <Text variant="body-sm" tone="tertiary" style={{ marginBottom: 12 }}>
         {sessions
           ? `Using ${sessions.used} of ${sessions.limit} allowed device${sessions.limit === 1 ? "" : "s"}.`

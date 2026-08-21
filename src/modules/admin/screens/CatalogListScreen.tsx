@@ -131,8 +131,7 @@ export default function CatalogListScreen() {
       <StatRow
         style={{ marginBottom: 16 }}
         stats={[
-          // A catalogue of 254,000 rows reporting "0 products" because one
-          // request failed is a coverage figure nobody should act on.
+          // Stats render "—" when their own query fails; 0 would read as a real count.
           {
             label: "Products",
             value: statsError

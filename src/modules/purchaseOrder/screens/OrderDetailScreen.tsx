@@ -245,13 +245,7 @@ export default function OrderDetailScreen() {
         }
         onCancel={() => setCancelOpen(false)}
       />
-      {/*
-        "Received" is terminal and irreversible, and it books NO stock — the
-        goods still have to be entered through Receive stock. One stray tap
-        while reaching for something else closed the order for good and took
-        any short-delivered lines off every worklist with it. Cancel already
-        asked before doing something permanent; this now does too.
-      */}
+      {/* "Received" is terminal and books no stock, so it confirms like Cancel does. */}
       <ConfirmDialog
         visible={receivedOpen}
         title="Mark this order as received?"

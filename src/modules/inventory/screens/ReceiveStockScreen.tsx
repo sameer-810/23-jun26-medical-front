@@ -173,14 +173,8 @@ export default function ReceiveStockScreen() {
    * other in its totals block, so the note has to be able to show either.
    */
   const [taxType, setTaxType] = useState<"intra" | "inter">("intra");
-  /**
-   * How this bill was settled.
-   *
-   * Distributors in India normally supply on 30-day credit, and without this
-   * control every receipt was booked as paid-in-full cash: the supplier's
-   * "Need to pay" stayed at ₹0, the statement stayed empty, and recording the
-   * real payment a month later was refused as exceeding an outstanding of zero.
-   */
+  // Indian distributors normally supply on 30-day credit; only "credit" books
+  // the bill onto the supplier's payable, anything else marks it paid in full.
   const [paymentMode, setPaymentMode] = useState<
     "cash" | "card" | "upi" | "credit"
   >("cash");
@@ -389,9 +383,8 @@ export default function ReceiveStockScreen() {
     setLines((cur) =>
       cur.map((l, idx) => {
         if (idx !== i) return l;
-        // Typing over a scanned figure IS the review, so the row stops being
-        // flagged. Otherwise a corrected line would keep nagging and the
-        // warning would lose all meaning.
+        // Editing a scanned value clears the row's review flag: typing over the
+        // figure is the review.
         const touchesReadValue =
           "purchasePrice" in patch ||
           "mrp" in patch ||
@@ -473,8 +466,8 @@ export default function ReceiveStockScreen() {
   // in between. toReceiptLines divides by the pack factor on the way out, which
   // is where the server's per-base-unit purchasePrice comes from.
   const validLines = toReceiptLines(lines, productsById);
-  // Rows that are half-filled would otherwise be dropped from the GRN without a
-  // word, leaving received goods unbooked. They block the save instead.
+  // A started row must be complete or the save is blocked — toReceiptLines
+  // would otherwise drop it from the GRN.
   const pendingLines = incompleteLines(lines, productsById);
   const totalBase = totalBaseUnits(lines, productsById);
   const bill = billTotals(lines, taxType);
@@ -485,14 +478,8 @@ export default function ReceiveStockScreen() {
 
   // Short-expiry gate: warn on lots nearing expiry, block already-expired ones.
   const [confirmShort, setConfirmShort] = useState(false);
-  /**
-   * Lines the bill scan was unsure about.
-   *
-   * The scanner already works this out and sets `flagged`, but nothing showed
-   * it: the cells rendered identically to hand-checked ones, so an unread rate
-   * or MRP went in unquestioned. Editing the row clears its flag — a figure the
-   * pharmacist has typed is a figure they have looked at.
-   */
+  // Lines the bill scan set `flagged` on. They must be acknowledged or edited
+  // before the save is allowed.
   const [ackFlagged, setAckFlagged] = useState(false);
   const flaggedLines = lines
     .map((l, i) => ({ i, name: productsById[l.productId || ""]?.name, l }))
@@ -500,15 +487,9 @@ export default function ReceiveStockScreen() {
   const needsFlagAck = flaggedLines.length > 0 && !ackFlagged;
 
   /**
-   * Lines going in without an expiry date.
-   *
-   * A batch saved with no expiry is invisible to every expiry report (they all
-   * filter out null) and FEFO sorts it last, so it sits at the back of the
-   * shelf and quietly goes out of date while the software reports a clean list.
-   * The bill scanner blanks any expiry it could not read, so this was easy to
-   * do by accident on a long invoice. Not blocked outright — a few non-medicine
-   * lines genuinely have no expiry — but it has to be a decision, not an
-   * oversight.
+   * Lines with no expiry date. A batch without one is filtered out of every
+   * expiry report and sorted last by FEFO. Acknowledged rather than blocked:
+   * some non-medicine lines legitimately have no expiry.
    */
   const [ackNoExpiry, setAckNoExpiry] = useState(false);
   const noExpiryLines = lines
@@ -567,14 +548,20 @@ export default function ReceiveStockScreen() {
     if (specs.length) void printLabels(specs, shopName);
   };
 
+  // Mirrors the button's `disabled` in full. The button is the only caller
+  // today, but a guard that only half-matches is how a keyboard shortcut or a
+  // second entry point ends up posting a GRN the UI had already refused.
+  const canSubmit =
+    validLines.length > 0 &&
+    pendingLines.length === 0 &&
+    !needsFlagAck &&
+    !needsExpiryAck &&
+    !blockedByExpired &&
+    !needsShortConfirm &&
+    !mut.isPending;
+
   const submit = () => {
-    if (
-      !validLines.length ||
-      pendingLines.length ||
-      needsFlagAck ||
-      needsExpiryAck
-    )
-      return;
+    if (!canSubmit) return;
     mut.mutate(
       {
         supplierId,
@@ -812,9 +799,7 @@ export default function ReceiveStockScreen() {
             onChangeText={setReference}
             placeholder="PO-1234"
           />
-          {/* Cash vs credit decides whether this bill lands on the supplier's
-              account. Without it every GRN booked as paid in full, so "Need to
-              pay" never moved and the payment could not be recorded later. */}
+          {/* Only "credit" puts the bill on the supplier's payable. */}
           <Select
             label="Payment"
             value={paymentMode}
@@ -1020,12 +1005,8 @@ export default function ReceiveStockScreen() {
                     align="center"
                     placeholder="0"
                   />
-                  {/* `flagged` is set when the bill scan could not read a
-                      figure confidently (e.g. a rate above MRP). It reached
-                      the grid and was then drawn exactly like a verified cell,
-                      so a rate misread as ₹412.50 for ₹41.25 saved silently —
-                      and the weighted-average cost carried the error into
-                      every later receipt of that batch. */}
+                  {/* `flagged` marks a figure the bill scan could not read
+                      confidently, e.g. a rate above MRP. */}
                   <GrnCell
                     w={COL.mrp}
                     value={line.mrp}
@@ -1215,9 +1196,6 @@ export default function ReceiveStockScreen() {
           bottom of a wide window is a phone pattern that followed us onto the
           counter PC; a commit button belongs at the end of the form it commits,
           at the size of the other controls. On a phone it still spans. */}
-      {/* Half-filled rows used to be dropped silently — 9 of 12 lines saved,
-          form reset, "Stock received" shown. The goods on those 3 rows were on
-          the shelf and in no GRN. Now they hold the save until they're done. */}
       {pendingLines.length > 0 ? (
         <Banner
           tone="warning"
@@ -1343,14 +1321,7 @@ export default function ReceiveStockScreen() {
           size="lg"
           fullWidth={!wide}
           loading={mut.isPending}
-          disabled={
-            !validLines.length ||
-            pendingLines.length > 0 ||
-            blockedByExpired ||
-            needsShortConfirm ||
-            needsFlagAck ||
-            needsExpiryAck
-          }
+          disabled={!canSubmit}
           onPress={submit}
         />
       </View>

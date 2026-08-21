@@ -141,8 +141,7 @@ export default function ProductsScreen() {
     <Screen
       overline="Catalogue"
       title="Products"
-      // "0 products" under the title is the same false claim as the empty
-      // state; with nothing loaded there is no count to report.
+      // No count to report when the list didn't load; 0 would be a real figure.
       subtitle={
         isError ? undefined : `${total.toLocaleString("en-IN")} products`
       }
@@ -199,13 +198,8 @@ export default function ProductsScreen() {
         </View>
       )}
 
-      {/*
-        Three states, not two. A pharmacy carrying 5,000 medicines was being
-        told "No products yet — add your first product" every time the request
-        failed, which is both alarming and an invitation to create duplicates.
-        A failure now says it failed; only a genuinely empty, un-searched
-        catalogue gets the onboarding copy.
-      */}
+      {/* Three states: failure, no match for the current filters, and an empty
+          catalogue — only the last gets the onboarding copy. */}
       {isError ? (
         <ErrorState
           error={error}

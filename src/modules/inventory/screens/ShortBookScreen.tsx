@@ -262,9 +262,6 @@ export default function ShortBookScreen() {
         <Banner tone="info" message={note} style={{ marginBottom: 12 }} />
       ) : null}
 
-      {/* "Nothing to reorder" is the most dangerous empty state in the app: it
-          tells a pharmacy it has no stock-outs. It must never stand in for a
-          list that simply failed to arrive. */}
       {isError ? (
         <ErrorState
           error={error}

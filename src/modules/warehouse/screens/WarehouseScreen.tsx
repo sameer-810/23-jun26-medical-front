@@ -70,8 +70,6 @@ export default function WarehouseScreen() {
         <Banner tone="danger" message={errorMsg} style={{ marginBottom: 16 }} />
       ) : null}
 
-      {/* "No warehouses yet — create a warehouse" on a failed load invites
-          someone to rebuild a location tree that already exists. */}
       {isError ? (
         <ErrorState
           error={error}

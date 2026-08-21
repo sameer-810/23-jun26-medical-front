@@ -127,8 +127,6 @@ export default function TeamScreen() {
         placeholder="Search name, email or role"
       />
 
-      {/* "No members yet" on a failed load reads as an emptied workspace, which
-          is alarming on the screen that governs who can get in. */}
       {isError ? (
         <ErrorState
           error={error}

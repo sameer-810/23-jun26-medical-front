@@ -16,14 +16,8 @@ type Nav = { navigate: (s: string) => void };
 export default function LoginScreen({ navigation }: { navigation: Nav }) {
   const [show, setShow] = useState(false);
   const mut = useLogin();
-  /**
-   * Neither of these is a credential problem, so neither gets the red error —
-   * but they are not the same message.
-   *
-   * They used to share one panel headed "Your registration is under review",
-   * which told a DECLINED applicant to wait for an approval email that is never
-   * coming. Waiting is the one thing that cannot resolve it.
-   */
+  // Pending and rejected are both workspace states, not credential errors, but
+  // they need different copy: pending resolves by waiting, rejected does not.
   const errCode = apiErrorCode(mut.error);
   const isPending = errCode === "WORKSPACE_PENDING_APPROVAL";
   const isRejected = errCode === "WORKSPACE_REJECTED";
@@ -46,14 +40,7 @@ export default function LoginScreen({ navigation }: { navigation: Nav }) {
       subtitle="Sign in to your Plusveda workspace"
     >
       <VStack gap={16}>
-        {/*
-          A registration still in the queue is not a failed sign-in.
-          
-          It renders as a calm amber notice rather than a red error, because
-          the person did nothing wrong and there is nothing for them to retry —
-          telling them "invalid credentials" in red would send them round the
-          password-reset loop for an account that is simply not open yet.
-        */}
+        {/* Workspace-state errors get the amber notice, not the red error panel. */}
         {mut.isError && needsUs ? (
           <View style={pendingBox}>
             <VStack gap={4}>

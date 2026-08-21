@@ -100,8 +100,6 @@ export default function PlansScreen() {
     >
       <AdminNav active="plans" />
 
-      {/* "No plans yet" would invite an operator to recreate plans that every
-          paying workspace is already subscribed to. */}
       {isError ? (
         <ErrorState
           error={error}

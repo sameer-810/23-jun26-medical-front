@@ -153,10 +153,9 @@ export interface ReceivePayload {
   /** Intra-state splits GST into CGST+SGST; inter-state charges IGST. */
   taxType?: "intra" | "inter";
   /**
-   * How the bill was settled. Anything other than "credit" books the receipt as
-   * paid in full; "credit" is what puts it on the supplier's account and makes
-   * it show up under "Need to pay". Omitting this field is why the payables
-   * ledger looked empty — the server defaults to cash.
+   * How the bill was settled. Anything but "credit" books the receipt as paid in
+   * full; "credit" puts it on the supplier's payable. The server defaults to
+   * cash when this is omitted, so a credit bill must send it explicitly.
    */
   paymentMode?: "cash" | "card" | "upi" | "credit";
   /** Paid up front on a credit bill. Clamped server-side to the bill total. */
@@ -229,19 +228,17 @@ export interface PurchaseReturnPayload {
   lines: {
     productId: string;
     /**
-     * Required, both here and on the server: a return takes stock out of one
-     * exact (product, batch, location) cell. Left optional, the missing keys
-     * dropped out of the lookup and an arbitrary cell of that product was
-     * decremented instead — the wrong lot off the shelf, the wrong expiry left
-     * behind.
+     * Required here and on the server: a return decrements one exact
+     * (product, batch, location) stock cell, and a missing key would match an
+     * arbitrary cell of that product instead.
      */
     batchId: string;
     batchNumber?: string;
     locationId: string;
     locationCode?: string;
     baseQuantity: number;
-    // No purchasePrice: the server prices the return from the batch's own cost,
-    // because this value credits the supplier's payable.
+    // No purchasePrice: this value credits the supplier's payable, so the server
+    // prices the return from the batch's own cost.
   }[];
 }
 

@@ -572,13 +572,8 @@ export default function NewSaleScreen() {
     .map((l, i) => ({ i, issue: stockIssue(l) }))
     .filter((x) => x.issue);
 
-  /**
-   * Lines the pharmacist added but left without a quantity.
-   *
-   * These used to be filtered out of the payload silently: the row stayed on
-   * screen, the sale completed, and the medicine went into the bag unbilled.
-   * A row that is on the counter has to be either billed or removed.
-   */
+  // Lines with a product but no quantity. They are dropped from the payload, so
+  // they block the sale: a row on the counter is either billed or removed.
   const blankQtyLines = lines
     .map((l, i) => ({ i, name: l.productName }))
     .filter(({ i }) => lines[i].productId && !(Number(lines[i].quantity) > 0));
@@ -632,9 +627,8 @@ export default function NewSaleScreen() {
       taxRatePct: l.taxRate === "" ? undefined : Number(l.taxRate),
     }));
 
-  // `!mut.isPending` is part of canSubmit, not just the button's disabled state:
-  // the Ctrl+Enter path reads this flag, and a held key auto-repeats. Without it
-  // one long press fires several POST /sales and bills the customer twice.
+  // `!mut.isPending` belongs in canSubmit, not only on the button: the Ctrl+Enter
+  // shortcut bypasses the disabled state and auto-repeats while held.
   const canSubmit =
     validLines.length > 0 &&
     shortLines.length === 0 &&
@@ -651,16 +645,9 @@ export default function NewSaleScreen() {
       },
       {
         onSuccess: (sale) => {
-          /**
-           * Empty the counter before anything else.
-           *
-           * This screen stays mounted in the Sales stack, so whatever is left
-           * here is what the pharmacist comes back to for the NEXT customer.
-           * Leaving the billed basket in place made "Complete sale" a second
-           * real invoice for goods already handed over, stock deducted twice.
-           * The sale is committed by now; `lines`/`validLines` below are the
-           * captured render values, so clearing state here is safe for them.
-           */
+          // The Sales stack keeps this screen mounted, so clear the cart after a
+          // sale or the next customer inherits it. `lines`/`validLines` used
+          // below are captured render values and stay valid after this reset.
           setLines([]);
           setCustomerId(null);
           setPaymentMode("cash");

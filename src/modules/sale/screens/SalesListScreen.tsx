@@ -197,9 +197,6 @@ export default function SalesListScreen() {
       </View>
 
       {isError ? (
-        // The table's own empty state says "No sales yet — create a sale to
-        // generate a GST invoice", which is a lie told to a shop that billed
-        // forty invoices this morning.
         <ErrorState
           error={error}
           title="Couldn't load your invoices"
