@@ -52,6 +52,11 @@ export default function SupplierDetailScreen() {
   const { data: purchases } = useSupplierPurchases(id);
   const updateMut = useUpdateSupplier(id);
   const removeMut = useRemoveSupplier();
+  const canManage = useAuthStore((s) => s.hasPermission)(
+    PERMISSIONS.SUPPLIERS_MANAGE,
+  );
+
+  const queryClient = useQueryClient();
   // Not a PATCH: deactivation soft-deletes, which hides the record from update.
   const restoreMut = useMutation({
     mutationFn: () => supplierApi.restore(id),
@@ -60,11 +65,6 @@ export default function SupplierDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
     },
   });
-  const canManage = useAuthStore((s) => s.hasPermission)(
-    PERMISSIONS.SUPPLIERS_MANAGE,
-  );
-
-  const queryClient = useQueryClient();
   const { data: statement } = useQuery({
     queryKey: ["supplier", "statement", id],
     queryFn: () => supplierApi.statement(id, { limit: 50 }),

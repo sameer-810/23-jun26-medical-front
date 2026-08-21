@@ -59,6 +59,11 @@ export default function CustomerDetailScreen() {
   const { data: sales } = useSales({ customerId: id });
   const updateMut = useUpdateCustomer(id);
   const removeMut = useRemoveCustomer();
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canManage = hasPermission(PERMISSIONS.CUSTOMERS_MANAGE);
+  const shopName = useAuthStore((s) => s.organization?.name) || "our pharmacy";
+
+  const queryClient = useQueryClient();
   // Not a PATCH: deactivation soft-deletes, which hides the record from update.
   const restoreMut = useMutation({
     mutationFn: () => customerApi.restore(id),
@@ -67,11 +72,6 @@ export default function CustomerDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
     },
   });
-  const hasPermission = useAuthStore((s) => s.hasPermission);
-  const canManage = hasPermission(PERMISSIONS.CUSTOMERS_MANAGE);
-  const shopName = useAuthStore((s) => s.organization?.name) || "our pharmacy";
-
-  const queryClient = useQueryClient();
   const { data: statement } = useQuery({
     queryKey: ["customer", "statement", id],
     queryFn: () => customerApi.statement(id, { limit: 50 }),
