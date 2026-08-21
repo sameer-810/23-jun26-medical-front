@@ -20,6 +20,7 @@ import {
   DataTable,
   Column,
   Skeleton,
+  ErrorState,
 } from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -58,7 +59,8 @@ export default function SalesListScreen() {
   } = { page, limit };
   if (search.trim()) params.search = search.trim();
   if (status !== "all") params.status = status;
-  const { data, isLoading, refetch, isRefetching } = useSales(params);
+  const { data, isLoading, isError, error, refetch, isRefetching } =
+    useSales(params);
   const sales = data?.data ?? [];
   const total = data?.meta?.total ?? 0;
   const totalPages = data?.meta?.pages ?? 1;
@@ -163,7 +165,7 @@ export default function SalesListScreen() {
       back="Back to billing"
       overline="Sales"
       title="Invoices"
-      subtitle={`${total.toLocaleString("en-IN")} sales`}
+      subtitle={isError ? undefined : `${total.toLocaleString("en-IN")} sales`}
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
       right={
@@ -194,7 +196,18 @@ export default function SalesListScreen() {
         />
       </View>
 
-      {isLoading && sales.length === 0 ? (
+      {isError ? (
+        // The table's own empty state says "No sales yet — create a sale to
+        // generate a GST invoice", which is a lie told to a shop that billed
+        // forty invoices this morning.
+        <ErrorState
+          error={error}
+          title="Couldn't load your invoices"
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+          style={{ marginTop: 16 }}
+        />
+      ) : isLoading && sales.length === 0 ? (
         <ListSkeleton />
       ) : (
         <View style={{ marginTop: 16 }}>

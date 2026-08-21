@@ -169,8 +169,24 @@ export const useAuthStore = create<AuthState>()(
             const { accessToken, refreshToken: newRefreshToken } = rs.data.data;
             updateTokens(accessToken, newRefreshToken);
             return accessToken;
-          } catch {
-            await get().logout();
+          } catch (err) {
+            /**
+             * Only a rejected token logs you out — not a bad connection.
+             *
+             * This used to log out on ANY failure, which threw away a
+             * still-valid seven-day refresh token whenever the shop's internet
+             * hiccuped or the API cold-started. The pharmacist then had to sign
+             * in again, and that re-login consumed another device slot — which
+             * is how a flaky line walked an account into the device-limit
+             * lockout without anyone doing anything wrong.
+             *
+             * A network error means "we could not ask", not "the answer was
+             * no": keep the token and let the next attempt succeed.
+             */
+            const status = (err as { response?: { status?: number } })?.response
+              ?.status;
+            const rejected = status === 401 || status === 403;
+            if (rejected) await get().logout();
             return null;
           } finally {
             refreshPromise = null;

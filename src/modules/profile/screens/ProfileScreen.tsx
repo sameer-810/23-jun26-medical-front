@@ -32,6 +32,7 @@ import {
   Avatar,
   Button,
   StatusChip,
+  ErrorState,
 } from "@shared/ui";
 
 export default function ProfileScreen() {
@@ -40,7 +41,14 @@ export default function ProfileScreen() {
   const logout = useAuthStore((s) => s.logout);
   const profileMut = useUpdateProfile();
   const pwdMut = useChangePassword();
-  const { data: sessions } = useSessions();
+  const {
+    data: sessions,
+    isLoading: sessionsLoading,
+    isError: sessionsError,
+    error: sessionsErr,
+    refetch: refetchSessions,
+    isFetching: sessionsFetching,
+  } = useSessions();
   const logoutAll = useLogoutAll();
 
   // Two independent forms on one screen — profile details and a password change.
@@ -125,6 +133,16 @@ export default function ProfileScreen() {
       </Text>
       <Card style={{ marginBottom: 24 }}>
         <VStack gap={16}>
+          {/* This card announced success and said nothing at all on failure —
+              a rejected save (duplicate phone, validation, dead connection)
+              simply looked like nothing had happened, while the password card
+              six inches below it reported its errors properly. Same pattern,
+              same place: above the fields. */}
+          {profileMut.isError && (
+            <Text variant="caption" tone="danger">
+              {apiErrorMessage(profileMut.error)}
+            </Text>
+          )}
           {profileMut.isSuccess && (
             <Text variant="caption" tone="success">
               Profile updated.
@@ -222,13 +240,28 @@ export default function ProfileScreen() {
       <Text variant="h3" tone="primary" style={{ marginBottom: 4 }}>
         Signed-in devices
       </Text>
+      {/* "Loading your devices…" was shown for every non-success state, so a
+          failed request left that line spinning forever with an empty card
+          under it — and the device cap is exactly what locks people out. */}
       <Text variant="body-sm" tone="tertiary" style={{ marginBottom: 12 }}>
         {sessions
           ? `Using ${sessions.used} of ${sessions.limit} allowed device${sessions.limit === 1 ? "" : "s"}.`
-          : "Loading your devices…"}
+          : sessionsError
+            ? "Your signed-in devices couldn't be loaded."
+            : sessionsLoading
+              ? "Loading your devices…"
+              : ""}
       </Text>
       <Card style={{ marginBottom: 24 }}>
         <VStack gap={14}>
+          {sessionsError && (
+            <ErrorState
+              error={sessionsErr}
+              title="Couldn't load your devices"
+              onRetry={() => refetchSessions()}
+              retrying={sessionsFetching}
+            />
+          )}
           {logoutAll.isError && (
             <Text variant="caption" tone="danger">
               {apiErrorMessage(logoutAll.error)}

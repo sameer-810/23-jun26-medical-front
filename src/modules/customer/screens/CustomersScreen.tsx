@@ -19,6 +19,7 @@ import {
   DataTable,
   Column,
   Skeleton,
+  ErrorState,
 } from "@shared/ui";
 
 export default function CustomersScreen() {
@@ -39,11 +40,12 @@ export default function CustomersScreen() {
     setPage(1);
   }
 
-  const { data, isLoading, refetch, isRefetching } = useCustomers({
-    ...(search.trim() ? { search: search.trim() } : {}),
-    page,
-    limit,
-  });
+  const { data, isLoading, isError, error, refetch, isRefetching } =
+    useCustomers({
+      ...(search.trim() ? { search: search.trim() } : {}),
+      page,
+      limit,
+    });
   const customers = data?.data ?? [];
   const total = data?.meta?.total ?? 0;
   const totalPages = data?.meta?.pages ?? 1;
@@ -98,7 +100,9 @@ export default function CustomersScreen() {
     <Screen
       overline="Partners"
       title="Customers"
-      subtitle={`${total.toLocaleString("en-IN")} customers`}
+      subtitle={
+        isError ? undefined : `${total.toLocaleString("en-IN")} customers`
+      }
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
       right={
@@ -118,7 +122,15 @@ export default function CustomersScreen() {
         placeholder="Search by name or mobile"
       />
 
-      {isLoading && customers.length === 0 ? (
+      {isError ? (
+        <ErrorState
+          error={error}
+          title="Couldn't load your customers"
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+          style={{ marginTop: 16 }}
+        />
+      ) : isLoading && customers.length === 0 ? (
         <ListSkeleton />
       ) : (
         <View style={{ marginTop: 16 }}>

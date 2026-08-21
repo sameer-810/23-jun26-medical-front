@@ -6,16 +6,30 @@
  * rejected, and "it works for me" usually means the developer was already
  * signed in. This starts from a cold browser with no session.
  *
- * Run:  node tools/verifyReviewerLogin.mjs
+ * The reviewer account is a real login on the live backend, so its password is
+ * never stored here — it lives in the Play Console form and in the environment
+ * of whoever runs this.
+ *
+ * Run:  REVIEWER_PASSWORD=… node tools/verifyReviewerLogin.mjs
  */
 import { chromium } from "playwright";
 import path from "node:path";
 import fs from "node:fs";
 
 const BASE = process.env.BASE || "http://localhost:8085";
-const EMAIL = process.env.REVIEWER_EMAIL || "play.reviewer@plusveda.app";
-const PASSWORD = process.env.REVIEWER_PASSWORD || "PlusvedaReview#2026";
+const EMAIL = process.env.REVIEWER_EMAIL;
+const PASSWORD = process.env.REVIEWER_PASSWORD;
 const OUT = path.resolve("../verify-evidence/reviewer");
+
+if (!EMAIL || !PASSWORD) {
+  console.error(
+    "\nREVIEWER_EMAIL / REVIEWER_PASSWORD are not set.\n" +
+      "This tool signs in to the live reviewer account, so the credential is never stored in the repo.\n" +
+      "Run with:  REVIEWER_EMAIL='…' REVIEWER_PASSWORD='…' node tools/verifyReviewerLogin.mjs\n",
+  );
+  process.exit(1);
+}
+
 fs.mkdirSync(OUT, { recursive: true });
 
 /** What the App access note tells the reviewer they can reach. */

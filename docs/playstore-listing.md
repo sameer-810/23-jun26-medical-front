@@ -17,7 +17,7 @@ features the app lacks, and overpromising earns refunds and one-star reviews.
 | Privacy policy URL   | `https://23-jun26-medical-front.vercel.app/privacy-policy.html` | live after the next Vercel deploy                                               |
 | Data deletion URL    | `https://23-jun26-medical-front.vercel.app/delete-account.html` | same                                                                            |
 | Package name         | `com.medstock.app`                                              | matches the EAS keystore `99:BE:F7:38…` — create the Play app with THIS package |
-| Reviewer login       | `play.reviewer@plusveda.app` / `PlusvedaReview#2026`            | created and tested — see §5                                                     |
+| Reviewer login       | `<REVIEWER_EMAIL>` / `<REVIEWER_PASSWORD>`                      | created and tested — see §5; the real values are never committed                |
 
 ---
 
@@ -136,12 +136,16 @@ https://23-jun26-medical-front.vercel.app/privacy-policy.html
 
 Choose **"All or some functionality is restricted"**, add one instruction set:
 
-| Field                  | Paste                        |
-| ---------------------- | ---------------------------- |
-| Name                   | `Full app access`            |
-| Username               | `play.reviewer@plusveda.app` |
-| Password               | `PlusvedaReview#2026`        |
-| Any other instructions | see below                    |
+| Field                  | Paste                 |
+| ---------------------- | --------------------- |
+| Name                   | `Full app access`     |
+| Username               | `<REVIEWER_EMAIL>`    |
+| Password               | `<REVIEWER_PASSWORD>` |
+| Any other instructions | see below             |
+
+> 🔒 The reviewer email and password are typed **straight into the Play Console
+> form** from the password manager. They are never written into this repo — this
+> file is public. See §5 for how to (re)create them.
 
 ```
 Plusveda is business software for pharmacies, so all functionality is behind a login.
@@ -225,9 +229,15 @@ purpose **App functionality** (plus **Account management** where noted).
 Created already — `node scripts/createReviewer.mjs` in the backend folder.
 
 ```
-Email:    play.reviewer@plusveda.app
-Password: PlusvedaReview#2026
+Email:    <REVIEWER_EMAIL>
+Password: <REVIEWER_PASSWORD>
 ```
+
+The script prints the pair it created. Keep it in the password manager and paste
+it only into the Play Console **App access** form — never back into this file or
+any other tracked file, since this repository is public. The verification tool
+reads the same pair from the environment:
+`REVIEWER_EMAIL='…' REVIEWER_PASSWORD='…' node tools/verifyReviewerLogin.mjs`.
 
 - Role **admin** in the MedStock Demo Pharmacy, so no screen is hidden. A staff
   account would hide Team & Access, Settings and Audit Logs, and a reviewer

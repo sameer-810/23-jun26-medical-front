@@ -3,11 +3,12 @@
  * and photographs each finding. Code inspection said what should happen; this
  * says what does.
  *
- * Run: node tools/auditModules.mjs
+ * Run: DEMO_PASSWORD=… node tools/auditModules.mjs
  */
 import { chromium } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
+import { DEMO_EMAIL, DEMO_PASSWORD } from "./demoCreds.mjs";
 
 const B = process.env.BASE || "http://localhost:8085";
 const OUT = path.resolve("../verify-evidence/audit");
@@ -35,8 +36,8 @@ const shot = (n) => p.screenshot({ path: path.join(OUT, `${n}.png`) });
 await p.goto(B, { waitUntil: "domcontentloaded" });
 await p.waitForSelector("input", { timeout: 300000 });
 await p.waitForTimeout(1500);
-await p.locator("input").nth(0).fill("admin@medstock.demo");
-await p.locator("input").nth(1).fill("Admin@123");
+await p.locator("input").nth(0).fill(DEMO_EMAIL);
+await p.locator("input").nth(1).fill(DEMO_PASSWORD);
 await p.keyboard.press("Enter");
 await p.waitForTimeout(9000);
 

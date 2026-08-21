@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, TextInput, ScrollView, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Undo2 } from "lucide-react-native";
 import { useReceipt } from "@modules/inventory/hooks/useInventory";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
@@ -30,16 +30,70 @@ export default function PurchaseReturnScreen() {
   const finalReason = reasonValue(reason, customReason);
   const [serverError, setServerError] = useState<string | null>(null);
 
+  const qc = useQueryClient();
   const mut = useMutation({
     mutationFn: (payload: PurchaseReturnPayload) =>
       inventoryApi.purchaseReturn(payload),
-    onSuccess: () => navigation.goBack(),
+    onSuccess: () => {
+      /**
+       * A return takes stock off the shelf, so everything that counts stock has
+       * to be told. Without this the goods still showed as on hand afterwards
+       * (focus-refetch is off globally), which reads as "the return did not
+       * save" — and the obvious next move is to file it a second time.
+       */
+      qc.invalidateQueries({ queryKey: ["stock"] });
+      qc.invalidateQueries({ queryKey: ["stock-value"] });
+      qc.invalidateQueries({ queryKey: ["receipts"] });
+      qc.invalidateQueries({ queryKey: ["receipt", receiptId] });
+      qc.invalidateQueries({ queryKey: ["product-inventory"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      navigation.goBack();
+    },
     onError: (err) => setServerError(apiErrorMessage(err)),
   });
 
   const submit = () => {
     if (!receipt) return;
     setServerError(null);
+
+    /**
+     * Say so when more is entered than was received, instead of quietly
+     * returning less.
+     *
+     * This used to `Math.min(n, l.baseQuantity)`, so typing 100 against a line
+     * of 24 submitted 24 with no warning — the supplier credit note then
+     * disagreed with what the shop believed it had sent back, by 76 units.
+     */
+    const overs = receipt.lines
+      .map((l, i) => ({
+        i,
+        name: l.productName,
+        max: l.baseQuantity,
+        n: Number(qty[i]),
+      }))
+      .filter((x) => x.n > 0 && x.n > x.max);
+    if (overs.length) {
+      const first = overs[0];
+      setServerError(
+        `You can return at most ${first.max} of ${first.name || `line ${first.i + 1}`} — that is all this bill received.`,
+      );
+      return;
+    }
+
+    // A line the receipt never tied to a batch and a location cannot be
+    // returned: the server needs the exact stock cell to take the goods from,
+    // and guessing one would take them off a different lot.
+    const untraceable = receipt.lines
+      .map((l, i) => ({ i, name: l.productName, l, n: Number(qty[i]) }))
+      .filter((x) => x.n > 0 && (!x.l.batchId || !x.l.locationId));
+    if (untraceable.length) {
+      const first = untraceable[0];
+      setServerError(
+        `${first.name || `Line ${first.i + 1}`} has no batch or storage location recorded on this receipt, so it cannot be returned automatically. Use a stock adjustment instead.`,
+      );
+      return;
+    }
+
     const lines = receipt.lines
       .map((l, i) => {
         const n = Number(qty[i]);
@@ -50,8 +104,7 @@ export default function PurchaseReturnScreen() {
           batchNumber: l.batchNumber,
           locationId: l.locationId,
           locationCode: l.locationCode,
-          baseQuantity: Math.min(n, l.baseQuantity),
-          purchasePrice: l.purchasePrice,
+          baseQuantity: n,
         };
       })
       .filter(Boolean) as PurchaseReturnPayload["lines"];

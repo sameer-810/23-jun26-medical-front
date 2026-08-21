@@ -15,6 +15,7 @@ import {
   SectionHeader,
   StatusChip,
   EmptyState,
+  ErrorState,
   DataTable,
   Column,
   Skeleton,
@@ -35,8 +36,19 @@ const batchStatusLabel = (b: ExpiryBatch) =>
     : `${b.daysToExpiry}d · ${b.expiryDate.slice(0, 10)}`;
 
 export default function ExpiryScreen() {
-  const { data, isLoading, refetch, isRefetching } = useExpiryReport();
+  const { data, isLoading, isError, error, refetch, isRefetching } =
+    useExpiryReport();
 
+  /**
+   * A failed report is not a clean shelf.
+   *
+   * The three tiles read `fmtInt(data?.summary.expired)` and `money(… ?? 0)`, so
+   * a dead request painted "Expired 0 · Expiring soon 0 · Value at risk ₹0" over
+   * an empty body — the exact picture of a pharmacy with nothing to worry about,
+   * on the one screen whose job is to say what has to come off the shelf today.
+   * When the report is absent the tiles say "—" and the page says why.
+   */
+  const missing = isError || (!data && !isLoading);
   const nothing = !isLoading && data && data.summary.total === 0;
 
   return (
@@ -52,29 +64,44 @@ export default function ExpiryScreen() {
           0 is a false alarm sitting at the top of the page every morning. The
           status dot is now earned: it appears only when there is something to
           act on. */}
+      {missing ? (
+        <ErrorState
+          error={error}
+          title="Couldn't load your expiry report"
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+          style={{ marginBottom: 10 }}
+        />
+      ) : null}
+
       <StatRow
         stats={[
           {
             label: "Expired",
-            value: fmtInt(data?.summary.expired),
-            accent: (data?.summary.expired ?? 0) > 0 ? accents.red : undefined,
+            value: missing ? "—" : fmtInt(data?.summary.expired),
+            accent:
+              !missing && (data?.summary.expired ?? 0) > 0
+                ? accents.red
+                : undefined,
           },
           {
             label: "Expiring soon",
-            value: fmtInt(data?.summary.expiringSoon),
+            value: missing ? "—" : fmtInt(data?.summary.expiringSoon),
             accent:
-              (data?.summary.expiringSoon ?? 0) > 0 ? accents.amber : undefined,
+              !missing && (data?.summary.expiringSoon ?? 0) > 0
+                ? accents.amber
+                : undefined,
           },
           {
             label: "Value at risk",
-            value: money(data?.summary.valueAtRisk ?? 0),
+            value: missing ? "—" : money(data?.summary.valueAtRisk ?? 0),
           },
         ]}
       />
 
       {isLoading && !data ? (
         <ListSkeleton />
-      ) : nothing ? (
+      ) : missing ? null : nothing ? (
         <EmptyState
           icon={ShieldCheck}
           title="Nothing expiring"

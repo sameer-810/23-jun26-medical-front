@@ -16,12 +16,18 @@ type Nav = { navigate: (s: string) => void };
 export default function LoginScreen({ navigation }: { navigation: Nav }) {
   const [show, setShow] = useState(false);
   const mut = useLogin();
-  // WORKSPACE_REJECTED reads the same way to the applicant — neither is a
-  // credential problem, and both are resolved by talking to us, not retrying.
+  /**
+   * Neither of these is a credential problem, so neither gets the red error —
+   * but they are not the same message.
+   *
+   * They used to share one panel headed "Your registration is under review",
+   * which told a DECLINED applicant to wait for an approval email that is never
+   * coming. Waiting is the one thing that cannot resolve it.
+   */
   const errCode = apiErrorCode(mut.error);
-  const isPending =
-    errCode === "WORKSPACE_PENDING_APPROVAL" ||
-    errCode === "WORKSPACE_REJECTED";
+  const isPending = errCode === "WORKSPACE_PENDING_APPROVAL";
+  const isRejected = errCode === "WORKSPACE_REJECTED";
+  const needsUs = isPending || isRejected;
   // onTouched: validate a field once it's blurred, then keep it live — the same
   // "don't scold mid-type" UX, now via the maintained standard library.
   const { control, handleSubmit } = useForm({
@@ -48,16 +54,20 @@ export default function LoginScreen({ navigation }: { navigation: Nav }) {
           telling them "invalid credentials" in red would send them round the
           password-reset loop for an account that is simply not open yet.
         */}
-        {mut.isError && isPending ? (
+        {mut.isError && needsUs ? (
           <View style={pendingBox}>
             <VStack gap={4}>
               <Text variant="label" tone="primary">
-                Your registration is under review
+                {isRejected
+                  ? "This registration was declined"
+                  : "Your registration is under review"}
               </Text>
               <Text variant="body-sm" tone="secondary">
                 {apiErrorMessage(
                   mut.error,
-                  "You'll receive an email once your workspace is approved.",
+                  isRejected
+                    ? "Get in touch and we'll go through what happened."
+                    : "You'll receive an email once your workspace is approved.",
                 )}
               </Text>
             </VStack>

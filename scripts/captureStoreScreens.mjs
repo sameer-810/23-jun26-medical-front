@@ -16,20 +16,21 @@
  *  3. The dev server must be running and the demo account must have data.
  *
  * Run:  npx expo start --web --port 8085
- *       node scripts/captureStoreScreens.mjs
+ *       DEMO_PASSWORD=… node scripts/captureStoreScreens.mjs
  */
 import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
+import { DEMO_EMAIL, DEMO_PASSWORD } from "../tools/demoCreds.mjs";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BASE = process.env.BASE || "http://localhost:8085";
-const EMAIL = process.env.DEMO_EMAIL || "admin@medstock.demo";
-const PASSWORD = process.env.DEMO_PASSWORD || "Admin@123";
+const EMAIL = DEMO_EMAIL;
+const PASSWORD = DEMO_PASSWORD;
 
 /**
  * CSS viewport x deviceScaleFactor = the pixel size Play receives.

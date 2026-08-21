@@ -6,12 +6,13 @@
  * deployed) against the live Render backend. Every check ends in PASS/FAIL plus
  * a screenshot, because "it's done" is worth nothing without the picture.
  *
- *   node tools/verify12.mjs            # all points
- *   node tools/verify12.mjs 1 5        # only those points
+ *   DEMO_PASSWORD=… node tools/verify12.mjs        # all points
+ *   DEMO_PASSWORD=… node tools/verify12.mjs 1 5    # only those points
  */
 import { chromium } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
+import { DEMO_EMAIL, DEMO_PASSWORD } from "./demoCreds.mjs";
 
 const BASE = process.env.BASE || "http://localhost:8085";
 const OUT = process.env.OUT || path.resolve("../verify-evidence");
@@ -46,8 +47,8 @@ async function login() {
   await page.waitForSelector("input", { timeout: 300000 });
   await page.waitForTimeout(1500);
   const inputs = page.locator("input");
-  await inputs.nth(0).fill("admin@medstock.demo");
-  await inputs.nth(1).fill("Admin@123");
+  await inputs.nth(0).fill(DEMO_EMAIL);
+  await inputs.nth(1).fill(DEMO_PASSWORD);
   await page.keyboard.press("Enter");
   await page.waitForTimeout(9000);
   return has("dashboard");
@@ -490,7 +491,8 @@ async function p789() {
   await add.nth(1).fill("Test");
   await add.nth(2).fill(`limit${stamp}@medstock.demo`);
   await add.nth(3).fill("9876500001");
-  await add.nth(4).fill("Staff@123");
+  // Throwaway member on a live tenant: unique per run, never a literal in the repo.
+  await add.nth(4).fill(`Staff@${stamp}`);
   // A member with no permissions may be rejected before the limit is reached,
   // which would prove nothing — grant one.
   const perm = page.locator("text=View the dashboard").first();

@@ -15,6 +15,7 @@ import {
   Card,
   Button,
   EmptyState,
+  ErrorState,
   Banner,
   ConfirmDialog,
 } from "@shared/ui";
@@ -30,7 +31,14 @@ type ModalState =
 export default function WarehouseScreen() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canManage = hasPermission(PERMISSIONS.WAREHOUSE_MANAGE);
-  const { data: roots, isLoading, refetch, isRefetching } = useWarehouseTree();
+  const {
+    data: roots,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isRefetching,
+  } = useWarehouseTree();
   const removeMut = useRemoveLocation();
   const [modal, setModal] = useState<ModalState>(null);
   const [pendingNode, setPendingNode] = useState<LocationTreeNode | null>(null);
@@ -62,7 +70,16 @@ export default function WarehouseScreen() {
         <Banner tone="danger" message={errorMsg} style={{ marginBottom: 16 }} />
       ) : null}
 
-      {warehouses.length === 0 ? (
+      {/* "No warehouses yet — create a warehouse" on a failed load invites
+          someone to rebuild a location tree that already exists. */}
+      {isError ? (
+        <ErrorState
+          error={error}
+          title="Couldn't load your locations"
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+        />
+      ) : warehouses.length === 0 ? (
         <EmptyState
           icon={WarehouseIcon}
           title={isLoading ? "Loading…" : "No warehouses yet"}

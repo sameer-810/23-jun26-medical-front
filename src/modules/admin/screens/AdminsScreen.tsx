@@ -16,11 +16,19 @@ import {
   DataTable,
   Column,
   Skeleton,
+  ErrorState,
 } from "@shared/ui";
 
 export default function AdminsScreen() {
   const navigation = useNavigation<any>();
-  const { data: admins, isLoading } = useAdmins();
+  const {
+    data: admins,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isRefetching,
+  } = useAdmins();
   const items = admins ?? [];
 
   const open = (a: PlatformAdminRow) =>
@@ -82,7 +90,15 @@ export default function AdminsScreen() {
     >
       <AdminNav active="admins" />
 
-      {isLoading && items.length === 0 ? (
+      {/* "No admins" is never true — someone is signed in reading this. */}
+      {isError ? (
+        <ErrorState
+          error={error}
+          title="Couldn't load the platform admins"
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+        />
+      ) : isLoading && items.length === 0 ? (
         <ListSkeleton />
       ) : (
         <DataTable<PlatformAdminRow>

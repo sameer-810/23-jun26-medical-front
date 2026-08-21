@@ -59,6 +59,7 @@ import {
   scanSummary,
   duplicateWarning,
   toReceiptLines,
+  incompleteLines,
   lineAmount,
   billTotals,
   totalBaseUnits,
@@ -172,6 +173,18 @@ export default function ReceiveStockScreen() {
    * other in its totals block, so the note has to be able to show either.
    */
   const [taxType, setTaxType] = useState<"intra" | "inter">("intra");
+  /**
+   * How this bill was settled.
+   *
+   * Distributors in India normally supply on 30-day credit, and without this
+   * control every receipt was booked as paid-in-full cash: the supplier's
+   * "Need to pay" stayed at ₹0, the statement stayed empty, and recording the
+   * real payment a month later was refused as exceeding an outstanding of zero.
+   */
+  const [paymentMode, setPaymentMode] = useState<
+    "cash" | "card" | "upi" | "credit"
+  >("cash");
+  const [amountPaid, setAmountPaid] = useState("");
   // The whole receipt, not just its number — its lines carry the label codes
   // the "Print labels" step needs.
   const [done, setDone] = useState<ReceiptDetail | null>(null);
@@ -374,7 +387,22 @@ export default function ReceiveStockScreen() {
 
   const setLine = (i: number, patch: Partial<DraftLine>) =>
     setLines((cur) =>
-      cur.map((l, idx) => (idx === i ? { ...l, ...patch } : l)),
+      cur.map((l, idx) => {
+        if (idx !== i) return l;
+        // Typing over a scanned figure IS the review, so the row stops being
+        // flagged. Otherwise a corrected line would keep nagging and the
+        // warning would lose all meaning.
+        const touchesReadValue =
+          "purchasePrice" in patch ||
+          "mrp" in patch ||
+          "expiryDate" in patch ||
+          "quantity" in patch;
+        return {
+          ...l,
+          ...patch,
+          flagged: touchesReadValue ? false : l.flagged,
+        };
+      }),
     );
 
   // Camera scan → resolve the barcode to a product and add it as a GRN line.
@@ -445,6 +473,9 @@ export default function ReceiveStockScreen() {
   // in between. toReceiptLines divides by the pack factor on the way out, which
   // is where the server's per-base-unit purchasePrice comes from.
   const validLines = toReceiptLines(lines, productsById);
+  // Rows that are half-filled would otherwise be dropped from the GRN without a
+  // word, leaving received goods unbooked. They block the save instead.
+  const pendingLines = incompleteLines(lines, productsById);
   const totalBase = totalBaseUnits(lines, productsById);
   const bill = billTotals(lines, taxType);
   const freeUnits = lines.reduce(
@@ -454,6 +485,36 @@ export default function ReceiveStockScreen() {
 
   // Short-expiry gate: warn on lots nearing expiry, block already-expired ones.
   const [confirmShort, setConfirmShort] = useState(false);
+  /**
+   * Lines the bill scan was unsure about.
+   *
+   * The scanner already works this out and sets `flagged`, but nothing showed
+   * it: the cells rendered identically to hand-checked ones, so an unread rate
+   * or MRP went in unquestioned. Editing the row clears its flag — a figure the
+   * pharmacist has typed is a figure they have looked at.
+   */
+  const [ackFlagged, setAckFlagged] = useState(false);
+  const flaggedLines = lines
+    .map((l, i) => ({ i, name: productsById[l.productId || ""]?.name, l }))
+    .filter((x) => x.l.flagged);
+  const needsFlagAck = flaggedLines.length > 0 && !ackFlagged;
+
+  /**
+   * Lines going in without an expiry date.
+   *
+   * A batch saved with no expiry is invisible to every expiry report (they all
+   * filter out null) and FEFO sorts it last, so it sits at the back of the
+   * shelf and quietly goes out of date while the software reports a clean list.
+   * The bill scanner blanks any expiry it could not read, so this was easy to
+   * do by accident on a long invoice. Not blocked outright — a few non-medicine
+   * lines genuinely have no expiry — but it has to be a decision, not an
+   * oversight.
+   */
+  const [ackNoExpiry, setAckNoExpiry] = useState(false);
+  const noExpiryLines = lines
+    .map((l, i) => ({ i, name: productsById[l.productId || ""]?.name, l }))
+    .filter((x) => x.l.productId && !x.l.expiryDate.trim());
+  const needsExpiryAck = noExpiryLines.length > 0 && !ackNoExpiry;
   const expFlags = lines.map((l) => expiryInfo(l.expiryDate));
   const expiredCount = lines.filter(
     (l, i) =>
@@ -507,12 +568,24 @@ export default function ReceiveStockScreen() {
   };
 
   const submit = () => {
-    if (!validLines.length) return;
+    if (
+      !validLines.length ||
+      pendingLines.length ||
+      needsFlagAck ||
+      needsExpiryAck
+    )
+      return;
     mut.mutate(
       {
         supplierId,
         referenceNo: referenceNo.trim() || undefined,
         taxType,
+        paymentMode,
+        // Only meaningful on a credit bill; the server clamps it to the total.
+        amountPaid:
+          paymentMode === "credit" && amountPaid.trim() !== ""
+            ? Number(amountPaid)
+            : undefined,
         lines: validLines,
       },
       {
@@ -523,6 +596,11 @@ export default function ReceiveStockScreen() {
           setReference("");
           setScanNote(null);
           setDupWarning(null);
+          setPaymentMode("cash");
+          setAmountPaid("");
+          setConfirmShort(false);
+          setAckFlagged(false);
+          setAckNoExpiry(false);
         },
       },
     );
@@ -734,6 +812,32 @@ export default function ReceiveStockScreen() {
             onChangeText={setReference}
             placeholder="PO-1234"
           />
+          {/* Cash vs credit decides whether this bill lands on the supplier's
+              account. Without it every GRN booked as paid in full, so "Need to
+              pay" never moved and the payment could not be recorded later. */}
+          <Select
+            label="Payment"
+            value={paymentMode}
+            options={[
+              { value: "cash", label: "Cash — paid in full" },
+              { value: "card", label: "Card — paid in full" },
+              { value: "upi", label: "UPI — paid in full" },
+              { value: "credit", label: "Credit — pay the supplier later" },
+            ]}
+            onChange={(v) =>
+              setPaymentMode((v as typeof paymentMode) || "cash")
+            }
+          />
+          {paymentMode === "credit" ? (
+            <TextField
+              label="Paid now (optional)"
+              value={amountPaid}
+              onChangeText={setAmountPaid}
+              placeholder="0"
+              keyboardType="decimal-pad"
+              hint="Part payment handed over at delivery. The rest stays on the supplier's account."
+            />
+          ) : null}
         </VStack>
       </Card>
 
@@ -916,12 +1020,19 @@ export default function ReceiveStockScreen() {
                     align="center"
                     placeholder="0"
                   />
+                  {/* `flagged` is set when the bill scan could not read a
+                      figure confidently (e.g. a rate above MRP). It reached
+                      the grid and was then drawn exactly like a verified cell,
+                      so a rate misread as ₹412.50 for ₹41.25 saved silently —
+                      and the weighted-average cost carried the error into
+                      every later receipt of that batch. */}
                   <GrnCell
                     w={COL.mrp}
                     value={line.mrp}
                     onChangeText={(v) => setLine(i, { mrp: v })}
                     numeric
                     align="right"
+                    warn={line.flagged}
                   />
                   <GrnCell
                     w={COL.rate}
@@ -929,6 +1040,7 @@ export default function ReceiveStockScreen() {
                     onChangeText={(v) => setLine(i, { purchasePrice: v })}
                     numeric
                     align="right"
+                    warn={line.flagged}
                   />
                   <GrnCell
                     w={COL.disc}
@@ -1103,6 +1215,123 @@ export default function ReceiveStockScreen() {
           bottom of a wide window is a phone pattern that followed us onto the
           counter PC; a commit button belongs at the end of the form it commits,
           at the size of the other controls. On a phone it still spans. */}
+      {/* Half-filled rows used to be dropped silently — 9 of 12 lines saved,
+          form reset, "Stock received" shown. The goods on those 3 rows were on
+          the shelf and in no GRN. Now they hold the save until they're done. */}
+      {pendingLines.length > 0 ? (
+        <Banner
+          tone="warning"
+          title={`${pendingLines.length} line${pendingLines.length === 1 ? "" : "s"} not ready — nothing is saved until they are`}
+          style={{ marginBottom: 12 }}
+        >
+          {pendingLines.map(({ i, name, missing }) => (
+            <Text key={i} variant="caption" tone="warning">
+              Line {i + 1} · {name}: needs {missing.join(", ")}
+            </Text>
+          ))}
+        </Banner>
+      ) : null}
+
+      {noExpiryLines.length > 0 ? (
+        <Banner tone="warning" style={{ marginBottom: 12 }}>
+          <HStack gap={10} align="center" justify="space-between" wrap>
+            <HStack gap={8} align="center" flex={1}>
+              <AlertTriangle
+                size={16}
+                color={palette.warning.text}
+                strokeWidth={2}
+              />
+              <VStack gap={2} flex={1}>
+                <Text variant="body-sm" tone="warning">
+                  {noExpiryLines.length} line
+                  {noExpiryLines.length > 1 ? "s have" : " has"} no expiry date.
+                  Stock saved without one never appears in expiry alerts and is
+                  sold last, so it can expire on the shelf unnoticed.
+                </Text>
+                <Text variant="caption" tone="warning">
+                  {noExpiryLines
+                    .map((f) => f.name || `Line ${f.i + 1}`)
+                    .join(", ")}
+                </Text>
+              </VStack>
+            </HStack>
+            <Pressable
+              onPress={() => setAckNoExpiry((v) => !v)}
+              style={styles.confirmToggle}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: ackNoExpiry }}
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  ackNoExpiry && {
+                    backgroundColor: palette.warning.text,
+                    borderColor: palette.warning.text,
+                  },
+                ]}
+              >
+                {ackNoExpiry ? (
+                  <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                ) : null}
+              </View>
+              <Text variant="label-sm" tone="warning">
+                No expiry
+              </Text>
+            </Pressable>
+          </HStack>
+        </Banner>
+      ) : null}
+
+      {flaggedLines.length > 0 ? (
+        <Banner tone="warning" style={{ marginBottom: 12 }}>
+          <HStack gap={10} align="center" justify="space-between" wrap>
+            <HStack gap={8} align="center" flex={1}>
+              <AlertTriangle
+                size={16}
+                color={palette.warning.text}
+                strokeWidth={2}
+              />
+              <VStack gap={2} flex={1}>
+                <Text variant="body-sm" tone="warning">
+                  {flaggedLines.length} line
+                  {flaggedLines.length > 1 ? "s were" : " was"} read from the
+                  bill but could not be confirmed — check the highlighted rate
+                  and MRP against the paper before saving.
+                </Text>
+                <Text variant="caption" tone="warning">
+                  {flaggedLines
+                    .map((f) => f.name || `Line ${f.i + 1}`)
+                    .join(", ")}
+                </Text>
+              </VStack>
+            </HStack>
+            <Pressable
+              onPress={() => setAckFlagged((v) => !v)}
+              style={styles.confirmToggle}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: ackFlagged }}
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  ackFlagged && {
+                    backgroundColor: palette.warning.text,
+                    borderColor: palette.warning.text,
+                  },
+                ]}
+              >
+                {ackFlagged ? (
+                  <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                ) : null}
+              </View>
+              <Text variant="label-sm" tone="warning">
+                Checked
+              </Text>
+            </Pressable>
+          </HStack>
+        </Banner>
+      ) : null}
+
       <View
         style={{
           marginTop: 4,
@@ -1114,7 +1343,14 @@ export default function ReceiveStockScreen() {
           size="lg"
           fullWidth={!wide}
           loading={mut.isPending}
-          disabled={!validLines.length || blockedByExpired || needsShortConfirm}
+          disabled={
+            !validLines.length ||
+            pendingLines.length > 0 ||
+            blockedByExpired ||
+            needsShortConfirm ||
+            needsFlagAck ||
+            needsExpiryAck
+          }
           onPress={submit}
         />
       </View>

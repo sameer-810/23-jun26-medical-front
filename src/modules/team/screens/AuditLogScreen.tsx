@@ -15,6 +15,7 @@ import {
   DataTable,
   Column,
   Skeleton,
+  ErrorState,
 } from "@shared/ui";
 
 const ACTION_TONE = (
@@ -45,11 +46,12 @@ export default function AuditLogScreen() {
     setPage(1);
   }
 
-  const { data, isLoading, refetch, isRefetching } = useAuditLogs({
-    ...(search.trim() ? { search: search.trim() } : {}),
-    page,
-    limit,
-  });
+  const { data, isLoading, isError, error, refetch, isRefetching } =
+    useAuditLogs({
+      ...(search.trim() ? { search: search.trim() } : {}),
+      page,
+      limit,
+    });
   const logs = data?.data ?? [];
   const total = data?.meta?.total ?? 0;
   const totalPages = data?.meta?.pages ?? 1;
@@ -112,7 +114,11 @@ export default function AuditLogScreen() {
     <Screen
       overline="Compliance"
       title="Audit Logs"
-      subtitle={`${total.toLocaleString("en-IN")} entries · append-only, tamper-proof`}
+      subtitle={
+        isError
+          ? "Append-only, tamper-proof"
+          : `${total.toLocaleString("en-IN")} entries · append-only, tamper-proof`
+      }
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
     >
@@ -122,7 +128,19 @@ export default function AuditLogScreen() {
         placeholder="Search actions, users or descriptions"
       />
 
-      {isLoading && logs.length === 0 ? (
+      {/* On a page whose subtitle promises an append-only, tamper-proof record,
+          "No activity yet" after a failed request is the worst possible thing
+          to show: it reads as a log that has been emptied. */}
+      {isError ? (
+        <ErrorState
+          error={error}
+          title="Couldn't load the audit log"
+          message="No entries have been lost — this list didn't load. Try again."
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+          style={{ marginTop: 16 }}
+        />
+      ) : isLoading && logs.length === 0 ? (
         <ListSkeleton />
       ) : (
         <View style={{ marginTop: 16 }}>

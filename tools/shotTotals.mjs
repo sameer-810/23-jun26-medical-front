@@ -11,6 +11,7 @@
  */
 import { chromium } from "playwright";
 import path from "node:path";
+import { DEMO_EMAIL, DEMO_PASSWORD } from "./demoCreds.mjs";
 
 const BASE = "http://localhost:8085";
 const OUT = path.resolve("../verify-evidence");
@@ -24,8 +25,8 @@ await page.goto(BASE, { waitUntil: "domcontentloaded", timeout: 300000 });
 await page.waitForSelector("input", { timeout: 300000 });
 await page.waitForTimeout(1500);
 const inp = page.locator("input");
-await inp.nth(0).fill("admin@medstock.demo");
-await inp.nth(1).fill("Admin@123");
+await inp.nth(0).fill(DEMO_EMAIL);
+await inp.nth(1).fill(DEMO_PASSWORD);
 await page.keyboard.press("Enter");
 await page.waitForTimeout(9000);
 

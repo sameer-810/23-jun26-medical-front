@@ -27,6 +27,7 @@ export default function OrderDetailScreen() {
   // Cancelling a placed order is not a style choice — it ends a commitment to a
   // distributor. It gets a confirm like every other destructive action.
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [receivedOpen, setReceivedOpen] = useState(false);
   const route = useRoute<any>();
   const id = route.params?.id as string;
   const qc = useQueryClient();
@@ -188,7 +189,7 @@ export default function OrderDetailScreen() {
                     <CheckCircle2 size={16} color="#FFFFFF" strokeWidth={2} />
                   }
                   loading={statusMut.isPending}
-                  onPress={() => statusMut.mutate("received")}
+                  onPress={() => setReceivedOpen(true)}
                 />
               ) : null}
               <Button
@@ -243,6 +244,26 @@ export default function OrderDetailScreen() {
           })
         }
         onCancel={() => setCancelOpen(false)}
+      />
+      {/*
+        "Received" is terminal and irreversible, and it books NO stock — the
+        goods still have to be entered through Receive stock. One stray tap
+        while reaching for something else closed the order for good and took
+        any short-delivered lines off every worklist with it. Cancel already
+        asked before doing something permanent; this now does too.
+      */}
+      <ConfirmDialog
+        visible={receivedOpen}
+        title="Mark this order as received?"
+        message="This closes the order for good — it cannot be reopened or edited afterwards. It does not add anything to stock: enter the goods through Receive stock so batches, expiry and cost are recorded."
+        confirmLabel="Mark received"
+        loading={statusMut.isPending}
+        onConfirm={() =>
+          statusMut.mutate("received", {
+            onSettled: () => setReceivedOpen(false),
+          })
+        }
+        onCancel={() => setReceivedOpen(false)}
       />
     </Screen>
   );

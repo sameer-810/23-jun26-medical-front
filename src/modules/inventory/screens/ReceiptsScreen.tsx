@@ -27,6 +27,7 @@ import {
   Button,
   DateField,
   Banner,
+  ErrorState,
 } from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -44,12 +45,13 @@ export default function ReceiptsScreen() {
   const [to, setTo] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  const { data, isLoading, refetch, isRefetching } = useReceipts({
-    page,
-    limit,
-    from: from || undefined,
-    to: to || undefined,
-  });
+  const { data, isLoading, isError, error, refetch, isRefetching } =
+    useReceipts({
+      page,
+      limit,
+      from: from || undefined,
+      to: to || undefined,
+    });
 
   const download = async (format: "pdf" | "excel") => {
     setBusy(true);
@@ -166,7 +168,11 @@ export default function ReceiptsScreen() {
       back="Back to receive"
       overline="Stock Inward"
       title="Receipt history"
-      subtitle={`${total.toLocaleString("en-IN")} goods-received notes`}
+      subtitle={
+        isError
+          ? undefined
+          : `${total.toLocaleString("en-IN")} goods-received notes`
+      }
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
     >
@@ -236,7 +242,16 @@ export default function ReceiptsScreen() {
         <Banner tone="info" message={note} style={{ marginBottom: 12 }} />
       ) : null}
 
-      {isLoading && receipts.length === 0 ? (
+      {/* A failed register is not an empty one — "No receipts yet" would have a
+          pharmacist re-entering goods they already booked in. */}
+      {isError ? (
+        <ErrorState
+          error={error}
+          title="Couldn't load the purchase register"
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+        />
+      ) : isLoading && receipts.length === 0 ? (
         <ListSkeleton />
       ) : (
         <>

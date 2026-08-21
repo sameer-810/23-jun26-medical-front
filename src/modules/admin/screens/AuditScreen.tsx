@@ -15,12 +15,16 @@ import {
   DataTable,
   Column,
   Skeleton,
+  ErrorState,
 } from "@shared/ui";
 
 export default function AuditScreen() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(30);
-  const { data, isLoading } = useAudit({ page, limit });
+  const { data, isLoading, isError, error, refetch, isRefetching } = useAudit({
+    page,
+    limit,
+  });
   const items = data?.data ?? [];
   const meta = data?.meta;
 
@@ -72,7 +76,17 @@ export default function AuditScreen() {
     <Screen overline="Platform" title="Audit log">
       <AdminNav active="audit" />
 
-      {isLoading && items.length === 0 ? (
+      {/* An audit trail that renders "No activity yet" when it failed to load
+          is worse than one that renders nothing — it makes a claim. */}
+      {isError ? (
+        <ErrorState
+          error={error}
+          title="Couldn't load the audit log"
+          message="No events have been lost — this list didn't load. Try again."
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+        />
+      ) : isLoading && items.length === 0 ? (
         <ListSkeleton />
       ) : (
         <View>

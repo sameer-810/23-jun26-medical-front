@@ -37,6 +37,7 @@ export { Fab } from "./Fab";
 export { Avatar } from "./Avatar";
 export { Screen } from "./Screen";
 export { EmptyState } from "./EmptyState";
+export { ErrorState } from "./ErrorState";
 export { Pagination } from "./Pagination";
 export { useBottomPadding, useTabBottomPadding } from "./useBottomPadding";
 export { useBreakpoint } from "./useBreakpoint";

@@ -20,6 +20,7 @@ import {
   DataTable,
   Column,
   Skeleton,
+  ErrorState,
 } from "@shared/ui";
 
 export default function CatalogListScreen() {
@@ -28,8 +29,14 @@ export default function CatalogListScreen() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
 
-  const { data: stats } = useCatalogStats();
-  const { data, isLoading } = useCatalog({ page, limit, search });
+  const { data: stats, isError: statsError } = useCatalogStats();
+  const { data, isLoading, isError, error, refetch, isRefetching } = useCatalog(
+    {
+      page,
+      limit,
+      search,
+    },
+  );
   const items = data?.data ?? [];
   const meta = data?.meta;
 
@@ -124,21 +131,31 @@ export default function CatalogListScreen() {
       <StatRow
         style={{ marginBottom: 16 }}
         stats={[
+          // A catalogue of 254,000 rows reporting "0 products" because one
+          // request failed is a coverage figure nobody should act on.
           {
             label: "Products",
-            value: (stats?.total ?? 0).toLocaleString("en-IN"),
+            value: statsError
+              ? "—"
+              : (stats?.total ?? 0).toLocaleString("en-IN"),
           },
           {
             label: "Active",
-            value: (stats?.active ?? 0).toLocaleString("en-IN"),
+            value: statsError
+              ? "—"
+              : (stats?.active ?? 0).toLocaleString("en-IN"),
           },
           {
             label: "With images",
-            value: (stats?.withImages ?? 0).toLocaleString("en-IN"),
+            value: statsError
+              ? "—"
+              : (stats?.withImages ?? 0).toLocaleString("en-IN"),
           },
           {
             label: "With clinical",
-            value: (stats?.withClinical ?? 0).toLocaleString("en-IN"),
+            value: statsError
+              ? "—"
+              : (stats?.withClinical ?? 0).toLocaleString("en-IN"),
           },
         ]}
       />
@@ -158,7 +175,14 @@ export default function CatalogListScreen() {
         />
       </View>
 
-      {isLoading && items.length === 0 ? (
+      {isError ? (
+        <ErrorState
+          error={error}
+          title="Couldn't load the catalogue"
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+        />
+      ) : isLoading && items.length === 0 ? (
         <ListSkeleton />
       ) : (
         <View>

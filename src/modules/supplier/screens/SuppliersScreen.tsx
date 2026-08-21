@@ -19,6 +19,7 @@ import {
   DataTable,
   Column,
   Skeleton,
+  ErrorState,
 } from "@shared/ui";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -40,11 +41,12 @@ export default function SuppliersScreen() {
     setPage(1);
   }
 
-  const { data, isLoading, refetch, isRefetching } = useSuppliers({
-    ...(search.trim() ? { search: search.trim() } : {}),
-    page,
-    limit,
-  });
+  const { data, isLoading, isError, error, refetch, isRefetching } =
+    useSuppliers({
+      ...(search.trim() ? { search: search.trim() } : {}),
+      page,
+      limit,
+    });
   const suppliers = data?.data ?? [];
   const total = data?.meta?.total ?? 0;
   const totalPages = data?.meta?.pages ?? 1;
@@ -118,7 +120,9 @@ export default function SuppliersScreen() {
     <Screen
       overline="Partners"
       title="Suppliers"
-      subtitle={`${total.toLocaleString("en-IN")} suppliers`}
+      subtitle={
+        isError ? undefined : `${total.toLocaleString("en-IN")} suppliers`
+      }
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
       right={
@@ -138,7 +142,15 @@ export default function SuppliersScreen() {
         placeholder="Search supplier"
       />
 
-      {isLoading && suppliers.length === 0 ? (
+      {isError ? (
+        <ErrorState
+          error={error}
+          title="Couldn't load your suppliers"
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+          style={{ marginTop: 16 }}
+        />
+      ) : isLoading && suppliers.length === 0 ? (
         <ListSkeleton />
       ) : (
         <View style={{ marginTop: 16 }}>

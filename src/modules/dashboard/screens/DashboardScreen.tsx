@@ -34,7 +34,7 @@ import {
   TrendChart,
   SectionHeader,
   Button,
-  Banner,
+  ErrorState,
   ListRow,
   ListGroup,
 } from "@shared/ui";
@@ -83,16 +83,31 @@ export default function DashboardScreen() {
   const has = useAuthStore((s) => s.hasPermission);
   const go = useSectionNav();
   const navigation = useNavigation<any>();
-  const { data, isLoading, refetch, isRefetching } = useDashboardSummary();
+  const {
+    data,
+    isLoading,
+    isError: sumError,
+    error: sumErr,
+    refetch,
+    isRefetching,
+  } = useDashboardSummary();
   const {
     data: fin,
     isError: finError,
+    error: finErr,
     isLoading: finLoading,
+    isRefetching: finRefetching,
     refetch: refetchFin,
   } = useQuery({
     queryKey: ["dashboard", "finance"],
     queryFn: dashboardApi.finance,
   });
+
+  /** Pull-to-refresh has to mean the whole page, not just the half it started on. */
+  const refreshAll = () => {
+    refetch();
+    refetchFin();
+  };
 
   /**
    * Money that failed to load must never render as zero.
@@ -106,6 +121,17 @@ export default function DashboardScreen() {
   const finMissing = finError || (!fin && !finLoading);
   const fmtFin = (value: number | undefined, format: (n: number) => string) =>
     finMissing ? "—" : format(value ?? 0);
+
+  /**
+   * The same rule for the headline figures, which had the same bug.
+   *
+   * `data?.sales.todayAmount ?? 0` reads "Today's sales ₹0" when the summary
+   * request fails — and ₹0 at 6pm is a claim about the day's trade, not a
+   * missing value. Everything on this page that can't be loaded now says so.
+   */
+  const sumMissing = sumError || (!data && !isLoading);
+  const fmtSum = (value: number | undefined, format: (n: number) => string) =>
+    sumMissing ? "—" : format(value ?? 0);
 
   const todayTrend = data?.sales.todayTrendPct;
   const lowStock = data?.inventory.lowStock ?? 0;
@@ -121,7 +147,7 @@ export default function DashboardScreen() {
   const kpis: Stat[] = [
     {
       label: "Today's sales",
-      value: money(data?.sales.todayAmount ?? 0),
+      value: fmtSum(data?.sales.todayAmount, money),
       hint: todayTrend != null ? "vs yesterday" : undefined,
       trend:
         todayTrend != null
@@ -131,19 +157,19 @@ export default function DashboardScreen() {
     },
     {
       label: "Products",
-      value: fmtInt(data?.products.total),
+      value: sumMissing ? "—" : fmtInt(data?.products.total),
       onPress: () => go("Products"),
     },
     {
       label: "Low stock",
-      value: fmtInt(lowStock),
-      accent: lowStock > 0 ? accents.amber : undefined,
+      value: sumMissing ? "—" : fmtInt(lowStock),
+      accent: !sumMissing && lowStock > 0 ? accents.amber : undefined,
       onPress: () => go("Inventory"),
     },
     {
       label: "Expiring soon",
-      value: fmtInt(expiringSoon),
-      accent: expiringSoon > 0 ? accents.red : undefined,
+      value: sumMissing ? "—" : fmtInt(expiringSoon),
+      accent: !sumMissing && expiringSoon > 0 ? accents.red : undefined,
       onPress: () => go("Expiry"),
     },
   ];
@@ -290,12 +316,24 @@ export default function DashboardScreen() {
     <Screen
       title={user?.firstName ? `Hello, ${user.firstName}` : "Dashboard"}
       right={wide ? actionBar : undefined}
-      refreshing={isRefetching || isLoading}
-      onRefresh={refetch}
+      refreshing={isRefetching || isLoading || finRefetching}
+      onRefresh={refreshAll}
     >
       {/* On a phone the actions get their own line under the title. */}
       {!wide && actionBar ? (
         <View style={{ marginBottom: 12 }}>{actionBar}</View>
+      ) : null}
+
+      {/* Same treatment the finance panel already had: name the failure above
+          the tiles, so the dashes below it have an explanation. */}
+      {sumMissing ? (
+        <ErrorState
+          error={sumErr}
+          title="Couldn't load today's figures"
+          onRetry={refreshAll}
+          retrying={isRefetching}
+          style={{ marginBottom: 10 }}
+        />
       ) : null}
 
       {/* Headline figures — one panel, hairline-divided. */}
@@ -321,7 +359,22 @@ export default function DashboardScreen() {
 
       {/* Needs attention — the reason this page exists. */}
       <SectionHeader title="Needs attention" />
-      {attn.length === 0 ? (
+      {/*
+        An empty attention list means one of two very different things, and this
+        used to render the reassuring one either way. "All clear — no low stock,
+        expiries or dues need action right now" is drawn from BOTH queries, so a
+        cold backend produced a green tick over a pharmacy that might have forty
+        expired batches and ₹80,000 uncollected. Silence is not all clear.
+      */}
+      {attn.length === 0 && (sumMissing || finMissing) ? (
+        <ErrorState
+          error={sumMissing ? sumErr : finErr}
+          title="Couldn't check what needs attention"
+          message="This is not an all-clear — the figures behind it didn't load. Try again to see what's outstanding."
+          onRetry={refreshAll}
+          retrying={isRefetching || finRefetching}
+        />
+      ) : attn.length === 0 ? (
         <Card>
           <HStack gap={10} align="center">
             <CheckCircle2
@@ -372,20 +425,14 @@ export default function DashboardScreen() {
       {/* Say it out loud, not just with a dash — these are the tiles someone
           acts on, and silence looks identical to "nothing is owed". */}
       {finMissing ? (
-        <Banner
-          tone="danger"
+        <ErrorState
+          error={finErr}
           title="Couldn't load your finance figures"
           message="These totals are not zero — they haven't loaded. Check your connection and try again."
+          onRetry={() => refetchFin()}
+          retrying={finRefetching}
           style={{ marginBottom: 10 }}
-        >
-          <Button
-            label="Retry"
-            variant="secondary"
-            size="xs"
-            fullWidth={false}
-            onPress={() => refetchFin()}
-          />
-        </Banner>
+        />
       ) : null}
 
       <StatRow
@@ -512,7 +559,11 @@ export default function DashboardScreen() {
       <ListGroup>
         <ListRow
           icon={Users}
-          title={`${data?.team.active ?? 0} active · ${data?.team.total ?? 0} total`}
+          title={
+            sumMissing
+              ? "—"
+              : `${data?.team.active ?? 0} active · ${data?.team.total ?? 0} total`
+          }
           subtitle="Team members in your workspace"
           chevron={false}
         />

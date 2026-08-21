@@ -29,6 +29,7 @@ import {
   Column,
   Skeleton,
   Banner,
+  ErrorState,
   PromptDialog,
   ConfirmDialog,
 } from "@shared/ui";
@@ -40,7 +41,7 @@ export default function ShortBookScreen() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
     queryKey: ["inventory", "shortbook", search, page, limit],
     queryFn: () => inventoryApi.shortbook({ search, page, limit }),
   });
@@ -261,7 +262,18 @@ export default function ShortBookScreen() {
         <Banner tone="info" message={note} style={{ marginBottom: 12 }} />
       ) : null}
 
-      {isLoading && items.length === 0 ? (
+      {/* "Nothing to reorder" is the most dangerous empty state in the app: it
+          tells a pharmacy it has no stock-outs. It must never stand in for a
+          list that simply failed to arrive. */}
+      {isError ? (
+        <ErrorState
+          error={error}
+          title="Couldn't load your reorder list"
+          message="This is not an empty ShortBook — it didn't load. Retry before assuming there is nothing to order."
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+        />
+      ) : isLoading && items.length === 0 ? (
         <ListSkeleton />
       ) : (
         <>

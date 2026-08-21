@@ -20,6 +20,7 @@ import {
   StatusChip,
   TextField,
   EmptyState,
+  ErrorState,
 } from "@shared/ui";
 
 /** Below this a lookup matches most of the catalogue — it isn't a search yet. */
@@ -77,7 +78,7 @@ export default function MedGuideScreen() {
   };
 
   const ready = term.length >= MIN_CHARS;
-  const { data, isFetching } = useQuery({
+  const { data, isFetching, isError, error, refetch } = useQuery({
     queryKey: ["medguide", term, page],
     queryFn: () => medguideApi.search({ search: term, page, limit: LIMIT }),
     enabled: ready,
@@ -116,7 +117,16 @@ export default function MedGuideScreen() {
         </View>
       ) : null}
 
-      {items.length === 0 ? (
+      {/* A failed lookup is not "no such medicine" — that distinction matters
+          when someone is standing at the counter deciding whether to order. */}
+      {isError ? (
+        <ErrorState
+          error={error}
+          title="Couldn't search the medicine guide"
+          onRetry={() => refetch()}
+          retrying={isFetching}
+        />
+      ) : items.length === 0 ? (
         <EmptyState
           icon={BookOpen}
           title={

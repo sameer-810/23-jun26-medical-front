@@ -353,6 +353,48 @@ export function duplicateWarning(bill: ScannedBill): string | null {
 const round4 = (n: number) =>
   Number.isFinite(n) ? Math.round(n * 10000) / 10000 : 0;
 
+/** A row the pharmacist has begun filling in — as opposed to a blank spare. */
+function isStarted(l: DraftLine): boolean {
+  return Boolean(
+    l.productId ||
+    l.fromBill ||
+    l.batchNumber.trim() ||
+    String(l.quantity).trim() ||
+    l.locationId,
+  );
+}
+
+/**
+ * Started rows that `toReceiptLines` would drop on the floor.
+ *
+ * Only complete lines get sent, which is right — but they used to be discarded
+ * in silence: a 12-line bill with 3 unmatched products saved 9, reset the form
+ * and reported success. Those goods were on the shelf and in no GRN, and the
+ * receipt could never reconcile against the paper bill. Callers use this to
+ * block the save and say exactly which rows still need work.
+ */
+export function incompleteLines(
+  lines: DraftLine[],
+  byId: Record<string, ProductLite> = {},
+): { i: number; name: string; missing: string[] }[] {
+  const out: { i: number; name: string; missing: string[] }[] = [];
+  lines.forEach((l, i) => {
+    if (!isStarted(l)) return;
+    const missing: string[] = [];
+    if (!l.productId) missing.push("product");
+    if (!l.batchNumber.trim()) missing.push("batch");
+    if (!(Number(l.quantity) > 0)) missing.push("quantity");
+    if (!l.locationId) missing.push("location");
+    if (!missing.length) return;
+    const name =
+      (l.productId ? byId[l.productId]?.name : null) ||
+      l.fromBill?.productName ||
+      `Line ${i + 1}`;
+    out.push({ i, name, missing });
+  });
+  return out;
+}
+
 /**
  * Only complete lines are sent; the rest are still being worked on.
  *

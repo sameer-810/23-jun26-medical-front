@@ -26,6 +26,7 @@ import {
   ChipsRow,
   SearchInput,
   EmptyState,
+  ErrorState,
   Pagination,
   ListRow,
   ListGroup,
@@ -83,7 +84,8 @@ export default function ProductsScreen() {
   if (debouncedSearch) params.search = debouncedSearch;
   if (categoryId !== "all") params.categoryId = categoryId;
 
-  const { data, isLoading, refetch, isRefetching } = useProducts(params);
+  const { data, isLoading, isError, error, refetch, isRefetching } =
+    useProducts(params);
 
   const products = data?.data ?? [];
   const total = data?.meta?.total ?? 0;
@@ -139,7 +141,11 @@ export default function ProductsScreen() {
     <Screen
       overline="Catalogue"
       title="Products"
-      subtitle={`${total.toLocaleString("en-IN")} products`}
+      // "0 products" under the title is the same false claim as the empty
+      // state; with nothing loaded there is no count to report.
+      subtitle={
+        isError ? undefined : `${total.toLocaleString("en-IN")} products`
+      }
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
       right={
@@ -193,13 +199,38 @@ export default function ProductsScreen() {
         </View>
       )}
 
-      {products.length === 0 ? (
+      {/*
+        Three states, not two. A pharmacy carrying 5,000 medicines was being
+        told "No products yet — add your first product" every time the request
+        failed, which is both alarming and an invitation to create duplicates.
+        A failure now says it failed; only a genuinely empty, un-searched
+        catalogue gets the onboarding copy.
+      */}
+      {isError ? (
+        <ErrorState
+          error={error}
+          title="Couldn't load your products"
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+          style={{ marginTop: 12 }}
+        />
+      ) : products.length === 0 ? (
         <EmptyState
           icon={Package}
-          title={isLoading ? "Loading…" : "No products yet"}
-          message="Add your first product to start building the catalogue."
+          title={
+            isLoading
+              ? "Loading…"
+              : debouncedSearch || categoryId !== "all"
+                ? "No products match that"
+                : "No products yet"
+          }
+          message={
+            debouncedSearch || categoryId !== "all"
+              ? "Try a different search term or clear the filters."
+              : "Add your first product to start building the catalogue."
+          }
           action={
-            canManage ? (
+            canManage && !debouncedSearch && categoryId === "all" ? (
               <Button
                 label="Add product"
                 fullWidth={false}

@@ -572,6 +572,17 @@ export default function NewSaleScreen() {
     .map((l, i) => ({ i, issue: stockIssue(l) }))
     .filter((x) => x.issue);
 
+  /**
+   * Lines the pharmacist added but left without a quantity.
+   *
+   * These used to be filtered out of the payload silently: the row stayed on
+   * screen, the sale completed, and the medicine went into the bag unbilled.
+   * A row that is on the counter has to be either billed or removed.
+   */
+  const blankQtyLines = lines
+    .map((l, i) => ({ i, name: l.productName }))
+    .filter(({ i }) => lines[i].productId && !(Number(lines[i].quantity) > 0));
+
   const totals = lines.reduce(
     (acc, l) => {
       const c = calc(l);
@@ -621,9 +632,16 @@ export default function NewSaleScreen() {
       taxRatePct: l.taxRate === "" ? undefined : Number(l.taxRate),
     }));
 
-  const canSubmit = validLines.length > 0 && shortLines.length === 0;
+  // `!mut.isPending` is part of canSubmit, not just the button's disabled state:
+  // the Ctrl+Enter path reads this flag, and a held key auto-repeats. Without it
+  // one long press fires several POST /sales and bills the customer twice.
+  const canSubmit =
+    validLines.length > 0 &&
+    shortLines.length === 0 &&
+    blankQtyLines.length === 0 &&
+    !mut.isPending;
   const submit = () => {
-    if (!validLines.length) return;
+    if (!validLines.length || mut.isPending || blankQtyLines.length) return;
     mut.mutate(
       {
         customerId,
@@ -633,6 +651,20 @@ export default function NewSaleScreen() {
       },
       {
         onSuccess: (sale) => {
+          /**
+           * Empty the counter before anything else.
+           *
+           * This screen stays mounted in the Sales stack, so whatever is left
+           * here is what the pharmacist comes back to for the NEXT customer.
+           * Leaving the billed basket in place made "Complete sale" a second
+           * real invoice for goods already handed over, stock deducted twice.
+           * The sale is committed by now; `lines`/`validLines` below are the
+           * captured render values, so clearing state here is safe for them.
+           */
+          setLines([]);
+          setCustomerId(null);
+          setPaymentMode("cash");
+          setRefillDays("");
           /**
            * Offer a refill call before leaving the screen.
            *
@@ -1228,6 +1260,19 @@ export default function NewSaleScreen() {
             <Text key={i} variant="caption" tone="warning">
               {lines[i].productName}: asked {issue!.needBase},{" "}
               {issue!.message.charAt(0).toLowerCase() + issue!.message.slice(1)}
+            </Text>
+          ))}
+        </Banner>
+      ) : null}
+      {blankQtyLines.length > 0 ? (
+        <Banner
+          tone="warning"
+          title="Enter a quantity, or remove the line"
+          style={{ marginBottom: 12 }}
+        >
+          {blankQtyLines.map(({ i, name }) => (
+            <Text key={i} variant="caption" tone="warning">
+              {name || `Line ${i + 1}`}: no quantity — it will not be billed
             </Text>
           ))}
         </Banner>

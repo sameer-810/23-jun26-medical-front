@@ -26,18 +26,12 @@
 import { chromium } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
+import { DEMO_EMAIL, DEMO_PASSWORD } from "./demoCreds.mjs";
 
 const B = process.env.BASE || "http://localhost:8085";
 const OUT = path.resolve("../ui-audit/redesign");
-const EMAIL = process.env.DEMO_EMAIL || "admin@medstock.demo";
-const PASSWORD = process.env.DEMO_PASSWORD;
-
-if (!PASSWORD) {
-  console.error(
-    "DEMO_PASSWORD is not set. Refusing to guess — pass it in the environment.",
-  );
-  process.exit(1);
-}
+const EMAIL = DEMO_EMAIL;
+const PASSWORD = DEMO_PASSWORD;
 
 /** Matches the client's localStorage key in src/shared/api/deviceId.ts. */
 const DEVICE_KEY = "medstock-device-id";

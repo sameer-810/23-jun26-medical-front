@@ -25,14 +25,14 @@ import {
   Column,
   Skeleton,
   TextField,
+  ErrorState,
 } from "@shared/ui";
 
 export default function TeamScreen() {
   const navigation = useNavigation<any>();
   const [search, setSearch] = useState("");
-  const { data, isLoading, refetch, isRefetching } = useTeamUsers(
-    search.trim() ? { search: search.trim() } : undefined,
-  );
+  const { data, isLoading, isError, error, refetch, isRefetching } =
+    useTeamUsers(search.trim() ? { search: search.trim() } : undefined);
   const users = data?.data ?? [];
 
   const open = (u: TeamUser) => navigation.navigate("UserDetail", { id: u.id });
@@ -103,7 +103,11 @@ export default function TeamScreen() {
     <Screen
       overline="Administration"
       title="Team & Access"
-      subtitle={`${data?.meta?.total ?? 0} members · permission-based access`}
+      subtitle={
+        isError
+          ? "Permission-based access"
+          : `${data?.meta?.total ?? 0} members · permission-based access`
+      }
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
       right={
@@ -123,7 +127,17 @@ export default function TeamScreen() {
         placeholder="Search name, email or role"
       />
 
-      {isLoading && users.length === 0 ? (
+      {/* "No members yet" on a failed load reads as an emptied workspace, which
+          is alarming on the screen that governs who can get in. */}
+      {isError ? (
+        <ErrorState
+          error={error}
+          title="Couldn't load your team"
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+          style={{ marginTop: 16 }}
+        />
+      ) : isLoading && users.length === 0 ? (
         <ListSkeleton />
       ) : (
         <View style={{ marginTop: 16 }}>

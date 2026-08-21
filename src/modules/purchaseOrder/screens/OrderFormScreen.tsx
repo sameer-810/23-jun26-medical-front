@@ -7,7 +7,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X, Search, PackageSearch } from "lucide-react-native";
 import { purchaseOrderApi } from "@modules/purchaseOrder/api/purchaseOrderApi";
 import type { SeededLine } from "@modules/purchaseOrder/types";
@@ -103,6 +103,7 @@ export default function OrderFormScreen() {
   const removeLine = (i: number) =>
     setLines((s) => s.filter((_, idx) => idx !== i));
 
+  const qc = useQueryClient();
   const mut = useMutation({
     mutationFn: (status: "draft" | "placed") =>
       purchaseOrderApi.create({
@@ -117,7 +118,15 @@ export default function OrderFormScreen() {
             estimatedPrice: Number(l.estimatedPrice) || 0,
           })),
       }),
-    onSuccess: () => navigation.goBack(),
+    onSuccess: () => {
+      // The list screen stays mounted behind this form and focus-refetch is off
+      // globally, so without this the new order simply is not there when the
+      // form closes. It reads as a failed save, and the natural response is to
+      // key the whole order again — which is how a distributor ends up
+      // receiving the same 12-line order twice.
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      navigation.goBack();
+    },
     onError: (err) => setServerError(apiErrorMessage(err)),
   });
 

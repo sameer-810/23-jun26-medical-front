@@ -15,11 +15,19 @@ import {
   DataTable,
   Column,
   Skeleton,
+  ErrorState,
 } from "@shared/ui";
 
 export default function PlansScreen() {
   const navigation = useNavigation<any>();
-  const { data: plans, isLoading } = usePlans(true);
+  const {
+    data: plans,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isRefetching,
+  } = usePlans(true);
   const items = plans ?? [];
 
   const open = (p: Plan) => navigation.navigate("AdminPlanForm", { id: p._id });
@@ -92,7 +100,16 @@ export default function PlansScreen() {
     >
       <AdminNav active="plans" />
 
-      {isLoading && items.length === 0 ? (
+      {/* "No plans yet" would invite an operator to recreate plans that every
+          paying workspace is already subscribed to. */}
+      {isError ? (
+        <ErrorState
+          error={error}
+          title="Couldn't load the plans"
+          onRetry={() => refetch()}
+          retrying={isRefetching}
+        />
+      ) : isLoading && items.length === 0 ? (
         <ListSkeleton />
       ) : (
         <DataTable<Plan>

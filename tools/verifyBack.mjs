@@ -12,6 +12,7 @@
 import { chromium } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
+import { DEMO_EMAIL, DEMO_PASSWORD } from "./demoCreds.mjs";
 
 const BASE = process.env.BASE || "http://localhost:8085";
 const OUT = path.resolve("../verify-evidence/back-links");
@@ -74,8 +75,8 @@ await page.goto(BASE, { waitUntil: "domcontentloaded", timeout: 300000 });
 await page.waitForSelector("input", { timeout: 300000 });
 await page.waitForTimeout(1500);
 const inp = page.locator("input");
-await inp.nth(0).fill("admin@medstock.demo");
-await inp.nth(1).fill("Admin@123");
+await inp.nth(0).fill(DEMO_EMAIL);
+await inp.nth(1).fill(DEMO_PASSWORD);
 await page.keyboard.press("Enter");
 await page.waitForTimeout(9000);
 if (!(await page.locator("body").innerText()).toLowerCase().includes("dash")) {
@@ -231,8 +232,8 @@ const mp = await phone.newPage();
 await mp.goto(BASE, { waitUntil: "domcontentloaded", timeout: 300000 });
 await mp.waitForSelector("input", { timeout: 300000 });
 await mp.waitForTimeout(1500);
-await mp.locator("input").nth(0).fill("admin@medstock.demo");
-await mp.locator("input").nth(1).fill("Admin@123");
+await mp.locator("input").nth(0).fill(DEMO_EMAIL);
+await mp.locator("input").nth(1).fill(DEMO_PASSWORD);
 await mp.keyboard.press("Enter");
 await mp.waitForTimeout(9000);
 await mp.goto(`${BASE}/receive-stock/scan`, { waitUntil: "domcontentloaded" });
