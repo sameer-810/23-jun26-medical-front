@@ -113,6 +113,26 @@ const clampInput = (v: string, max: number, min = 0) => {
   return v;
 };
 
+/** The clamped value plus what to say about it — silently rewriting a typed
+ *  figure leaves the cashier believing they entered something else. */
+const clampWithNote = (
+  v: string,
+  max: number,
+  label: string,
+): { value: string; note: string | null } => {
+  const clamped = clampInput(v, max);
+  if (clamped === v) return { value: v, note: null };
+  const n = Number(v);
+  if (Number.isNaN(n)) return { value: clamped, note: null };
+  return {
+    value: clamped,
+    note:
+      n < 0
+        ? `${label} cannot be negative — set to 0.`
+        : `${label} capped at ${clamped}.`,
+  };
+};
+
 export default function NewSaleScreen() {
   const navigation = useNavigation<any>();
   const { width } = useWindowDimensions();
@@ -643,13 +663,32 @@ export default function NewSaleScreen() {
 
   // `!mut.isPending` belongs in canSubmit, not only on the button: the Ctrl+Enter
   // shortcut bypasses the disabled state and auto-repeats while held.
+  /**
+   * A bill that charges nothing has to be deliberate.
+   *
+   * A 100% discount is a legitimate thing to do — a replacement, a goodwill
+   * pack — but it is also what a mis-keyed discount looks like, and the goods
+   * leave either way. Acknowledging it costs one tap; giving stock away by
+   * accident costs the shop.
+   */
+  const [ackFreeSale, setAckFreeSale] = useState(false);
+  // Set when a typed figure was rewritten to its ceiling; cleared on the next
+  // edit that fits, so it reads as feedback rather than a stuck error.
+  const [clampNote, setClampNote] = useState<string | null>(null);
+  const isFreeSale = validLines.length > 0 && grand <= 0;
+  // Adjusted during render, not in an effect — the same pattern the list
+  // screens use to reset a page number when a filter changes. Once the total is
+  // no longer zero the acknowledgement is stale and must not carry over.
+  if (!isFreeSale && ackFreeSale) setAckFreeSale(false);
+
   const canSubmit =
     validLines.length > 0 &&
     shortLines.length === 0 &&
     blankQtyLines.length === 0 &&
+    (!isFreeSale || ackFreeSale) &&
     !mut.isPending;
   const submit = () => {
-    if (!validLines.length || mut.isPending || blankQtyLines.length) return;
+    if (!canSubmit) return;
     mut.mutate(
       {
         customerId,
@@ -900,6 +939,7 @@ export default function NewSaleScreen() {
                         gross={c.gross}
                         onValue={(v) => setLine(i, { discount: v })}
                         onMode={(m) => setLine(i, { discountMode: m })}
+                        onNote={setClampNote}
                       />
                       <Cell
                         w={COL.gst}
@@ -1061,6 +1101,7 @@ export default function NewSaleScreen() {
                           gross={c.gross}
                           onValue={(v) => setLine(i, { discount: v })}
                           onMode={(m) => setLine(i, { discountMode: m })}
+                          onNote={setClampNote}
                         />
                       </Field>
                       <Field label="GST%" w={56}>
@@ -1282,6 +1323,45 @@ export default function NewSaleScreen() {
           ))}
         </Banner>
       ) : null}
+      {clampNote ? (
+        <Banner tone="info" message={clampNote} style={{ marginBottom: 12 }} />
+      ) : null}
+      {isFreeSale ? (
+        <Banner
+          tone="warning"
+          title="This bill charges nothing"
+          style={{ marginBottom: 12 }}
+        >
+          <Text variant="caption" tone="warning">
+            The discount takes the total to ₹0. The stock still leaves the shelf
+            — confirm this is intended.
+          </Text>
+          <Pressable
+            onPress={() => setAckFreeSale((v) => !v)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: ackFreeSale }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 8,
+            }}
+          >
+            <View
+              style={[
+                freeSaleBox,
+                ackFreeSale && {
+                  backgroundColor: palette.warning.text,
+                  borderColor: palette.warning.text,
+                },
+              ]}
+            />
+            <Text variant="label-sm" tone="warning">
+              Give these items free
+            </Text>
+          </Pressable>
+        </Banner>
+      ) : null}
       {mut.isError ? (
         <Banner
           tone="danger"
@@ -1314,7 +1394,10 @@ export default function NewSaleScreen() {
       title="New sale"
       subtitle="Scan or search · FEFO auto-picks nearest-expiry batches"
       right={
-        <HStack gap={8}>
+        /* Wraps because these four do not fit one phone-width line: unwrapped,
+           the last button sat past the right edge and the whole billing screen
+           panned sideways to reach it, clipping the search and totals. */
+        <HStack gap={8} wrap>
           {/* A counter that can't silence the beeps ends up with the machine
               volume down, which kills the error tone too. */}
           <Button
@@ -1684,6 +1767,7 @@ function DiscCell({
   gross,
   onValue,
   onMode,
+  onNote,
 }: {
   w: number;
   line: DraftLine;
@@ -1691,13 +1775,20 @@ function DiscCell({
   gross: number;
   onValue: (v: string) => void;
   onMode: (m: "amount" | "pct") => void;
+  /** Reports a rewritten value so the screen can say what it changed. */
+  onNote: (note: string | null) => void;
 }) {
   const ceiling = (mode: "amount" | "pct") => (mode === "pct" ? 100 : gross);
+  const label = () => (line.discountMode === "pct" ? "Discount %" : "Discount");
   return (
     <View style={[styles.discWrap, { width: w }]}>
       <TextInput
         value={line.discount}
-        onChangeText={(v) => onValue(clampInput(v, ceiling(line.discountMode)))}
+        onChangeText={(v) => {
+          const r = clampWithNote(v, ceiling(line.discountMode), label());
+          onValue(r.value);
+          onNote(r.note);
+        }}
         keyboardType="decimal-pad"
         placeholder="0"
         placeholderTextColor={palette.text.tertiary}
@@ -1714,7 +1805,13 @@ function DiscCell({
               onPress={() => {
                 // A value that was legal in the old mode can exceed the new
                 // mode's ceiling — 150 is fine in rupees, not as a percent.
-                onValue(clampInput(line.discount, ceiling(m)));
+                const r = clampWithNote(
+                  line.discount,
+                  ceiling(m),
+                  m === "pct" ? "Discount %" : "Discount",
+                );
+                onValue(r.value);
+                onNote(r.note);
                 onMode(m);
               }}
               style={[styles.discToggleBtn, active && styles.discToggleBtnOn]}
@@ -1892,3 +1989,11 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
 });
+
+const freeSaleBox = {
+  width: 16,
+  height: 16,
+  borderRadius: radius.xs,
+  borderWidth: 1.5,
+  borderColor: palette.warning.text,
+} as const;

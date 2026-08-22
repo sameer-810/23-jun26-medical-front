@@ -20,8 +20,9 @@ import {
   Skeleton,
   ConfirmDialog,
 } from "@shared/ui";
+import { fmtMoneyExact, fmtDate } from "@shared/format";
 
-const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+const money = fmtMoneyExact;
 
 export default function OrderDetailScreen() {
   // Cancelling a placed order is not a style choice — it ends a commitment to a
@@ -122,7 +123,7 @@ export default function OrderDetailScreen() {
                   }
                 />
                 <Text variant="body-sm" tone="tertiary">
-                  {new Date(order.createdAt).toLocaleDateString("en-IN")}
+                  {fmtDate(order.createdAt)}
                 </Text>
               </HStack>
               <HStack justify="space-between">

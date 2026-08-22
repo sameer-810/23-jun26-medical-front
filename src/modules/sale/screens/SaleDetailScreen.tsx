@@ -18,6 +18,7 @@ import {
   Button,
   StatusChip,
   Skeleton,
+  ErrorState,
 } from "@shared/ui";
 import { ReturnModal } from "@modules/sale/components/ReturnModal";
 
@@ -30,12 +31,26 @@ const STATUS_TONE = {
 export default function SaleDetailScreen() {
   const route = useRoute<any>();
   const id = route.params?.id as string;
-  const { data: sale, isLoading } = useSale(id);
+  const { data: sale, isLoading, isError, error } = useSale(id);
   const { data: profile } = useInvoiceProfile();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canReturn = hasPermission(PERMISSIONS.SALES_MANAGE);
   const shopName = useAuthStore((s) => s.organization?.name) || "Pharmacy";
   const [returnOpen, setReturnOpen] = useState(false);
+
+  if (isError) {
+    return (
+      <Screen back="Back to sales" overline="Sales" title="Invoice">
+        <ErrorState
+          error={error}
+          title="This invoice isn't available"
+          message="It may have been removed, or the link may be out of date. Open Sales to find the invoice."
+          actionLabel="Go to sales"
+          onAction={() => navigation.navigate("Sales")}
+        />
+      </Screen>
+    );
+  }
 
   if (isLoading || !sale) {
     return (

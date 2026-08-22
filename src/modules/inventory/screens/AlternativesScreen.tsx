@@ -15,6 +15,7 @@ import {
   EmptyState,
   Skeleton,
 } from "@shared/ui";
+import { fmtDate } from "@shared/format";
 
 type Sort = "expiry" | "price" | "margin";
 const TABS: { key: Sort; label: string }[] = [
@@ -113,8 +114,7 @@ export default function AlternativesScreen() {
                   </Text>
                   {it.nearestExpiry ? (
                     <Text variant="caption" tone="tertiary">
-                      Exp{" "}
-                      {new Date(it.nearestExpiry).toLocaleDateString("en-IN")}
+                      Exp {fmtDate(it.nearestExpiry)}
                     </Text>
                   ) : null}
                 </VStack>

@@ -21,8 +21,9 @@ import {
   Skeleton,
   ErrorState,
 } from "@shared/ui";
+import { fmtMoneyExact } from "@shared/format";
 
-const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+const money = fmtMoneyExact;
 
 export default function SuppliersScreen() {
   const navigation = useNavigation<any>();

@@ -20,9 +20,11 @@ import {
   StatTile,
   StatusChip,
   Skeleton,
+  ErrorState,
 } from "@shared/ui";
+import { fmtMoneyExact, fmtDate } from "@shared/format";
 
-const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+const money = fmtMoneyExact;
 
 function expiryInfo(iso: string | null): {
   label: string;
@@ -31,7 +33,7 @@ function expiryInfo(iso: string | null): {
   if (!iso) return { label: "No expiry", tone: "neutral" };
   const d = new Date(iso);
   const days = Math.ceil((d.getTime() - Date.now()) / 86400000);
-  const date = d.toISOString().slice(0, 10);
+  const date = fmtDate(iso);
   if (days < 0) return { label: `Expired ${date}`, tone: "danger" };
   if (days <= 30)
     return { label: `Expires ${date} (${days}d)`, tone: "danger" };
@@ -46,9 +48,24 @@ export default function ProductInventoryScreen() {
   const id = route.params?.id as string;
   const { width } = useWindowDimensions();
   const cols = width >= 800 ? 4 : 2;
-  const { data, isLoading, refetch, isRefetching } = useProductInventory(id);
+  const { data, isLoading, isError, error, refetch, isRefetching } =
+    useProductInventory(id);
 
   const tileW = `${100 / cols}%` as DimensionValue;
+
+  if (isError) {
+    return (
+      <Screen back="Back to inventory" overline="Inventory" title="Product">
+        <ErrorState
+          error={error}
+          title="This product isn't available"
+          message="It may have been removed. Open Inventory to find it."
+          actionLabel="Go to inventory"
+          onAction={() => navigation.navigate("Inventory")}
+        />
+      </Screen>
+    );
+  }
 
   if (isLoading || !data) {
     return (

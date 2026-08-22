@@ -41,8 +41,9 @@ import {
   PromptDialog,
   Skeleton,
 } from "@shared/ui";
+import { fmtMoneyExact, fmtDate } from "@shared/format";
 
-const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+const money = fmtMoneyExact;
 
 export default function SupplierDetailScreen() {
   const navigation = useNavigation<any>();
@@ -250,7 +251,7 @@ export default function SupplierDetailScreen() {
             <ListRow
               key={p.id}
               title={p.receiptNo}
-              subtitle={`${new Date(p.receivedAt).toLocaleDateString()} · ${p.lineCount} line${p.lineCount === 1 ? "" : "s"} · ${p.totalQuantity} units`}
+              subtitle={`${fmtDate(p.receivedAt)} · ${p.lineCount} line${p.lineCount === 1 ? "" : "s"} · ${p.totalQuantity} units`}
               value={money(p.totalValue)}
             />
           ))}
@@ -279,7 +280,7 @@ export default function SupplierDetailScreen() {
                     {r.type} {r.ref ? `· ${r.ref}` : ""}
                   </Text>
                   <Text variant="caption" tone="tertiary">
-                    {new Date(r.date).toLocaleDateString("en-IN")}
+                    {fmtDate(r.date)}
                     {r.note ? ` · ${r.note}` : ""}
                   </Text>
                 </VStack>

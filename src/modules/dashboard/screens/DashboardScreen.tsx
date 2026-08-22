@@ -173,7 +173,10 @@ export default function DashboardScreen() {
       icon: PackageX,
       title: `${expired} expired batch${expired === 1 ? "" : "es"} to write off`,
       hint: "Remove from sellable stock",
-      nav: "Expiry",
+      // The expiry screen only lists lots; the write-off tool is Damaged, which
+      // carries an "Expired" reason. A row named for an action has to reach the
+      // control that performs it.
+      nav: "Damaged",
       action: "Write off",
     });
   if (expiringSoon > 0)

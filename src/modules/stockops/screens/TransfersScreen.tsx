@@ -25,6 +25,7 @@ import {
   EmptyState,
   Banner,
 } from "@shared/ui";
+import { fmtDate } from "@shared/format";
 
 export default function TransfersScreen() {
   const { data: locations } = useAllLocations();
@@ -176,8 +177,7 @@ export default function TransfersScreen() {
                     {t.transferNo} · {t.productName}
                   </Text>
                   <Text variant="caption" tone="tertiary">
-                    batch {t.batchNumber} ·{" "}
-                    {new Date(t.createdAt).toLocaleDateString()}
+                    batch {t.batchNumber} · {fmtDate(t.createdAt)}
                   </Text>
                 </VStack>
                 <VStack gap={4} align="flex-end">

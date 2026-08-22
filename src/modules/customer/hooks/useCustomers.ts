@@ -12,6 +12,8 @@ export const useCustomers = (params?: {
   search?: string;
   page?: number;
   limit?: number;
+  /** "inactive" lists deactivated customers so they can be restored. */
+  status?: "active" | "inactive";
 }) =>
   useQuery({
     queryKey: ["customers", params],

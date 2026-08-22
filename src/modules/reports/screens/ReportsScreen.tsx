@@ -7,7 +7,8 @@ import {
 } from "@modules/reports/hooks/useReports";
 import { ReportType, ReportColumn } from "@modules/reports/api/reportsApi";
 import { apiErrorMessage } from "@api/apiClient";
-import { palette } from "@shared/designSystem";
+import { fmtMoneyExact, fmtDate } from "@shared/format";
+import { palette, layout } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -20,6 +21,7 @@ import {
   EmptyState,
   DataTable,
   Column,
+  useBreakpoint,
 } from "@shared/ui";
 
 type ReportRow = Record<string, unknown>;
@@ -33,26 +35,51 @@ type ReportRow = Record<string, unknown>;
  * permission-checked — this removes the one-click export from the workbench,
  * not the data model.
  */
+/**
+ * GST is offered alongside them: it is a rate- and HSN-wise TAX SUMMARY for
+ * GSTR-1, not a line-by-line list of what the pharmacy stocks or buys, so it
+ * does not carry the leak the four above were removed for.
+ */
 const TYPES: { key: ReportType; label: string; timed: boolean }[] = [
   { key: "sales", label: "Sales", timed: true },
+  { key: "gst", label: "GST (HSN)", timed: true },
   { key: "expiry", label: "Expiry", timed: false },
   { key: "warehouse", label: "Warehouse", timed: false },
   { key: "user-activity", label: "User activity", timed: true },
 ];
 
-const money = (n: number) =>
-  `₹${Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+// A report is read against a piece of paper, so it uses the exact formatter —
+// the exports already print 2dp, and a screen that drops trailing paise
+// disagrees with the file generated from the very same rows.
+const money = fmtMoneyExact;
+
+/**
+ * Which summary keys are rupees.
+ *
+ * Counts ("Invoices", "HSN groups") must stay plain. The list is explicit
+ * because a name-matching rule missed "Refunds", which then printed as a bare
+ * `-272.46` in a row of ₹ figures.
+ */
+const MONEY_STAT =
+  /value|total|tax|taxable|refund|payable|paid|due|cost|price|cgst|sgst|igst/i;
+const COUNT_STAT =
+  /invoices|groups|count|rows|products|batches|locations|movements|units/i;
+const isMoneyStat = (k: string) => MONEY_STAT.test(k) && !COUNT_STAT.test(k);
 
 function fmt(value: unknown, col: ReportColumn) {
   if (value == null || value === "") return "—";
   if (col.type === "money") return money(Number(value));
   if (col.type === "number") return String(value);
-  if (col.type === "date")
-    return new Date(value as string).toISOString().slice(0, 10);
+  // `toISOString` renders in UTC, so a sale at 00:01 IST printed as the
+  // PREVIOUS day — inside a report whose header stated today's range. Dates go
+  // through the shared IST formatter, like the rest of the app.
+  if (col.type === "date") return fmtDate(value as string);
   return String(value);
 }
 
 export default function ReportsScreen() {
+  const { isWide } = useBreakpoint();
+  const gutter = isWide ? layout.screenPadding : layout.screenPaddingPhone;
   // Must be one of TYPES above — "inventory" was removed, and defaulting to a
   // type with no chip left the screen loading a report nothing could select.
   const [type, setType] = useState<ReportType>("sales");
@@ -75,8 +102,9 @@ export default function ReportsScreen() {
       refreshing={isRefetching}
       onRefresh={refetch}
     >
-      {/* Type selector */}
-      <View style={{ marginHorizontal: -24, marginBottom: 16 }}>
+      {/* Type selector. The bleed has to MATCH the screen's own gutter — a
+          hardcoded 24 overshot a phone's 16 and pushed the page 8px sideways. */}
+      <View style={{ marginHorizontal: -gutter, marginBottom: 16 }}>
         <ChipsRow
           chips={TYPES.map((t) => ({ key: t.key, label: t.label }))}
           active={type}
@@ -159,8 +187,7 @@ export default function ReportsScreen() {
                   {k}
                 </Text>
                 <Text variant="h3" tone="primary">
-                  {typeof v === "number" &&
-                  k.toLowerCase().match(/value|total|tax|taxable/)
+                  {typeof v === "number" && isMoneyStat(k)
                     ? money(v)
                     : String(v)}
                 </Text>

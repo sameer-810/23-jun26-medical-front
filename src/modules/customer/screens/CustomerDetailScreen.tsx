@@ -42,9 +42,11 @@ import {
   ConfirmDialog,
   PromptDialog,
   Skeleton,
+  ErrorState,
 } from "@shared/ui";
+import { fmtMoneyExact, fmtDate } from "@shared/format";
 
-const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+const money = fmtMoneyExact;
 const STATUS_TONE = {
   completed: "success",
   partially_returned: "warning",
@@ -55,7 +57,7 @@ export default function CustomerDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const id = route.params?.id as string;
-  const { data: customer } = useCustomer(id);
+  const { data: customer, isError, error } = useCustomer(id);
   const { data: sales } = useSales({ customerId: id });
   const updateMut = useUpdateCustomer(id);
   const removeMut = useRemoveCustomer();
@@ -82,6 +84,7 @@ export default function CustomerDetailScreen() {
 
   const [collectOpen, setCollectOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const payMut = useMutation({
     mutationFn: (amount: number) =>
       customerApi.recordPayment(id, { amount, mode: "cash" }),
@@ -102,6 +105,20 @@ export default function CustomerDetailScreen() {
     (s, x) => s + (x.grandTotal - x.totalReturned),
     0,
   );
+
+  if (isError) {
+    return (
+      <Screen back="Back to customers" overline="Customer" title="Customer">
+        <ErrorState
+          error={error}
+          title="This customer isn't available"
+          message="They may have been deactivated. Open Customers and switch to the Deactivated tab to find and reactivate them."
+          actionLabel="Go to customers"
+          onAction={() => navigation.navigate("Customers")}
+        />
+      </Screen>
+    );
+  }
 
   if (!customer) {
     return (
@@ -228,8 +245,8 @@ export default function CustomerDetailScreen() {
             <Button
               label={
                 outstanding > 0
-                  ? `Collect payment (₹${Math.round(outstanding)} due)`
-                  : "Collect payment"
+                  ? `Collect payment (${money(outstanding)} due)`
+                  : "Nothing outstanding"
               }
               variant={outstanding > 0 ? "primary" : "secondary"}
               icon={
@@ -239,6 +256,7 @@ export default function CustomerDetailScreen() {
                   strokeWidth={2}
                 />
               }
+              disabled={outstanding <= 0}
               loading={payMut.isPending}
               onPress={() => setCollectOpen(true)}
             />
@@ -258,9 +276,7 @@ export default function CustomerDetailScreen() {
               onPress={() =>
                 sendWhatsApp(
                   customer.mobile,
-                  `Dear ${customer?.name || "Customer"}, a friendly reminder from *${shopName}*: your outstanding balance is *₹${Math.round(
-                    outstanding,
-                  )}*. Kindly clear it at your convenience. Thank you!`,
+                  `Dear ${customer?.name || "Customer"}, a friendly reminder from *${shopName}*: your outstanding balance is *${money(outstanding)}*. Kindly clear it at your convenience. Thank you!`,
                 )
               }
             />
@@ -281,7 +297,7 @@ export default function CustomerDetailScreen() {
             <ListRow
               key={s.id}
               title={s.invoiceNo}
-              subtitle={`${new Date(s.saleDate).toLocaleDateString()} · ${s.itemCount} item${s.itemCount === 1 ? "" : "s"}`}
+              subtitle={`${fmtDate(s.saleDate)} · ${s.itemCount} item${s.itemCount === 1 ? "" : "s"}`}
               value={money(s.grandTotal)}
               right={
                 s.status === "completed" ? undefined : (
@@ -318,7 +334,7 @@ export default function CustomerDetailScreen() {
                     {r.type} {r.ref ? `· ${r.ref}` : ""}
                   </Text>
                   <Text variant="caption" tone="tertiary">
-                    {new Date(r.date).toLocaleDateString("en-IN")}
+                    {fmtDate(r.date)}
                     {r.note ? ` · ${r.note}` : ""}
                   </Text>
                 </VStack>
@@ -370,6 +386,11 @@ export default function CustomerDetailScreen() {
             onPress={() => restoreMut.mutate()}
           />
         ))}
+      {removeError && (
+        <Text variant="caption" tone="danger" style={{ marginTop: 8 }}>
+          {removeError}
+        </Text>
+      )}
       {updateMut.isError && (
         <Text variant="caption" tone="danger" style={{ marginTop: 8 }}>
           {apiErrorMessage(updateMut.error)}
@@ -386,7 +407,7 @@ export default function CustomerDetailScreen() {
         title={`Collect from ${customer?.name || "customer"}`}
         message={
           outstanding > 0
-            ? `Outstanding ₹${Math.round(outstanding)}. Enter the amount collected.`
+            ? `Outstanding ${money(outstanding)}. Enter the amount collected.`
             : "Enter the amount collected from this customer."
         }
         label="Amount (₹)"
@@ -406,12 +427,21 @@ export default function CustomerDetailScreen() {
       <ConfirmDialog
         visible={removeOpen}
         title="Deactivate customer?"
-        message={`${customer?.name || "This customer"} will be hidden from new sales. You can reactivate later.`}
+        message={`${customer?.name || "This customer"} will be hidden from new sales. You can reactivate later from Customers → Deactivated.`}
         confirmLabel="Deactivate"
         destructive
         loading={removeMut.isPending}
         onConfirm={() =>
-          removeMut.mutate(id, { onSuccess: () => navigation.goBack() })
+          removeMut.mutate(id, {
+            onSuccess: () => navigation.navigate("Customers"),
+            // The server refuses while a balance is outstanding. Closing the
+            // dialog on failure left the refusal invisible and the screen
+            // looking like nothing had happened.
+            onError: (e) => {
+              setRemoveOpen(false);
+              setRemoveError(apiErrorMessage(e));
+            },
+          })
         }
         onCancel={() => setRemoveOpen(false)}
       />

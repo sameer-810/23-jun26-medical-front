@@ -46,10 +46,16 @@ export const authApi = {
     return res.data;
   },
 
-  /** Devices this account is signed in on, with the current one flagged. */
-  sessions: async (refreshToken: string | null): Promise<SessionList> => {
+  /**
+   * Devices this account is signed in on, with the current one flagged.
+   *
+   * The flag is matched on the device id, not the refresh token: the token
+   * rotates on every silent refresh so it rarely matched, and a credential has
+   * no business in a URL where it lands in server logs and browser history.
+   */
+  sessions: async (): Promise<SessionList> => {
     const res = await apiClient.get("/auth/sessions", {
-      params: refreshToken ? { refreshToken } : undefined,
+      params: { deviceId: await getDeviceId() },
     });
     return res.data.data as SessionList;
   },

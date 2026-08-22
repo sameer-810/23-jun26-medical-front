@@ -27,7 +27,13 @@ export interface OutstandingResult {
 }
 
 export const customerApi = {
-  list: async (params?: { search?: string; page?: number; limit?: number }) => {
+  list: async (params?: {
+    search?: string;
+    page?: number;
+    limit?: number;
+    /** "inactive" lists deactivated customers so they can be restored. */
+    status?: "active" | "inactive";
+  }) => {
     const res = await apiClient.get<Paginated<Customer>>("/customers", {
       params,
     });

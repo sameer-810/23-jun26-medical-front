@@ -6,7 +6,7 @@ import { Undo2, Ban } from "lucide-react-native";
 import { useReceipt } from "@modules/inventory/hooks/useInventory";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { apiErrorMessage } from "@api/apiClient";
-import { fmtMoneyExact } from "@shared/format";
+import { fmtMoneyExact, fmtDate, fmtDateTime } from "@shared/format";
 import { palette } from "@shared/designSystem";
 import {
   Screen,
@@ -18,6 +18,7 @@ import {
   Banner,
   StatusChip,
   Skeleton,
+  ErrorState,
   PromptDialog,
 } from "@shared/ui";
 
@@ -41,13 +42,12 @@ function Row({ label, value }: { label: string; value: string }) {
     </HStack>
   );
 }
-const d = (iso: string | null) =>
-  iso ? new Date(iso).toISOString().slice(0, 10) : "—";
+const d = fmtDate;
 
 export default function ReceiptDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { data: r, isLoading } = useReceipt(route.params?.id);
+  const { data: r, isLoading, isError, error } = useReceipt(route.params?.id);
   const qc = useQueryClient();
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidError, setVoidError] = useState<string | null>(null);
@@ -72,12 +72,28 @@ export default function ReceiptDetailScreen() {
     },
   });
 
+  if (isError) {
+    return (
+      <Screen back="Back to history" overline="Stock Inward" title="Receipt">
+        <ErrorState
+          error={error}
+          title="This receipt isn't available"
+          message="It may have been removed, or the link may be out of date. Open the receiving history to find it."
+          actionLabel="Go to history"
+          onAction={() =>
+            navigation.navigate("Receive", { screen: "Receipts" })
+          }
+        />
+      </Screen>
+    );
+  }
+
   return (
     <Screen
       back="Back to history"
       overline="Stock Inward"
       title={r?.receiptNo || "Receipt"}
-      subtitle={r ? new Date(r.receivedAt).toLocaleString() : ""}
+      subtitle={r ? fmtDateTime(r.receivedAt) : ""}
       right={
         r && !voided ? (
           <HStack gap={8}>

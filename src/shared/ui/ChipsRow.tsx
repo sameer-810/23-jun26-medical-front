@@ -36,6 +36,10 @@ export function ChipsRow({ chips, active, onChange }: Props) {
               // which one is currently applied is the whole point.
               accessibilityRole="radio"
               accessibilityState={{ selected: isActive, checked: isActive }}
+              // Native only — react-native-web drops hitSlop. The drawn chip is
+              // 30px, which clears the 24px minimum on web; this buys a phone
+              // thumb the extra margin without loosening the dense row.
+              hitSlop={{ top: 7, bottom: 7 }}
               style={({ pressed }) => [
                 styles.chip,
                 isActive && styles.chipActive,

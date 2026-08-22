@@ -40,6 +40,7 @@ import { useImageCapture, CapturedImage } from "@shared/useImageCapture";
 import { apiErrorMessage } from "@api/apiClient";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
+import { fmtMoneyExact, fmtDate } from "@shared/format";
 import { palette, radius, accents } from "@shared/designSystem";
 import {
   Screen,
@@ -60,14 +61,13 @@ import {
   ConfirmDialog,
 } from "@shared/ui";
 
-const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
-const fmtDate = (d: string) =>
-  new Date(d).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+// To the paisa: this register is read against the cheque in hand, and a
+// rounded ₹65 does not match an instrument written for ₹64.50.
+const money = fmtMoneyExact;
 
+/** "bounced" -> "Bounced", so a row reads like the filter chip above it. */
+const titleCase = (s: string) =>
+  s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 const STATUS_TONE: Record<
   ChequeStatus,
   "warning" | "success" | "danger" | "neutral"
@@ -77,6 +77,11 @@ const STATUS_TONE: Record<
   bounced: "danger",
   cancelled: "neutral",
 };
+
+// Statuses that still have somewhere to go. A bounced cheque is included
+// because re-presenting one is routine — it clears on the second run and the
+// register has to be able to say so; the API allows bounced -> cleared.
+const OPEN_STATUSES: ChequeStatus[] = ["pending", "bounced"];
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -101,6 +106,9 @@ export default function PdcScreen() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  // Cleared is terminal — the row loses its actions and its Delete. Ask first,
+  // the way deleting and receiving already do.
+  const [clearTarget, setClearTarget] = useState<Cheque | null>(null);
   const [viewPhoto, setViewPhoto] = useState<Cheque | null>(null);
   const invalidateCheques = useInvalidateCheques();
 
@@ -472,14 +480,14 @@ export default function PdcScreen() {
                         </Pressable>
                       ) : null}
                       <StatusChip
-                        label={c.status}
+                        label={titleCase(c.status)}
                         tone={STATUS_TONE[c.status]}
                       />
                     </HStack>
                   }
                 />
 
-                {canManage && c.status === "pending" ? (
+                {canManage && OPEN_STATUSES.includes(c.status) ? (
                   <HStack gap={8} wrap style={styles.actions}>
                     <Button
                       label="Cleared"
@@ -494,26 +502,26 @@ export default function PdcScreen() {
                         />
                       }
                       loading={statusMut.isPending}
-                      onPress={() =>
-                        statusMut.mutate({ id: c._id, status: "cleared" })
-                      }
+                      onPress={() => setClearTarget(c)}
                     />
-                    <Button
-                      label="Bounced"
-                      variant="secondary"
-                      size="xs"
-                      fullWidth={false}
-                      icon={
-                        <Ban
-                          size={14}
-                          color={palette.danger.text}
-                          strokeWidth={2.2}
-                        />
-                      }
-                      onPress={() =>
-                        statusMut.mutate({ id: c._id, status: "bounced" })
-                      }
-                    />
+                    {c.status === "pending" ? (
+                      <Button
+                        label="Bounced"
+                        variant="secondary"
+                        size="xs"
+                        fullWidth={false}
+                        icon={
+                          <Ban
+                            size={14}
+                            color={palette.danger.text}
+                            strokeWidth={2.2}
+                          />
+                        }
+                        onPress={() =>
+                          statusMut.mutate({ id: c._id, status: "bounced" })
+                        }
+                      />
+                    ) : null}
                     <Button
                       label="Cancel"
                       variant="ghost"
@@ -564,6 +572,26 @@ export default function PdcScreen() {
             });
         }}
         onCancel={() => setDeleteId(null)}
+      />
+
+      <ConfirmDialog
+        visible={clearTarget !== null}
+        title="Mark cheque cleared?"
+        message={
+          clearTarget
+            ? `${money(clearTarget.amount)} — ${clearTarget.partyName}, cheque ${clearTarget.chequeNo}. A cleared cheque cannot be changed back.`
+            : ""
+        }
+        confirmLabel="Mark cleared"
+        loading={statusMut.isPending}
+        onConfirm={() => {
+          if (clearTarget)
+            statusMut.mutate(
+              { id: clearTarget._id, status: "cleared" },
+              { onSuccess: () => setClearTarget(null) },
+            );
+        }}
+        onCancel={() => setClearTarget(null)}
       />
 
       <ChequePhotoViewer

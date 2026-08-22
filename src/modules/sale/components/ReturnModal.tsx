@@ -4,6 +4,7 @@ import { X } from "lucide-react-native";
 import { useCreateReturn } from "@modules/sale/hooks/useSales";
 import { Sale } from "@modules/sale/types";
 import { apiErrorMessage } from "@api/apiClient";
+import { fmtMoneyExact } from "@shared/format";
 import { palette, radius, shadows } from "@shared/designSystem";
 import {
   Text,
@@ -40,6 +41,24 @@ export function ReturnModal({ visible, sale, onClose }: Props) {
     (Number(qty[lineId]) || 0) > returnableOf(lineId);
   const anyOver = sale.lines.some((l) => overBy(l.id));
   const anyQty = sale.lines.some((l) => (Number(qty[l.id]) || 0) > 0);
+
+  /**
+   * What this return pays back, per line and in total.
+   *
+   * Money is about to leave the till, so the figure has to be on screen before
+   * the button is pressed. The server settles a COMPLETE return at the
+   * invoice's collected total (so the round-off comes back too); this preview
+   * says so rather than quietly differing by up to ₹0.50.
+   */
+  const refundOf = (l: (typeof sale.lines)[number]) => {
+    const q = Number(qty[l.id]) || 0;
+    if (!(q > 0) || !(l.baseQuantity > 0)) return 0;
+    return (q / l.baseQuantity) * (l.taxableAmount + l.taxAmount);
+  };
+  const refundTotal = sale.lines.reduce((s, l) => s + refundOf(l), 0);
+  const completesInvoice = sale.lines.every(
+    (l) => (Number(qty[l.id]) || 0) + l.returnedBaseQty >= l.baseQuantity,
+  );
 
   const submit = () => {
     const lines = sale.lines
@@ -94,6 +113,9 @@ export function ReturnModal({ visible, sale, onClose }: Props) {
                       </Text>
                       <Text variant="caption" tone="tertiary">
                         Sold {l.baseQuantity} · returnable {returnable}
+                        {refundOf(l) > 0
+                          ? ` · refund ${fmtMoneyExact(refundOf(l))}`
+                          : ""}
                       </Text>
                     </VStack>
                     <View style={{ width: 100 }}>
@@ -123,13 +145,41 @@ export function ReturnModal({ visible, sale, onClose }: Props) {
             />
           </View>
 
+          {anyQty && !anyOver ? (
+            <View style={refundBox}>
+              <HStack align="center" justify="space-between">
+                <Text variant="label" tone="primary">
+                  Refund to customer
+                </Text>
+                <Text variant="h3" tone="accent">
+                  {fmtMoneyExact(refundTotal)}
+                </Text>
+              </HStack>
+              {completesInvoice ? (
+                <Text
+                  variant="caption"
+                  tone="tertiary"
+                  style={{ marginTop: 4 }}
+                >
+                  Returns the whole invoice — settles at the{" "}
+                  {fmtMoneyExact(sale.grandTotal)} collected, including its
+                  round-off.
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
           {anyOver && (
             <Text variant="caption" tone="danger" style={{ marginTop: 10 }}>
               A return quantity is more than what was sold — fix the amber line.
             </Text>
           )}
           <Button
-            label="Process return"
+            label={
+              anyQty && !anyOver
+                ? `Process return · ${fmtMoneyExact(refundTotal)}`
+                : "Process return"
+            }
             style={{ marginTop: 16 }}
             loading={mut.isPending}
             disabled={!anyQty || anyOver || !finalReason}
@@ -174,4 +224,13 @@ const errBox = {
   borderWidth: 1,
   borderColor: palette.danger.border,
   marginBottom: 12,
+} as const;
+
+const refundBox = {
+  padding: 12,
+  borderRadius: radius.md,
+  backgroundColor: palette.surface.secondary,
+  borderWidth: 1,
+  borderColor: palette.border.subtle,
+  marginTop: 12,
 } as const;

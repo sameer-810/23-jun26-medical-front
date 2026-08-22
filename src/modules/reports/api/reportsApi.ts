@@ -10,6 +10,7 @@ import { useAuthStore } from "@shared/store/useAuthStore";
 export type ReportType =
   | "inventory"
   | "sales"
+  | "gst"
   | "expiry"
   | "batch"
   | "stock-movement"

@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { useProducts } from "@modules/product/hooks/useProducts";
 import { useProductInventory } from "@modules/inventory/hooks/useInventory";
 import { VStack, HStack, Select, Text } from "@shared/ui";
+import { fmtDate } from "@shared/format";
 
 export interface CellSelection {
   productId: string | null;
@@ -62,7 +63,7 @@ export function StockCellPicker({
   const batches = inv?.batches || [];
   const batchOptions = batches.map((b) => ({
     value: b.batchId,
-    label: `${b.batchNumber}${b.expiryDate ? ` · exp ${b.expiryDate.slice(0, 10)}` : ""} · ${b.onHand} ${baseUnit}`,
+    label: `${b.batchNumber}${b.expiryDate ? ` · exp ${fmtDate(b.expiryDate)}` : ""} · ${b.onHand} ${baseUnit}`,
   }));
   const selectedBatch = batches.find((b) => b.batchId === value.batchId);
   const locationOptions = (selectedBatch?.locations || []).map((l) => ({

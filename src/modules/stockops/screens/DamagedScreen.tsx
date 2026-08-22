@@ -28,6 +28,7 @@ import {
   reasonValue,
   WRITE_OFF_REASONS,
 } from "@shared/ui";
+import { fmtMoneyExact, fmtDate } from "@shared/format";
 
 const TYPES = [
   { key: "damaged", label: "Damaged" },
@@ -35,7 +36,7 @@ const TYPES = [
   { key: "expired", label: "Expired" },
   { key: "correction", label: "Correction" },
 ];
-const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+const money = fmtMoneyExact;
 const TYPE_TONE = {
   damaged: "danger",
   lost: "danger",
@@ -196,8 +197,7 @@ export default function DamagedScreen() {
                     {a.adjustmentNo} · {a.productName}
                   </Text>
                   <Text variant="caption" tone="tertiary">
-                    {a.batchNumber} @ {a.locationCode} ·{" "}
-                    {new Date(a.createdAt).toLocaleDateString()}
+                    {a.batchNumber} @ {a.locationCode} · {fmtDate(a.createdAt)}
                     {a.reason ? ` · ${a.reason}` : ""}
                   </Text>
                 </VStack>

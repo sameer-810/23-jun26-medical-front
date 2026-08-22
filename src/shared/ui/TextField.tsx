@@ -116,6 +116,11 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    // On web the underlying <input> carries an intrinsic `min-width: auto`,
+    // which is a floor of roughly 159px that `flex: 1` cannot shrink past. In a
+    // narrow column — PIN, currency code, a time field — the box then pushed
+    // wider than its container and the whole PAGE scrolled sideways on a phone.
+    minWidth: 0,
     fontSize: 14,
     color: palette.text.primary,
     paddingVertical: 8,

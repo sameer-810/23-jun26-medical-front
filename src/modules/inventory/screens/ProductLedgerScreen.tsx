@@ -17,6 +17,7 @@ import {
   Skeleton,
   useBreakpoint,
 } from "@shared/ui";
+import { fmtDate } from "@shared/format";
 
 export default function ProductLedgerScreen() {
   const route = useRoute<any>();
@@ -131,7 +132,7 @@ export default function ProductLedgerScreen() {
               <HStack gap={8} align="center" style={styles.row}>
                 <VStack gap={1} style={styles.cDate}>
                   <Text variant="caption" tone="secondary">
-                    {new Date(r.date).toLocaleDateString("en-IN")}
+                    {fmtDate(r.date)}
                   </Text>
                   {r.batchNumber ? (
                     <Text variant="caption" tone="tertiary" numberOfLines={1}>

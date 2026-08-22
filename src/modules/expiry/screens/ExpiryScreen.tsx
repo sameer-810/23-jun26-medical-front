@@ -4,7 +4,7 @@ import { ShieldCheck, MapPin } from "lucide-react-native";
 import { useExpiryReport } from "@modules/expiry/hooks/useExpiry";
 import { ExpiryBatch } from "@modules/expiry/api/expiryApi";
 import { palette, accents, numeric } from "@shared/designSystem";
-import { fmtInt, fmtMoney } from "@shared/format";
+import { fmtInt, fmtMoney, fmtDate } from "@shared/format";
 import {
   Screen,
   Text,
@@ -32,8 +32,8 @@ const batchTone = (b: ExpiryBatch) =>
 
 const batchStatusLabel = (b: ExpiryBatch) =>
   b.expired
-    ? `Expired ${b.expiryDate.slice(0, 10)}`
-    : `${b.daysToExpiry}d · ${b.expiryDate.slice(0, 10)}`;
+    ? `Expired ${fmtDate(b.expiryDate)}`
+    : `${b.daysToExpiry}d · ${fmtDate(b.expiryDate)}`;
 
 export default function ExpiryScreen() {
   const { data, isLoading, isError, error, refetch, isRefetching } =
@@ -172,7 +172,7 @@ function Section({ title, items }: { title: string; items: ExpiryBatch[] }) {
       sortValue: (b) => b.expiryDate,
       render: (b) => (
         <Text variant="body-sm" tone="tertiary">
-          {b.expiryDate.slice(0, 10)}
+          {fmtDate(b.expiryDate)}
         </Text>
       ),
     },

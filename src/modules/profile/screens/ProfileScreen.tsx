@@ -34,6 +34,7 @@ import {
   StatusChip,
   ErrorState,
 } from "@shared/ui";
+import { fmtDateTime } from "@shared/format";
 
 export default function ProfileScreen() {
   const user = useAuthStore((s) => s.user);
@@ -288,7 +289,7 @@ export default function ProfileScreen() {
                   {s.current && <StatusChip label="This device" tone="info" />}
                 </HStack>
                 <Text variant="caption" tone="tertiary" numberOfLines={1}>
-                  {[s.ip, new Date(s.lastSeenAt).toLocaleString()]
+                  {[s.ip, fmtDateTime(s.lastSeenAt)]
                     .filter(Boolean)
                     .join("  ·  ")}
                 </Text>

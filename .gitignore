@@ -8,6 +8,8 @@ npm-debug.*
 
 # local env files
 .env
+.env.*
+!.env.example
 .env.local
 .env*.local
 .env.*.local
@@ -27,3 +29,18 @@ credentials/
 *.keystore
 *.jks
 keystore.properties
+
+# QA and exploratory browser tests. Scratch work driven against a throwaway
+# database: the scripts hardcode local ports, the *-state/*-auth files CACHE
+# ACCESS TOKENS, and the shot folders run to tens of megabytes of PNGs. None of
+# it ships. The durable tools here (verify*, shoot*, auditModules, demoCreds)
+# are tracked as before.
+tools/qa-*
+tools/qb-*
+tools/qp-*
+tools/qr-*
+tools/qv-*
+tools/qaProbe.mjs
+tools/*-shots/
+tools/*-state.json
+tools/*-auth.json

@@ -16,6 +16,7 @@ import {
   SearchInput,
   EmptyState,
 } from "@shared/ui";
+import { fmtDate } from "@shared/format";
 
 const EXP_FILTERS = [
   { key: "0", label: "Any expiry" },
@@ -164,7 +165,7 @@ function BatchResult({ batch }: { batch: SearchBatchResult }) {
           <StatusChip
             label={
               batch.expiryDate
-                ? `exp ${batch.expiryDate.slice(0, 10)}`
+                ? `exp ${fmtDate(batch.expiryDate)}`
                 : "no expiry"
             }
             tone={expiryTone(batch.expiryDate)}

@@ -18,6 +18,8 @@ export interface MessageResponse {
 export interface LoginPayload {
   email: string;
   password: string;
+  /** Ends the user's other sessions so this device can take a slot. */
+  signOutOthers?: boolean;
 }
 
 export interface SignupPayload {

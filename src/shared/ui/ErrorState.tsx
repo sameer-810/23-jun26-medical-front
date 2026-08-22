@@ -24,6 +24,12 @@ interface Props {
   onRetry?: () => void;
   /** The query's `isFetching`, so Retry shows it is working. */
   retrying?: boolean;
+  /**
+   * A way forward when retrying is pointless — a 404 will 404 again. Shown
+   * instead of Retry, so the banner never offers a button that cannot work.
+   */
+  actionLabel?: string;
+  onAction?: () => void;
   style?: object;
 }
 
@@ -37,6 +43,8 @@ export function ErrorState({
   message,
   onRetry,
   retrying,
+  actionLabel,
+  onAction,
   style,
 }: Props) {
   return (
@@ -46,7 +54,16 @@ export function ErrorState({
       message={message ?? apiErrorMessage(error, FALLBACK)}
       style={style}
     >
-      {onRetry ? (
+      {onAction && actionLabel ? (
+        <Button
+          label={actionLabel}
+          variant="secondary"
+          size="xs"
+          fullWidth={false}
+          onPress={onAction}
+          style={{ marginTop: 8, alignSelf: "flex-start" }}
+        />
+      ) : onRetry ? (
         <Button
           label="Retry"
           variant="secondary"

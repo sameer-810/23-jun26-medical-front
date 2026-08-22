@@ -20,10 +20,21 @@ export function BackLink({ label = "Back", onPress }: Props) {
   return (
     <Pressable
       onPress={onPress}
-      hitSlop={6}
+      hitSlop={{ top: 13, bottom: 13, left: 12, right: 12 }}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={{ marginBottom: 16, alignSelf: "flex-start" }}
+      /**
+       * Real padding, cancelled by negative margin — the link still sits flush
+       * where it was, but the box you can hit is 34px instead of 18. `hitSlop`
+       * alone was not enough: react-native-web drops it, so on the counter PC
+       * and the Electron build the target stayed the height of the text.
+       */
+      style={{
+        alignSelf: "flex-start",
+        paddingVertical: 8,
+        paddingRight: 8,
+        marginBottom: 8,
+      }}
     >
       <HStack gap={6} align="center">
         <ArrowLeft size={18} color={palette.text.link} strokeWidth={2} />

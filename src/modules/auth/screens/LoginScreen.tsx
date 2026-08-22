@@ -22,6 +22,11 @@ export default function LoginScreen({ navigation }: { navigation: Nav }) {
   const isPending = errCode === "WORKSPACE_PENDING_APPROVAL";
   const isRejected = errCode === "WORKSPACE_REJECTED";
   const needsUs = isPending || isRejected;
+  /**
+   * The device cap is the one refusal the user can clear themselves, but only
+   * from here — the profile it used to point at is behind this very login.
+   */
+  const atDeviceLimit = errCode === "DEVICE_LIMIT_REACHED";
   // onTouched: validate a field once it's blurred, then keep it live — the same
   // "don't scold mid-type" UX, now via the maintained standard library.
   const { control, handleSubmit } = useForm({
@@ -33,6 +38,14 @@ export default function LoginScreen({ navigation }: { navigation: Nav }) {
   const submit = handleSubmit((data) =>
     mut.mutate({ email: data.email.trim(), password: data.password }),
   );
+  // Re-submits the same credentials, releasing the other sessions first.
+  const submitSigningOutOthers = handleSubmit((data) =>
+    mut.mutate({
+      email: data.email.trim(),
+      password: data.password,
+      signOutOthers: true,
+    }),
+  );
 
   return (
     <AuthLayout
@@ -41,7 +54,25 @@ export default function LoginScreen({ navigation }: { navigation: Nav }) {
     >
       <VStack gap={16}>
         {/* Workspace-state errors get the amber notice, not the red error panel. */}
-        {mut.isError && needsUs ? (
+        {mut.isError && atDeviceLimit ? (
+          <View style={pendingBox}>
+            <VStack gap={8}>
+              <Text variant="label" tone="primary">
+                Signed in on too many devices
+              </Text>
+              <Text variant="body-sm" tone="secondary">
+                {apiErrorMessage(mut.error)}
+              </Text>
+              <Button
+                label="Sign out everywhere and continue here"
+                variant="secondary"
+                size="sm"
+                loading={mut.isPending}
+                onPress={submitSigningOutOthers}
+              />
+            </VStack>
+          </View>
+        ) : mut.isError && needsUs ? (
           <View style={pendingBox}>
             <VStack gap={4}>
               <Text variant="label" tone="primary">

@@ -159,7 +159,11 @@ export default function OrderFormScreen() {
   };
 
   return (
-    <Screen back="Back to orders" overline="eOrders" title="New purchase order">
+    <Screen
+      back="Back to orders"
+      overline="Purchasing"
+      title="New purchase order"
+    >
       {serverError ? (
         <Banner
           tone="danger"

@@ -57,6 +57,19 @@ const asDate = (v: DateInput): Date | null => {
 export const fmtDate = (v: DateInput) => {
   const d = asDate(v);
   if (!d) return "—";
+  /**
+   * A value stored at exactly UTC midnight is a DATE ONLY — an expiry, a
+   * manufacturing date — carrying no meaningful time. Reinterpreting it in
+   * another zone can shift it a day, and an expiry printed a day out is a
+   * dispensing-safety problem, so it is rendered as the day it was stored.
+   * Everything else is a real instant (a sale rung at 00:01 IST belongs to
+   * today) and is resolved in IST.
+   */
+  const iso = d.toISOString();
+  if (iso.endsWith("T00:00:00.000Z")) {
+    const [y, m, day] = iso.slice(0, 10).split("-");
+    return `${day}-${m}-${y}`;
+  }
   // en-GB is DD/MM/YYYY in every ICU build; the separator is ours.
   return d
     .toLocaleDateString("en-GB", {

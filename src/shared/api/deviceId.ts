@@ -47,7 +47,46 @@ export async function getDeviceId(): Promise<string> {
   return id;
 }
 
-/** Coarse device label (platform) shown in future session lists. */
+/**
+ * The label shown in "Devices you're signed in on".
+ *
+ * `Platform.OS` alone produced "web" for the counter PC, the tablet and the
+ * owner's laptop alike, so the one list that exists to tell devices apart told
+ * you nothing. On web the browser and OS are read off the user-agent; a
+ * pharmacy runs a counter desktop and a couple of phones, and "Windows ·
+ * Chrome" against "Android" is enough to know which slot to free.
+ */
 export function getDeviceName(): string {
-  return Platform.OS;
+  if (Platform.OS !== "web") {
+    return Platform.OS === "ios" ? "iPhone / iPad" : "Android device";
+  }
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
+  if (!ua) return "Browser";
+
+  // Order matters: Edge and Opera both claim Chrome, Chrome claims Safari.
+  const browser = /Edg\//.test(ua)
+    ? "Edge"
+    : /OPR\/|Opera/.test(ua)
+      ? "Opera"
+      : /Firefox\//.test(ua)
+        ? "Firefox"
+        : /Chrome\//.test(ua)
+          ? "Chrome"
+          : /Safari\//.test(ua)
+            ? "Safari"
+            : "Browser";
+
+  const os = /Windows/.test(ua)
+    ? "Windows"
+    : /Mac OS X/.test(ua)
+      ? "Mac"
+      : /Android/.test(ua)
+        ? "Android"
+        : /iPhone|iPad|iPod/.test(ua)
+          ? "iOS"
+          : /Linux/.test(ua)
+            ? "Linux"
+            : "";
+
+  return os ? `${os} · ${browser}` : browser;
 }

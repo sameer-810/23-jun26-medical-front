@@ -34,6 +34,14 @@ export function PermissionEditor({ available, selected, onToggle }: Props) {
                 <Pressable
                   key={key}
                   onPress={() => onToggle(key)}
+                  // The tick is drawn, not a real <input>, so on web the row
+                  // read as an unlabelled clickable div: a screen reader
+                  // announced the permission name with no on/off state, and
+                  // nothing said it could be toggled.
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: on }}
+                  accessibilityLabel={meta?.label || key}
+                  accessibilityHint={meta?.description}
                   style={[styles.row, on && styles.rowOn]}
                 >
                   <HStack gap={12} align="center" flex={1}>

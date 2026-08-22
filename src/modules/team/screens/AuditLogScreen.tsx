@@ -17,6 +17,7 @@ import {
   Skeleton,
   ErrorState,
 } from "@shared/ui";
+import { fmtDateTime } from "@shared/format";
 
 const ACTION_TONE = (
   action: string,
@@ -221,7 +222,4 @@ function LogRow({ log }: { log: ActivityLog }) {
   );
 }
 
-function formatWhen(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleString();
-}
+const formatWhen = fmtDateTime;

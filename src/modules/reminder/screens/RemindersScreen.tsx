@@ -32,6 +32,7 @@ import {
   ChipsRow,
   StatusChip,
   EmptyState,
+  ConfirmDialog,
 } from "@shared/ui";
 
 const PRIORITIES = [
@@ -75,6 +76,9 @@ export default function RemindersScreen() {
   const createMut = useCreateReminder();
   const updateMut = useUpdateReminder();
   const removeMut = useRemoveReminder();
+  // A reminder is deleted for good and the row sits beside "Done". Ask, the
+  // way every other destructive row in the app does.
+  const [deleteTarget, setDeleteTarget] = useState<Reminder | null>(null);
 
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
@@ -355,7 +359,7 @@ export default function RemindersScreen() {
                       variant="ghost"
                       size="sm"
                       fullWidth={false}
-                      onPress={() => removeMut.mutate(r.id)}
+                      onPress={() => setDeleteTarget(r)}
                       icon={
                         <Trash2
                           size={15}
@@ -371,6 +375,22 @@ export default function RemindersScreen() {
           })}
         </VStack>
       )}
+
+      <ConfirmDialog
+        visible={deleteTarget !== null}
+        title="Delete reminder?"
+        message={deleteTarget ? `"${deleteTarget.title}" will be removed.` : ""}
+        confirmLabel="Delete"
+        destructive
+        loading={removeMut.isPending}
+        onConfirm={() => {
+          if (deleteTarget)
+            removeMut.mutate(deleteTarget.id, {
+              onSuccess: () => setDeleteTarget(null),
+            });
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </Screen>
   );
 }

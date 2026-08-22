@@ -5,15 +5,14 @@ import { useAuthStore } from "@shared/store/useAuthStore";
 /**
  * The devices this account is signed in on.
  *
- * The caller's own refresh token goes along so the server can flag which row is
+ * The caller's own device id goes along so the server can flag which row is
  * "this device" — without it, someone freeing a slot can't tell which session
  * they're about to end.
  */
 export function useSessions() {
-  const refreshToken = useAuthStore((s) => s.refreshToken);
   return useQuery({
     queryKey: ["auth", "sessions"],
-    queryFn: () => authApi.sessions(refreshToken),
+    queryFn: () => authApi.sessions(),
   });
 }
 

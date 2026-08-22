@@ -1,11 +1,14 @@
 import React, { useState } from "react";
 import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Plus, Users } from "lucide-react-native";
+import { Plus, Users, RotateCcw } from "lucide-react-native";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCustomers } from "@modules/customer/hooks/useCustomers";
+import { customerApi } from "@modules/customer/api/customerApi";
 import { Customer } from "@modules/customer/types";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
+import { palette } from "@shared/designSystem";
 import {
   Screen,
   Text,
@@ -15,6 +18,8 @@ import {
   Button,
   ListRow,
   SearchInput,
+  ChipsRow,
+  ConfirmDialog,
   Pagination,
   DataTable,
   Column,
@@ -31,9 +36,15 @@ export default function CustomersScreen() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
+  /**
+   * Deactivating soft-deletes, so a deactivated customer is invisible to every
+   * other query. This is the only way back to one — without it the deactivate
+   * dialog's "you can reactivate later" cannot be honoured from the app.
+   */
+  const [status, setStatus] = useState<"active" | "inactive">("active");
 
   // Filter change → back to page 1 (adjusted during render, not in an effect).
-  const filterKey = `${search}|${limit}`;
+  const filterKey = `${search}|${limit}|${status}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
@@ -45,6 +56,7 @@ export default function CustomersScreen() {
       ...(search.trim() ? { search: search.trim() } : {}),
       page,
       limit,
+      status,
     });
   const customers = data?.data ?? [];
   const total = data?.meta?.total ?? 0;
@@ -52,8 +64,24 @@ export default function CustomersScreen() {
 
   if (!isLoading && totalPages > 0 && page > totalPages) setPage(totalPages);
 
-  const open = (c: Customer) =>
+  const qc = useQueryClient();
+  const restoreMut = useMutation({
+    mutationFn: (id: string) => customerApi.restore(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["customers"] }),
+  });
+  const [restoreTarget, setRestoreTarget] = useState<Customer | null>(null);
+
+  /**
+   * A deactivated customer cannot be opened — the detail route 404s for a
+   * soft-deleted record — so here the row offers the one action that applies.
+   */
+  const open = (c: Customer) => {
+    if (status === "inactive") {
+      setRestoreTarget(c);
+      return;
+    }
     navigation.navigate("CustomerDetail", { id: c.id });
+  };
 
   const columns: Column<Customer>[] = [
     {
@@ -96,6 +124,27 @@ export default function CustomersScreen() {
     },
   ];
 
+  if (status === "inactive" && canWrite) {
+    columns.push({
+      key: "restore",
+      header: "",
+      width: 120,
+      align: "right",
+      render: (c) => (
+        <Button
+          label="Reactivate"
+          variant="secondary"
+          size="xs"
+          fullWidth={false}
+          icon={
+            <RotateCcw size={14} color={palette.text.primary} strokeWidth={2} />
+          }
+          onPress={() => setRestoreTarget(c)}
+        />
+      ),
+    });
+  }
+
   return (
     <Screen
       overline="Partners"
@@ -122,6 +171,17 @@ export default function CustomersScreen() {
         placeholder="Search by name or mobile"
       />
 
+      <View style={{ marginTop: 10 }}>
+        <ChipsRow
+          chips={[
+            { key: "active", label: "Active" },
+            { key: "inactive", label: "Deactivated" },
+          ]}
+          active={status}
+          onChange={(k: string) => setStatus(k as "active" | "inactive")}
+        />
+      </View>
+
       {isError ? (
         <ErrorState
           error={error}
@@ -140,7 +200,13 @@ export default function CustomersScreen() {
             keyExtractor={(c) => c.id}
             onRowPress={open}
             mobileCard={(c) => (
-              <CustomerRow customer={c} onPress={() => open(c)} />
+              <CustomerRow
+                customer={c}
+                onPress={() => open(c)}
+                action={
+                  status === "inactive" && canWrite ? "Reactivate" : undefined
+                }
+              />
             )}
             emptyIcon={Users}
             emptyTitle="No customers yet"
@@ -161,6 +227,21 @@ export default function CustomersScreen() {
           ) : null}
         </View>
       )}
+
+      <ConfirmDialog
+        visible={Boolean(restoreTarget)}
+        title="Reactivate customer?"
+        message={`${restoreTarget?.name || "This customer"} will appear in lists and can be billed again. Their history is unchanged.`}
+        confirmLabel="Reactivate"
+        loading={restoreMut.isPending}
+        onConfirm={() =>
+          restoreTarget &&
+          restoreMut.mutate(restoreTarget.id, {
+            onSettled: () => setRestoreTarget(null),
+          })
+        }
+        onCancel={() => setRestoreTarget(null)}
+      />
     </Screen>
   );
 }
@@ -185,9 +266,11 @@ function ListSkeleton() {
 function CustomerRow({
   customer,
   onPress,
+  action,
 }: {
   customer: Customer;
   onPress: () => void;
+  action?: string;
 }) {
   // The GSTIN was a chip of its own; it is an identifier, not a status, so it
   // belongs on the identifier line beside the mobile number.
@@ -198,6 +281,17 @@ function CustomerRow({
         .filter(Boolean)
         .join(" · ")}
       onPress={onPress}
+      right={
+        action ? (
+          <Button
+            label={action}
+            variant="secondary"
+            size="xs"
+            fullWidth={false}
+            onPress={onPress}
+          />
+        ) : undefined
+      }
     />
   );
 }

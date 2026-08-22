@@ -12,7 +12,7 @@ import { ReceiptListItem } from "@modules/inventory/types";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { downloadBlob } from "@shared/download";
 import { apiErrorMessage } from "@api/apiClient";
-import { fmtDate } from "@shared/format";
+import { fmtDate, fmtMoneyExact } from "@shared/format";
 import { palette } from "@shared/designSystem";
 import {
   Screen,
@@ -31,7 +31,7 @@ import {
   ErrorState,
 } from "@shared/ui";
 
-const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+const money = fmtMoneyExact;
 
 export default function ReceiptsScreen() {
   const navigation = useNavigation<any>();
@@ -129,7 +129,7 @@ export default function ReceiptsScreen() {
       sortValue: (r) => r.receivedAt,
       render: (r) => (
         <Text variant="body-sm" tone="tertiary">
-          {new Date(r.receivedAt).toLocaleDateString("en-IN")}
+          {fmtDate(r.receivedAt)}
         </Text>
       ),
     },

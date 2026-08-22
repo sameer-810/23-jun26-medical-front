@@ -19,8 +19,9 @@ import {
   Column,
   Skeleton,
 } from "@shared/ui";
+import { fmtMoneyExact } from "@shared/format";
 
-const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+const money = fmtMoneyExact;
 const STATUS_TONE: Record<PoStatus, "neutral" | "info" | "success" | "danger"> =
   {
     draft: "neutral",
@@ -132,7 +133,7 @@ export default function OrdersScreen() {
 
   return (
     <Screen
-      overline="eOrders"
+      overline="Purchasing"
       title="Purchase orders"
       right={
         <Button
@@ -178,7 +179,16 @@ export default function OrdersScreen() {
             onRowPress={open}
             mobileCard={(o) => <OrderRow order={o} onPress={() => open(o)} />}
             emptyIcon={ShoppingBag}
-            emptyTitle="No orders yet"
+            emptyTitle={
+              filter === "all"
+                ? "No orders yet"
+                : `No ${FILTERS.find((f) => f.key === filter)?.label.toLowerCase() ?? filter} orders`
+            }
+            emptyMessage={
+              filter === "all"
+                ? undefined
+                : "Orders in other states are still here — switch the filter above."
+            }
           />
           {orders.length > 0 && meta ? (
             <View style={{ marginTop: 16 }}>

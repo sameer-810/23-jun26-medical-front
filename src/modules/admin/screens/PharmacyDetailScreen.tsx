@@ -37,6 +37,7 @@ import {
   PromptDialog,
   Skeleton,
 } from "@shared/ui";
+import { fmtDate, fmtDateTime } from "@shared/format";
 
 export default function PharmacyDetailScreen() {
   const navigation = useNavigation<any>();
@@ -106,8 +107,7 @@ export default function PharmacyDetailScreen() {
                       {org.name}
                     </Text>
                     <Text variant="body-sm" tone="tertiary">
-                      {org.industry} · since{" "}
-                      {new Date(org.createdAt).toLocaleDateString("en-IN")}
+                      {org.industry} · since {fmtDate(org.createdAt)}
                     </Text>
                   </VStack>
                 </HStack>
@@ -256,11 +256,7 @@ export default function PharmacyDetailScreen() {
                       </Text>
                     </Text>
                     <Text variant="caption" tone="tertiary" numberOfLines={1}>
-                      {[
-                        s.deviceName,
-                        s.ip,
-                        new Date(s.lastSeenAt).toLocaleString(),
-                      ]
+                      {[s.deviceName, s.ip, fmtDateTime(s.lastSeenAt)]
                         .filter(Boolean)
                         .join("  ·  ")}
                     </Text>
@@ -389,9 +385,7 @@ export default function PharmacyDetailScreen() {
                     <Text variant="body-sm" tone="secondary">
                       Registered{" "}
                       {org.approvalRequestedAt
-                        ? new Date(org.approvalRequestedAt).toLocaleDateString(
-                            "en-IN",
-                          )
+                        ? fmtDate(org.approvalRequestedAt)
                         : "recently"}
                       . They cannot sign in until this is approved.
                     </Text>
