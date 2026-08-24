@@ -22,14 +22,37 @@ import {
 } from "@expo-google-fonts/inter";
 
 import RootNavigator from "@navigation/RootNavigator";
+import { navigationRef } from "@navigation/navigationRef";
 import { palette } from "@shared/designSystem";
+import { startOfflineEngine } from "@shared/offline/outboxEngine";
 
 /** Browser tab and desktop window title before a screen names itself. */
 const APP_TITLE = "Plusveda — Inventory & Sales";
 
+/**
+ * `networkMode: "always"` on both halves, because this app owns its own
+ * connectivity model and React Query's default fights it.
+ *
+ * The default ("online") gates on `navigator.onLine`. A paused MUTATION never
+ * calls its `mutationFn` at all — so `useCreateSale` never reached the outbox,
+ * no bill was captured, and the counter got a spinner that span forever on the
+ * exact stroke offline billing exists for. Queries are the same story one step
+ * down: a paused query never runs `queryFn`, so `withLocalFallback` never gets
+ * to answer from the local mirror.
+ *
+ * `useOfflineStore` decides what "offline" means here — inferred from real
+ * traffic and a /health probe — and the outbox decides what to do about it.
+ * Both are strictly better informed than a browser flag that only knows
+ * whether an interface is up.
+ */
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: false, refetchOnWindowFocus: false },
+    queries: {
+      retry: false,
+      refetchOnWindowFocus: false,
+      networkMode: "always",
+    },
+    mutations: { networkMode: "always" },
   },
 });
 
@@ -135,7 +158,12 @@ const linking = {
           },
           Sales: {
             path: "sales",
-            screens: { SalesList: "", NewSale: "new", SaleDetail: ":id" },
+            screens: {
+              SalesList: "",
+              NewSale: "new",
+              OfflineSync: "offline",
+              SaleDetail: ":id",
+            },
           },
           Customers: {
             path: "customers",
@@ -174,7 +202,23 @@ export default function App() {
   useEffect(() => {
     if (Platform.OS === "web" && typeof document !== "undefined") {
       document.title = APP_TITLE;
+      /**
+       * Offline app shell — a refresh with no network must still load the
+       * till. The Electron build serves from disk and skips this naturally.
+       *
+       * Gated on `isSecureContext`, not on the protocol string: browsers also
+       * allow service workers on http://localhost, and a `=== "https:"` test
+       * excluded exactly that — so the offline shell could never be verified
+       * on a local build, which is why nothing caught that it wasn't
+       * registering. `isSecureContext` is the condition the browser itself
+       * applies, so this asks the real question.
+       */
+      if ("serviceWorker" in navigator && window.isSecureContext) {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      }
     }
+    // Outbox drain + connectivity judgement + invoice-series registration.
+    startOfflineEngine(queryClient);
   }, []);
 
   if (!fontsLoaded) {
@@ -189,6 +233,7 @@ export default function App() {
         <SafeAreaProvider>
           <StatusBar style="dark" />
           <NavigationContainer
+            ref={navigationRef}
             linking={linking as never}
             /**
              * Without this, the container overwrites the title set above with

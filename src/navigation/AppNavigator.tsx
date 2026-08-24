@@ -31,6 +31,7 @@ import { Text, HStack } from "@shared/ui";
 import { Sidebar } from "./Sidebar";
 import { CommandPalette } from "./CommandPalette";
 import { PhoneTabBar, useHasPhoneTabs } from "./PhoneTabBar";
+import { OfflineBanner } from "@shared/offline/OfflineBanner";
 import { NAV_ITEMS, useVisibleNavItems } from "./navItems";
 
 import DashboardScreen from "@modules/dashboard/screens/DashboardScreen";
@@ -130,6 +131,7 @@ export default function AppNavigator() {
 
   return (
     <View style={{ flex: 1 }}>
+      <OfflineBanner />
       <Drawer.Navigator
         initialRouteName="Dashboard"
         drawerContent={drawerContent}

@@ -1,5 +1,10 @@
 import { apiClient } from "@api/apiClient";
 import {
+  withLocalFallback,
+  localScan,
+  localProductInventory,
+} from "@shared/offline/offlineFallbacks";
+import {
   StockSummaryItem,
   StockValue,
   ProductInventory,
@@ -34,13 +39,19 @@ export const inventoryApi = {
     );
     return res.data.data;
   },
-  productInventory: async (productId: string) => {
-    const res = await apiClient.get<{
-      success: boolean;
-      data: ProductInventory;
-    }>(`/inventory/products/${productId}`);
-    return res.data.data;
-  },
+  productInventory: async (productId: string) =>
+    // Offline: availability computed from the mirrored stock rows — the sale
+    // screen's stock warnings keep working during an outage.
+    withLocalFallback(
+      async () => {
+        const res = await apiClient.get<{
+          success: boolean;
+          data: ProductInventory;
+        }>(`/inventory/products/${productId}`);
+        return res.data.data;
+      },
+      () => localProductInventory(productId) as unknown as ProductInventory,
+    ),
   search: async (params: { q?: string; expiringInDays?: number }) => {
     const res = await apiClient.get<{ success: boolean; data: SearchResult }>(
       "/inventory/search",
@@ -51,12 +62,18 @@ export const inventoryApi = {
     return res.data.data;
   },
   /** Resolve a scanned shelf-label or product barcode to a sellable lot. */
-  scan: async (code: string): Promise<ScanResult> => {
-    const res = await apiClient.get<{ success: boolean; data: ScanResult }>(
-      `/inventory/scan/${encodeURIComponent(code)}`,
-    );
-    return res.data.data;
-  },
+  scan: async (code: string): Promise<ScanResult> =>
+    // Offline: label codes, batch numbers and product barcodes resolve
+    // against the mirror, so scanning at the counter survives an outage.
+    withLocalFallback(
+      async () => {
+        const res = await apiClient.get<{ success: boolean; data: ScanResult }>(
+          `/inventory/scan/${encodeURIComponent(code)}`,
+        );
+        return res.data.data;
+      },
+      () => localScan(code) as unknown as ScanResult,
+    ),
 
   receive: async (payload: ReceivePayload) => {
     const res = await apiClient.post<{ success: boolean; data: ReceiptDetail }>(

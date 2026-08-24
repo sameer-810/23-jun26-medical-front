@@ -1,6 +1,7 @@
 import axios, { InternalAxiosRequestConfig } from "axios";
 import { environment } from "@config/env";
 import { useAuthStore } from "../store/useAuthStore";
+import { useOfflineStore } from "../offline/useOfflineStore";
 
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
@@ -18,8 +19,19 @@ apiClient.interceptors.request.use((config) => {
 });
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Every completed round-trip is proof of reachability — the cheapest
+    // connectivity detector there is, and it can never disagree with reality.
+    useOfflineStore.getState().setOnline(true);
+    return response;
+  },
   async (error) => {
+    // An HTTP error still travelled the wire; only a missing response means
+    // the network itself is gone.
+    if (error.response) useOfflineStore.getState().setOnline(true);
+    else if (axios.isAxiosError(error))
+      useOfflineStore.getState().setOnline(false);
+
     const originalRequest = error.config as CustomAxiosRequestConfig;
     if (!originalRequest) return Promise.reject(error);
 
@@ -35,16 +47,18 @@ apiClient.interceptors.response.use(
 
     if (error.response?.status === 401) {
       originalRequest._retry = true;
-      try {
-        const newToken = await useAuthStore.getState().refreshSession();
-        if (newToken) {
-          originalRequest.headers.Authorization = "Bearer " + newToken;
-          return apiClient(originalRequest);
-        }
-        await useAuthStore.getState().logout();
-      } catch (refreshError) {
-        await useAuthStore.getState().logout();
-        return Promise.reject(refreshError);
+      /**
+       * refreshSession is the sole judge of whether this session dies: it
+       * logs out only when the server actually rejects the refresh token
+       * (401/403). A null here can also mean the network was unreachable —
+       * logging out on that turned every power cut into a lockout the
+       * pharmacist couldn't recover from, because logging back in needs the
+       * very server that just went away.
+       */
+      const newToken = await useAuthStore.getState().refreshSession();
+      if (newToken) {
+        originalRequest.headers.Authorization = "Bearer " + newToken;
+        return apiClient(originalRequest);
       }
     }
     return Promise.reject(error);

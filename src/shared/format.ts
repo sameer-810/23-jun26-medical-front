@@ -94,3 +94,37 @@ export const fmtDateTime = (v: DateInput) => {
   });
   return `${fmtDate(d)} ${time}`;
 };
+
+/**
+ * The calendar day a value falls on, in the business zone, as "YYYY-MM-DD".
+ *
+ * Same split as `fmtDate`: a UTC-midnight value is a stored DATE and is read
+ * back as written; anything else is an instant resolved in IST. Sortable and
+ * comparable as a plain string.
+ */
+export const businessYmd = (v: DateInput): string | null => {
+  const d = asDate(v);
+  if (!d) return null;
+  const iso = d.toISOString();
+  if (iso.endsWith("T00:00:00.000Z")) return iso.slice(0, 10);
+  // en-CA is YYYY-MM-DD in every ICU build.
+  return d.toLocaleDateString("en-CA", { timeZone: IST });
+};
+
+/** Today, in the business zone. */
+export const todayYmd = () => businessYmd(new Date()) as string;
+
+/**
+ * Is this lot past its expiry date?
+ *
+ * Stock is sellable THROUGH its expiry date — the server's cutoff is the start
+ * of today's business day, not the current instant. Comparing against `now`
+ * instead (which the offline fallback used to do) makes a lot expiring TODAY
+ * sellable online and refused offline: the till disagrees with itself on the
+ * one day a pharmacist is most likely to be clearing that lot. A lot with no
+ * expiry never expires.
+ */
+export const isExpiredLot = (expiry: DateInput): boolean => {
+  const day = businessYmd(expiry);
+  return day != null && day < todayYmd();
+};

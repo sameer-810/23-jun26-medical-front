@@ -3,11 +3,13 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import NewSaleScreen from "@modules/sale/screens/NewSaleScreen";
 import SalesListScreen from "@modules/sale/screens/SalesListScreen";
 import SaleDetailScreen from "@modules/sale/screens/SaleDetailScreen";
+import OfflineSyncScreen from "@modules/sale/screens/OfflineSyncScreen";
 
 export type SaleStackParamList = {
   NewSale: undefined;
   SalesList: undefined;
   SaleDetail: { id: string };
+  OfflineSync: undefined;
 };
 
 const Stack = createNativeStackNavigator<SaleStackParamList>();
@@ -26,6 +28,7 @@ export default function SalesNavigator() {
       <Stack.Screen name="NewSale" component={NewSaleScreen} />
       <Stack.Screen name="SalesList" component={SalesListScreen} />
       <Stack.Screen name="SaleDetail" component={SaleDetailScreen} />
+      <Stack.Screen name="OfflineSync" component={OfflineSyncScreen} />
     </Stack.Navigator>
   );
 }

@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiClient } from "@api/apiClient";
 import {
   Sale,
@@ -42,10 +43,41 @@ export const saleApi = {
     );
     return res.data.data;
   },
+  /**
+   * Last-good-value cached: the profile carries `priceIncludesTax` (changes
+   * the till's tax maths) and the company header every printed invoice needs,
+   * so an outage must not blank either.
+   */
   invoiceProfile: async () => {
-    const res = await apiClient.get<{ success: boolean; data: InvoiceProfile }>(
-      "/settings/invoice-profile",
-    );
-    return res.data.data;
+    try {
+      const res = await apiClient.get<{
+        success: boolean;
+        data: InvoiceProfile;
+      }>("/settings/invoice-profile");
+      AsyncStorage.setItem(
+        PROFILE_CACHE_KEY,
+        JSON.stringify(res.data.data),
+      ).catch(() => {});
+      return res.data.data;
+    } catch (err) {
+      const cached = await getCachedInvoiceProfile();
+      if (cached) return cached;
+      throw err;
+    }
   },
 };
+
+const PROFILE_CACHE_KEY = "medstock-invoice-profile";
+
+/** The last profile a successful fetch stored, or null. */
+export async function getCachedInvoiceProfile(): Promise<InvoiceProfile | null> {
+  const cached = await AsyncStorage.getItem(PROFILE_CACHE_KEY).catch(
+    () => null,
+  );
+  if (!cached) return null;
+  try {
+    return JSON.parse(cached) as InvoiceProfile;
+  } catch {
+    return null;
+  }
+}

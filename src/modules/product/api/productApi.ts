@@ -7,6 +7,10 @@ import {
   Brand,
   Paginated,
 } from "@modules/product/types";
+import {
+  withLocalFallback,
+  localProductList,
+} from "@shared/offline/offlineFallbacks";
 
 export const productApi = {
   list: async (params?: {
@@ -15,12 +19,19 @@ export const productApi = {
     brandId?: string;
     page?: number;
     limit?: number;
-  }) => {
-    const res = await apiClient.get<Paginated<ProductListItem>>("/products", {
-      params,
-    });
-    return res.data;
-  },
+  }) =>
+    // Offline, the local mirror answers (name/SKU/barcode/salt search) so the
+    // till keeps finding medicines with no server.
+    withLocalFallback(
+      async () => {
+        const res = await apiClient.get<Paginated<ProductListItem>>(
+          "/products",
+          { params },
+        );
+        return res.data;
+      },
+      () => localProductList(params) as Paginated<ProductListItem>,
+    ),
   get: async (id: string) => {
     const res = await apiClient.get<{ success: boolean; data: Product }>(
       `/products/${id}`,

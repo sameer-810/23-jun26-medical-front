@@ -42,7 +42,8 @@ import {
 } from "@modules/customer/hooks/useCustomers";
 import { useCreateSale, useInvoiceProfile } from "@modules/sale/hooks/useSales";
 import { useCreateReminder } from "@modules/reminder/hooks/useReminders";
-import { SaleLineInput } from "@modules/sale/types";
+import { SaleLineInput, Sale } from "@modules/sale/types";
+import { printInvoice } from "@modules/sale/invoice";
 import { apiErrorMessage } from "@api/apiClient";
 import { fmtMoney, fmtMoneyExact, fmtDate } from "@shared/format";
 import { palette, radius } from "@shared/designSystem";
@@ -672,6 +673,10 @@ export default function NewSaleScreen() {
    * accident costs the shop.
    */
   const [ackFreeSale, setAckFreeSale] = useState(false);
+  // The confirmation left on screen after a bill is captured offline.
+  const [queuedNotice, setQueuedNotice] = useState<string | null>(null);
+  // Locally-priced document behind the notice's "Print bill" action.
+  const [queuedSale, setQueuedSale] = useState<Sale | null>(null);
   // Set when a typed figure was rewritten to its ceiling; cleared on the next
   // edit that fits, so it reads as feedback rather than a stuck error.
   const [clampNote, setClampNote] = useState<string | null>(null);
@@ -689,6 +694,7 @@ export default function NewSaleScreen() {
     !mut.isPending;
   const submit = () => {
     if (!canSubmit) return;
+    setQueuedNotice(null);
     mut.mutate(
       {
         customerId,
@@ -705,6 +711,23 @@ export default function NewSaleScreen() {
           setCustomerId(null);
           setPaymentMode("cash");
           setRefillDays("");
+          /**
+           * Captured offline: there is no server sale to open, so stay here,
+           * ready for the next customer, and say what was promised — the bill
+           * number the drain will honour. Printing the queued bill arrives
+           * with the local sale store (Phase 2).
+           */
+          if ("queued" in sale) {
+            setQueuedNotice(
+              sale.displayNo
+                ? `Bill ${sale.displayNo} saved offline — it will sync when the connection returns.`
+                : "Bill saved offline — it will be numbered and synced when the connection returns.",
+            );
+            setQueuedSale(sale.printableSale);
+            return;
+          }
+          setQueuedNotice(null);
+          setQueuedSale(null);
           /**
            * Offer a refill call before leaving the screen.
            *
@@ -1368,6 +1391,20 @@ export default function NewSaleScreen() {
           message={apiErrorMessage(mut.error)}
           style={{ marginBottom: 12 }}
         />
+      ) : null}
+      {queuedNotice ? (
+        <Banner tone="info" message={queuedNotice} style={{ marginBottom: 12 }}>
+          {queuedSale ? (
+            <Pressable
+              onPress={() => void printInvoice(queuedSale, invoiceProfile)}
+              style={{ marginTop: 6 }}
+            >
+              <Text variant="label-sm" tone="link">
+                Print bill
+              </Text>
+            </Pressable>
+          ) : null}
+        </Banner>
       ) : null}
       <Button
         label={

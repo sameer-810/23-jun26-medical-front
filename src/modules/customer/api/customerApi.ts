@@ -1,5 +1,9 @@
 import { apiClient } from "@api/apiClient";
 import { Customer, CustomerPayload, Paginated } from "@modules/customer/types";
+import {
+  withLocalFallback,
+  localCustomerList,
+} from "@shared/offline/offlineFallbacks";
 
 export interface StatementRow {
   date: string;
@@ -33,12 +37,18 @@ export const customerApi = {
     limit?: number;
     /** "inactive" lists deactivated customers so they can be restored. */
     status?: "active" | "inactive";
-  }) => {
-    const res = await apiClient.get<Paginated<Customer>>("/customers", {
-      params,
-    });
-    return res.data;
-  },
+  }) =>
+    // Offline, the mirror answers (actives only) — enough for the till's
+    // customer picker; the restore flow is inherently online.
+    withLocalFallback(
+      async () => {
+        const res = await apiClient.get<Paginated<Customer>>("/customers", {
+          params,
+        });
+        return res.data;
+      },
+      () => localCustomerList(params) as Paginated<Customer>,
+    ),
   get: async (id: string) => {
     const res = await apiClient.get<{ success: boolean; data: Customer }>(
       `/customers/${id}`,

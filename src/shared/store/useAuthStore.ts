@@ -159,10 +159,15 @@ export const useAuthStore = create<AuthState>()(
         refreshPromise = (async () => {
           try {
             const { refreshToken, updateTokens, logout } = get();
-            if (!refreshToken || isTokenExpired(refreshToken)) {
+            if (!refreshToken) {
               await logout();
               return null;
             }
+            // A locally-expired refresh token is NOT judged here — the device
+            // clock may be wrong, and during an outage the server never got to
+            // rule on it. Send it anyway: online, an expired token comes back
+            // 401 and the catch below signs out; offline, the network error
+            // keeps the session for the next attempt.
             const rs = await axios.post(`${environment.apiUrl}/auth/refresh`, {
               refreshToken,
             });
@@ -186,7 +191,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       initializeAuth: async () => {
-        const { token, refreshToken, refreshSession, logout } = get();
+        const { token, refreshToken, refreshSession } = get();
         if (!token && !refreshToken) {
           set({ isAuthChecked: true });
           return;
@@ -195,14 +200,21 @@ export const useAuthStore = create<AuthState>()(
           set({ isAuthenticated: true, isAuthChecked: true });
           return;
         }
-        if (refreshToken && !isTokenExpired(refreshToken)) {
-          const newToken = await refreshSession();
-          if (newToken) {
+        if (refreshToken) {
+          await refreshSession();
+          /**
+           * Offline grace: refreshSession clears the session only when the
+           * server rejected the token. If credentials survived the attempt,
+           * the failure was network/outage — boot with the cached user and
+           * permissions so a restart during a power cut lands back in the
+           * app, not on a login screen it cannot pass. The next successful
+           * request re-judges the session.
+           */
+          if (get().refreshToken) {
             set({ isAuthenticated: true, isAuthChecked: true });
             return;
           }
         }
-        await logout();
         set({ isAuthChecked: true });
       },
     }),
