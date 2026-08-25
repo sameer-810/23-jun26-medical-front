@@ -32,6 +32,7 @@ export type { Column } from "./DataTable";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { PromptDialog } from "./PromptDialog";
 export { Skeleton } from "./Skeleton";
+export { Reveal } from "./Reveal";
 export { BackLink } from "./BackLink";
 export { Fab } from "./Fab";
 export { Avatar } from "./Avatar";

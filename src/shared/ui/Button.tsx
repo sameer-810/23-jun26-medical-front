@@ -14,9 +14,11 @@ import {
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { palette, radius, outline, layout } from "../designSystem";
+import { palette, radius, outline, layout, motion } from "../designSystem";
+import { haptic, type FeedbackTone } from "../touchFeedback";
 import { Text } from "./Text";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -35,6 +37,15 @@ interface Props {
   rightIcon?: React.ReactNode;
   fullWidth?: boolean;
   style?: ViewStyle;
+  /**
+   * Haptic fired on press. Defaults by variant: the filled variants commit
+   * something, so they get `impact`; secondary and ghost are usually navigation
+   * or dismissal and get the lighter `select`.
+   *
+   * Pass `"none"` for a button pressed repeatedly in a tight loop — a quantity
+   * stepper held down, say — where one buzz per tick becomes a rattle.
+   */
+  hapticTone?: FeedbackTone | "none";
 }
 
 /**
@@ -81,12 +92,29 @@ export function Button({
   rightIcon,
   fullWidth = true,
   style,
+  hapticTone,
 }: Props) {
   const press = useSharedValue(0);
   const { width } = useWindowDimensions();
   const isDisabled = disabled || loading;
   const c = getVariantColors(variant);
   const s = (width >= layout.wideBreakpoint ? DESKTOP : PHONE)[size];
+  const tone: FeedbackTone | "none" =
+    hapticTone ?? (c.borderWidth === 0 ? "impact" : "select");
+
+  /**
+   * The haptic fires on press-in, not on press.
+   *
+   * Press-in is the moment the finger lands, so the buzz arrives with the touch
+   * rather than ~80ms after it; on `onPress` it reads as a delayed reaction to
+   * something you already did. It also means a press that ends up cancelled
+   * (finger dragged off the button) still confirmed the contact — which is the
+   * truth: you did touch it.
+   */
+  const onPressIn = () => {
+    press.set(withTiming(1, { duration: 90 }));
+    if (tone !== "none") haptic(tone);
+  };
 
   /**
    * The disabled dimming lives IN here, not in the style array.
@@ -117,8 +145,17 @@ export function Button({
          */
         accessibilityRole="button"
         accessibilityState={{ disabled: isDisabled, busy: loading }}
-        onPressIn={() => press.set(withTiming(1, { duration: 90 }))}
-        onPressOut={() => press.set(withTiming(0, { duration: 140 }))}
+        onPressIn={onPressIn}
+        /*
+          Release springs rather than eases back.
+
+          `withTiming` returns the button to rest at a constant rate, which reads
+          as a slider being reset. A spring overshoots a hair and settles — the
+          way a physical key returns — and that tiny bit of physics is most of
+          what separates an interface that feels alive from one that merely
+          changes state. It costs nothing: same frame budget, same 140ms.
+        */
+        onPressOut={() => press.set(withSpring(0, motion.spring.crisp))}
         style={[
           styles.base,
           {

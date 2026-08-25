@@ -11,6 +11,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
+import { haptic } from "../touchFeedback";
 import type { LucideIcon } from "lucide-react-native";
 import { palette, radius, motion, outline, numeric } from "../designSystem";
 import { Text } from "./Text";
@@ -61,10 +62,19 @@ export function StatTile({
   onPress,
   style,
 }: Props) {
-  const scale = useSharedValue(1);
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.get() }],
-  }));
+  /**
+   * Was 0.99 — a 1% squeeze, which on a half-width tile is under 2pt of travel
+   * and reads as no response at all. See the note on Card.PRESS_SCALE; a stat
+   * tile is smaller, so it can take slightly more without looking rubbery.
+   */
+  const press = useSharedValue(0);
+  const animStyle = useAnimatedStyle(() => {
+    const p = press.get();
+    return {
+      transform: [{ scale: 1 - p * 0.04 }],
+      opacity: 1 - p * 0.1,
+    };
+  });
 
   const dark = tone !== "light";
   const valueColor = dark ? "#FFFFFF" : palette.text.primary;
@@ -174,8 +184,11 @@ export function StatTile({
     <Animated.View style={[animStyle, style ? undefined : { flex: 1 }]}>
       <Pressable
         onPress={onPress}
-        onPressIn={() => scale.set(withSpring(0.99, motion.spring.crisp))}
-        onPressOut={() => scale.set(withSpring(1, motion.spring.gentle))}
+        onPressIn={() => {
+          press.set(withSpring(1, motion.spring.crisp));
+          haptic("select");
+        }}
+        onPressOut={() => press.set(withSpring(0, motion.spring.gentle))}
       >
         {body}
       </Pressable>
