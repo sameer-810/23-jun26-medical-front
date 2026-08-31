@@ -11,6 +11,8 @@ import {
 } from "lucide-react-native";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { ShortbookItem } from "@modules/inventory/types";
+import { PurchaseHistoryModal } from "@modules/inventory/components/PurchaseHistoryModal";
+import { fmtMoneyExact } from "@shared/format";
 import { apiErrorMessage } from "@api/apiClient";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { useDebouncedValue } from "@shared/hooks";
@@ -70,6 +72,8 @@ export default function ShortBookScreen() {
   );
   const [editing, setEditing] = useState<ShortbookItem | null>(null);
   const [removing, setRemoving] = useState<ShortbookItem | null>(null);
+  // Which medicine's purchase history / supplier comparison is open.
+  const [historyFor, setHistoryFor] = useState<ShortbookItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
@@ -210,6 +214,16 @@ export default function ShortBookScreen() {
         ),
     },
     {
+      key: "supplier",
+      header: "Best supplier",
+      width: 170,
+      sortable: true,
+      sortValue: (it) => it.cheapestSupplier?.effectiveRate ?? Infinity,
+      render: (it) => (
+        <SupplierCell item={it} onPress={() => setHistoryFor(it)} />
+      ),
+    },
+    {
       key: "status",
       header: "Status",
       width: 90,
@@ -320,6 +334,7 @@ export default function ShortBookScreen() {
                 canManage={canManage}
                 onEdit={() => setEditing(it)}
                 onRemove={() => setRemoving(it)}
+                onHistory={() => setHistoryFor(it)}
               />
             )}
             emptyIcon={ListChecks}
@@ -365,6 +380,13 @@ export default function ShortBookScreen() {
         }
         onSubmit={saveLevel}
         onCancel={() => setEditing(null)}
+      />
+
+      <PurchaseHistoryModal
+        visible={!!historyFor}
+        productId={historyFor?.productId ?? null}
+        productName={historyFor?.name}
+        onClose={() => setHistoryFor(null)}
       />
 
       <ConfirmDialog
@@ -415,16 +437,63 @@ function RowActions({
   );
 }
 
+/**
+ * The cheapest-supplier cell: name, effective rate per pack, and the green
+ * badge when it actually beats someone. Tapping opens the full comparison.
+ */
+function SupplierCell({
+  item,
+  onPress,
+}: {
+  item: ShortbookItem;
+  onPress: () => void;
+}) {
+  const s = item.cheapestSupplier;
+  if (!s) {
+    return (
+      <Pressable onPress={onPress} hitSlop={6}>
+        <Text variant="caption" tone="tertiary">
+          never bought
+        </Text>
+      </Pressable>
+    );
+  }
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={`Purchase history for ${item.name}`}
+    >
+      <VStack gap={2}>
+        <Text variant="label" tone="link" numberOfLines={1}>
+          {s.supplierName}
+        </Text>
+        <Text variant="caption" tone="secondary" numberOfLines={1}>
+          {s.effectiveRate != null ? fmtMoneyExact(s.effectiveRate) : "—"}
+          {s.unit ? `/${s.unit}` : ""}
+          {s.scheme !== "Nil" ? ` · ${s.scheme}` : ""}
+        </Text>
+        {s.supplierCount > 1 && s.savingsPct < 0 ? (
+          <StatusChip tone="success" label={`Cheapest (${s.savingsPct}%)`} />
+        ) : null}
+      </VStack>
+    </Pressable>
+  );
+}
+
 function ShortBookRow({
   item,
   canManage,
   onEdit,
   onRemove,
+  onHistory,
 }: {
   item: ShortbookItem;
   canManage: boolean;
   onEdit: () => void;
   onRemove: () => void;
+  onHistory: () => void;
 }) {
   return (
     <Card>
@@ -478,6 +547,10 @@ function ShortBookRow({
             ) : null}
           </VStack>
         </HStack>
+
+        <View style={styles.supplierLine}>
+          <SupplierCell item={item} onPress={onHistory} />
+        </View>
       </VStack>
     </Card>
   );
@@ -514,5 +587,10 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
     borderLeftWidth: 1,
     borderLeftColor: palette.border.subtle,
+  },
+  supplierLine: {
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: palette.border.subtle,
   },
 });

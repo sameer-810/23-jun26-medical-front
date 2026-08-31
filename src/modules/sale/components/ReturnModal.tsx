@@ -19,12 +19,32 @@ import {
 interface Props {
   visible: boolean;
   sale: Sale;
+  /** Lines a scan matched — pre-filled with one sale unit so the common
+   *  "customer brought one pack back" is a glance and a tap. */
+  preselectLineIds?: string[];
   onClose: () => void;
 }
 
-export function ReturnModal({ visible, sale, onClose }: Props) {
+export function ReturnModal({
+  visible,
+  sale,
+  preselectLineIds,
+  onClose,
+}: Props) {
   const mut = useCreateReturn();
-  const [qty, setQty] = useState<Record<string, string>>({});
+  const [qty, setQty] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    for (const id of preselectLineIds || []) {
+      const l = sale.lines.find((x) => x.id === id);
+      if (!l) continue;
+      const returnable = l.baseQuantity - l.returnedBaseQty;
+      // One sale unit, in base units (a strip of 10 tablets → 10).
+      const oneUnit = l.quantity > 0 ? l.baseQuantity / l.quantity : 1;
+      const suggested = Math.min(returnable, oneUnit);
+      if (suggested > 0) initial[id] = String(Math.round(suggested * 1000) / 1000);
+    }
+    return initial;
+  });
   // Shared with the purchase return and the write-off screen, so the same four
   // words mean the same thing wherever stock moves backwards.
   const [reason, setReason] = useState("");

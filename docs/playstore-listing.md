@@ -14,8 +14,8 @@ features the app lacks, and overpromising earns refunds and one-star reviews.
 | -------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | Developer / company  | FiveM Infotech                                                  | taken from the AshShifa launch doc                                              |
 | Public support email | `5fivempvt@gmail.com`                                           | same source                                                                     |
-| Privacy policy URL   | `https://23-jun26-medical-front.vercel.app/privacy-policy.html` | live after the next Vercel deploy                                               |
-| Data deletion URL    | `https://23-jun26-medical-front.vercel.app/delete-account.html` | same                                                                            |
+| Privacy policy URL   | `https://portal.plusveda.online/privacy-policy.html`            | live, 200 OK                                                                    |
+| Data deletion URL    | `https://portal.plusveda.online/delete-account.html`            | live, 200 OK                                                                    |
 | Package name         | `com.medstock.app`                                              | matches the EAS keystore `99:BE:F7:38…` — create the Play app with THIS package |
 | Reviewer login       | `<REVIEWER_EMAIL>` / `<REVIEWER_PASSWORD>`                      | created and tested — see §5; the real values are never committed                |
 
@@ -115,7 +115,7 @@ Questions or help: 5fivempvt@gmail.com
 | App category       | Business                                    |
 | Tags               | Business tools, Finance & accounting        |
 | Email address      | `5fivempvt@gmail.com`                       |
-| Website (optional) | `https://23-jun26-medical-front.vercel.app` |
+| Website (optional) | `https://www.plusveda.online`                |
 | External marketing | Leave unticked unless you plan Google Ads   |
 
 ---
@@ -125,7 +125,7 @@ Questions or help: 5fivempvt@gmail.com
 ### Privacy policy
 
 ```
-https://23-jun26-medical-front.vercel.app/privacy-policy.html
+https://portal.plusveda.online/privacy-policy.html
 ```
 
 ### Ads
@@ -189,7 +189,7 @@ adds requirements you do not want.
 Deletion URL:
 
 ```
-https://23-jun26-medical-front.vercel.app/delete-account.html
+https://portal.plusveda.online/delete-account.html
 ```
 
 Then declare these types. For every one: **Collected = Yes, Shared = No**,
@@ -281,7 +281,14 @@ Full rollout cannot be undone except by shipping a new version, so start at 20%.
 
 ## 7. Before you press submit
 
-- [ ] Both URLs deployed and opening the real pages, not the app shell
+- [x] Both URLs deployed and opening the real pages, not the app shell — verified
+      2026-08-27: `portal.plusveda.online/privacy-policy.html` and
+      `/delete-account.html` both return 200 with the right `<title>`. The old
+      `23-jun26-medical-front.vercel.app` paths only 308-redirect here, so paste
+      the `portal.plusveda.online` URLs into Play, not the vercel.app ones.
+- [ ] Screenshots re-captured against the post-14-Aug "quiet premium" UI — the
+      current set in `store-assets/` was captured 08 Aug and still shows the old
+      gradient hero, Poppins headings and colour-topped stat cards
 - [x] `RECORD_AUDIO` / `SYSTEM_ALERT_WINDOW` blocked — the build now fails if either survives the merge
 - [ ] Screenshot 02 shows a real bill, not "No items yet"
 - [x] Reviewer login tested from a cold browser (10/10)

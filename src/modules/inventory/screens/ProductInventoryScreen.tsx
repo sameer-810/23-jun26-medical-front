@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, useWindowDimensions, DimensionValue } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import {
@@ -6,8 +6,10 @@ import {
   CalendarClock,
   ScrollText,
   Repeat2,
+  Receipt,
 } from "lucide-react-native";
 import { useProductInventory } from "@modules/inventory/hooks/useInventory";
+import { PurchaseHistoryModal } from "@modules/inventory/components/PurchaseHistoryModal";
 import { ProductBatchStock } from "@modules/inventory/types";
 import { palette, radius } from "@shared/designSystem";
 import {
@@ -50,6 +52,7 @@ export default function ProductInventoryScreen() {
   const cols = width >= 800 ? 4 : 2;
   const { data, isLoading, isError, error, refetch, isRefetching } =
     useProductInventory(id);
+  const [showPurchases, setShowPurchases] = useState(false);
 
   const tileW = `${100 / cols}%` as DimensionValue;
 
@@ -136,9 +139,28 @@ export default function ProductInventoryScreen() {
             }
             onPress={() => navigation.navigate("ProductLedger", { id })}
           />
+          <Button
+            label="Purchases"
+            size="sm"
+            variant="secondary"
+            icon={
+              <Receipt
+                size={16}
+                color={palette.text.secondary}
+                strokeWidth={2}
+              />
+            }
+            onPress={() => setShowPurchases(true)}
+          />
         </HStack>
       }
     >
+      <PurchaseHistoryModal
+        visible={showPurchases}
+        productId={id}
+        productName={data?.product.name}
+        onClose={() => setShowPurchases(false)}
+      />
       <View
         style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 }}
       >

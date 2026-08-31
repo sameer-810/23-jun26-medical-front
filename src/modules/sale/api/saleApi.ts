@@ -8,6 +8,7 @@ import {
   ReturnDoc,
   InvoiceProfile,
   Paginated,
+  ScanReturnMatch,
 } from "@modules/sale/types";
 
 export const saleApi = {
@@ -27,6 +28,14 @@ export const saleApi = {
     const res = await apiClient.get<{ success: boolean; data: Sale }>(
       `/sales/${id}`,
     );
+    return res.data.data;
+  },
+  /** Recent invoices that sold from one lot — the scan-driven return lookup. */
+  byBatch: async (batchId: string) => {
+    const res = await apiClient.get<{
+      success: boolean;
+      data: ScanReturnMatch[];
+    }>(`/sales/by-batch/${batchId}`);
     return res.data.data;
   },
   create: async (payload: CreateSalePayload) => {

@@ -363,6 +363,64 @@ export interface ShortbookItem {
   daysCover: number | null;
   /** Computed reorder qty — covers a month of demand, never below `need`. */
   suggested: number;
+  /** Who last sold it cheapest once schemes/discounts count; null = never bought. */
+  cheapestSupplier?: CheapestSupplier | null;
+}
+
+export interface CheapestSupplier {
+  supplierId: string | null;
+  supplierName: string;
+  /** Effective cost per pack (scheme + discount folded in). */
+  effectiveRate: number | null;
+  unit: string;
+  lastDate: string | null;
+  scheme: string;
+  /** Negative = cheaper than the runner-up by this %; 0 = only one supplier. */
+  savingsPct: number;
+  supplierCount: number;
+}
+
+export interface SupplierComparisonRow {
+  supplierId: string | null;
+  supplierName: string;
+  lastDate: string | null;
+  batchNumber: string;
+  scheme: string;
+  effectiveRate: number | null;
+  effectiveRatePerBase: number;
+  unit: string;
+  status: "cheapest" | "higher";
+  deltaPct: number;
+}
+
+export interface PurchaseHistoryLine {
+  receiptId: string;
+  receiptNo: string;
+  referenceNo: string;
+  supplierId: string | null;
+  supplierName: string;
+  date: string;
+  batchNumber: string;
+  expiryDate: string | null;
+  unit: string;
+  quantity: number;
+  freeQuantity: number;
+  scheme: string;
+  billedRate: number | null;
+  discountAmount: number;
+  discountPct: number;
+  gstPct: number;
+  effectiveRate: number | null;
+  landedCost: number | null;
+  mrp: number;
+  locationCode: string;
+  lineValue: number;
+}
+
+export interface ProductPurchasesResult {
+  product: { id: string; name: string; sku: string; baseUnit: string };
+  suppliers: SupplierComparisonRow[];
+  purchases: PurchaseHistoryLine[];
 }
 
 export interface AlternativeItem {

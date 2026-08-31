@@ -36,7 +36,12 @@ export default function SaleDetailScreen() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canReturn = hasPermission(PERMISSIONS.SALES_MANAGE);
   const shopName = useAuthStore((s) => s.organization?.name) || "Pharmacy";
-  const [returnOpen, setReturnOpen] = useState(false);
+  // "Return by scan" arrives with the form already asked for and the scanned
+  // lot's line(s) named — the pharmacist lands straight on the quantity.
+  const [returnOpen, setReturnOpen] = useState<boolean>(
+    Boolean(route.params?.openReturn),
+  );
+  const preselectLineIds: string[] | undefined = route.params?.returnLineIds;
 
   if (isError) {
     return (
@@ -319,6 +324,7 @@ export default function SaleDetailScreen() {
       <ReturnModal
         visible={returnOpen}
         sale={sale}
+        preselectLineIds={preselectLineIds}
         onClose={() => setReturnOpen(false)}
       />
     </Screen>

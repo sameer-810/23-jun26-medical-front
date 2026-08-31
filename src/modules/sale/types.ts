@@ -1,10 +1,17 @@
 export type SaleStatus = "completed" | "partially_returned" | "returned";
 
 export interface SaleAllocation {
+  batchId: string | null;
   batchNumber: string;
+  locationId: string | null;
   locationCode: string;
   baseQty: number;
   returnedQty: number;
+}
+
+/** An invoice that sold from a scanned lot, with the lines that came from it. */
+export interface ScanReturnMatch extends SaleListItem {
+  matchedLineIds: string[];
 }
 
 export interface SaleLine {

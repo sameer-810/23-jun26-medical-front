@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   View,
@@ -7,7 +7,14 @@ import {
   TextInput,
   ScrollView,
   useWindowDimensions,
+  Platform,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useScanGun } from "@shared/useScanGun";
+import {
+  QuickEntryPanel,
+  QuickEntry,
+} from "@modules/inventory/components/QuickEntryPanel";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import {
   Plus,
@@ -54,6 +61,7 @@ import { printLabels, LabelSpec } from "@modules/inventory/label";
 import { LabelPrintSettings } from "@modules/inventory/components/LabelPrintSettings";
 import {
   emptyLine,
+  isoToDate,
   linesFromScan,
   productsFromScan,
   scanSummary,
@@ -183,6 +191,33 @@ export default function ReceiveStockScreen() {
   // the "Print labels" step needs.
   const [done, setDone] = useState<ReceiptDetail | null>(null);
   const [scanNote, setScanNote] = useState<string | null>(null);
+  /** The scanned pack awaiting its batch / qty / rack in the quick-entry row. */
+  const [quick, setQuick] = useState<QuickEntry | null>(null);
+  const scanSeq = useRef(0);
+  const [scanCode, setScanCode] = useState("");
+  /**
+   * The rack the last line went to. A delivery is mostly put away in one
+   * place, and every line used to demand the rack be picked by hand — the
+   * single biggest reason "scan and go" wasn't. Remembered per shop.
+   */
+  const orgId = useAuthStore((s) => s.user?.organizationId) || "";
+  const [lastLocationId, setLastLocationId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!orgId) return;
+    AsyncStorage.getItem(`medstock-grn-last-loc:${orgId}`)
+      .then((v) => {
+        if (v) setLastLocationId(v);
+      })
+      .catch(() => {});
+  }, [orgId]);
+  const rememberLocation = (id: string | null) => {
+    setLastLocationId(id);
+    if (id && orgId) {
+      AsyncStorage.setItem(`medstock-grn-last-loc:${orgId}`, id).catch(
+        () => {},
+      );
+    }
+  };
   /** Supplier name read off a scanned bill that matched nothing in the master. */
   const [unmatchedSupplier, setUnmatchedSupplier] = useState<string | null>(
     null,
@@ -338,7 +373,7 @@ export default function ReceiveStockScreen() {
       if (blank >= 0) {
         return cur.map((l, k) => (k === blank ? { ...l, ...patch } : l));
       }
-      return [...cur, { ...emptyLine(), ...patch }];
+      return [...cur, { ...emptyLine(), locationId: lastLocationId, ...patch }];
     });
   };
 
@@ -369,7 +404,10 @@ export default function ReceiveStockScreen() {
         const blank = cur.findIndex((l) => !l.productId);
         if (blank >= 0)
           return cur.map((l, k) => (k === blank ? { ...l, ...patch } : l));
-        return [...cur, { ...emptyLine(), ...patch }];
+        return [
+          ...cur,
+          { ...emptyLine(), locationId: lastLocationId, ...patch },
+        ];
       });
       scanFeedback("ok");
       setScanNote(`Added ${lite.name} from the global catalogue.`);
@@ -398,13 +436,26 @@ export default function ReceiveStockScreen() {
       }),
     );
 
-  // Camera scan → resolve the barcode to a product and add it as a GRN line.
-  // Unknown barcodes aren't linked to any product yet, so we say so.
+  /**
+   * Any scan — USB gun, camera, or a code typed into the scan box — resolves
+   * the pack and opens the quick-entry row. A shelf label of a lot we already
+   * stock pre-fills batch, expiry and prices, so a repeat delivery is qty +
+   * Enter; a product barcode leaves those for the pharmacist to read off the
+   * pack. Unknown codes say so instead of silently doing nothing.
+   */
   const [scanOpen, setScanOpen] = useState(false);
-  const handleCameraScan = async (code: string) => {
+  const focusScanBox = () => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      setTimeout(() => document.getElementById("grn-scan")?.focus(), 30);
+    }
+  };
+  const handleScan = async (code: string) => {
     setScanOpen(false);
+    setScanCode("");
+    const trimmed = code.trim();
+    if (!trimmed) return;
     try {
-      const res = await inventoryApi.scan(code);
+      const res = await inventoryApi.scan(trimmed);
       const sp = res.product;
       if (!sp) throw new Error("no match");
       const lite: ProductLite = {
@@ -415,15 +466,42 @@ export default function ReceiveStockScreen() {
         packs: sp.packs || [],
       };
       setKnownProducts((cur) => ({ ...cur, [lite.id]: lite }));
-      addLineForProduct(lite.id);
+      const lot = res.kind === "batch" ? res.batch : undefined;
+      scanSeq.current += 1;
+      setQuick({
+        scanId: scanSeq.current,
+        product: lite,
+        knownLot: Boolean(lot),
+        batchNumber: lot?.batchNumber || "",
+        expiryDate: lot?.expiryDate ? isoToDate(lot.expiryDate).slice(0, 7) : "",
+        mrp: lot?.mrp ? String(lot.mrp) : "",
+        purchasePrice: lot?.purchasePrice ? String(lot.purchasePrice) : "",
+      });
       scanFeedback("ok");
-      setScanNote(`Added ${sp.name} from its barcode.`);
+      setScanNote(null);
     } catch {
       scanFeedback("error");
       setScanNote(
-        `Barcode "${code}" isn't linked to a product yet. Search the product below and save this barcode on it (in Add/Edit product).`,
+        `"${trimmed}" isn't linked to a product yet. Search the product below and save this barcode on it (in Add/Edit product).`,
       );
+      focusScanBox();
     }
+  };
+  // USB scanner anywhere on the page, except inside the scan box (which
+  // handles its own Enter) — the same arrangement the till uses.
+  useScanGun((code) => void handleScan(code), { ignoreSelector: "#grn-scan" });
+
+  /** Quick-entry row confirmed → it becomes a GRN line; back to scanning. */
+  const commitQuick = (line: DraftLine) => {
+    setLines((cur) => {
+      const blank = cur.findIndex((l) => !l.productId);
+      if (blank >= 0) return cur.map((l, k) => (k === blank ? line : l));
+      return [...cur, line];
+    });
+    rememberLocation(line.locationId);
+    setQuick(null);
+    scanFeedback("ok");
+    focusScanBox();
   };
 
   /**
@@ -825,6 +903,34 @@ export default function ReceiveStockScreen() {
           ) : null}
         </VStack>
       </Card>
+
+      {/* Scan first. A USB gun, the camera, or a code typed here all land in
+          handleScan; the quick-entry row below it takes the pack's details. */}
+      <View style={{ marginBottom: 10 }}>
+        <TextField
+          nativeID="grn-scan"
+          value={scanCode}
+          onChangeText={setScanCode}
+          onSubmitEditing={() => void handleScan(scanCode)}
+          blurOnSubmit={false}
+          placeholder="Scan a pack barcode or shelf label — or type it and press Enter"
+          autoCapitalize="none"
+          autoCorrect={false}
+          leading={
+            <ScanLine size={18} color={palette.teal[600]} strokeWidth={2} />
+          }
+        />
+      </View>
+      <QuickEntryPanel
+        entry={quick}
+        locationOptions={locationOptions}
+        defaultLocationId={lastLocationId}
+        onCommit={commitQuick}
+        onCancel={() => {
+          setQuick(null);
+          focusScanBox();
+        }}
+      />
 
       <View style={{ marginBottom: 12, zIndex: 20 }}>
         <Combobox
@@ -1348,7 +1454,7 @@ export default function ReceiveStockScreen() {
       <CameraScanner
         visible={scanOpen}
         title="Scan pack barcode"
-        onDetected={handleCameraScan}
+        onDetected={(code) => void handleScan(code)}
         onClose={() => setScanOpen(false)}
       />
     </Screen>

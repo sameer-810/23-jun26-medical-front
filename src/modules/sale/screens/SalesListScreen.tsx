@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { View, useWindowDimensions } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Plus, Receipt } from "lucide-react-native";
+import { Plus, Receipt, Undo2 } from "lucide-react-native";
 import { useSales } from "@modules/sale/hooks/useSales";
 import { SaleListItem } from "@modules/sale/types";
-import { layout } from "@shared/designSystem";
+import { ScanReturnModal } from "@modules/sale/components/ScanReturnModal";
+import { layout, palette } from "@shared/designSystem";
 import { fmtInt, fmtMoney, fmtDate } from "@shared/format";
 import { useDebouncedValue } from "@shared/hooks";
 import {
@@ -45,6 +46,7 @@ export default function SalesListScreen() {
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
+  const [scanReturnOpen, setScanReturnOpen] = useState(false);
 
   // Filter change → back to page 1 (adjusted during render, not in an effect).
   const filterKey = `${term}|${status}|${limit}`;
@@ -175,15 +177,37 @@ export default function SalesListScreen() {
       refreshing={searching}
       onRefresh={refetch}
       right={
-        <Button
-          label="New sale"
-          size="sm"
-          fullWidth={false}
-          icon={<Plus size={18} color="#FFFFFF" strokeWidth={2.2} />}
-          onPress={() => navigation.navigate("NewSale")}
-        />
+        <HStack gap={8}>
+          <Button
+            label="Return by scan"
+            size="sm"
+            variant="secondary"
+            fullWidth={false}
+            icon={<Undo2 size={16} color={palette.text.secondary} strokeWidth={2.2} />}
+            onPress={() => setScanReturnOpen(true)}
+          />
+          <Button
+            label="New sale"
+            size="sm"
+            fullWidth={false}
+            icon={<Plus size={18} color="#FFFFFF" strokeWidth={2.2} />}
+            onPress={() => navigation.navigate("NewSale")}
+          />
+        </HStack>
       }
     >
+      <ScanReturnModal
+        visible={scanReturnOpen}
+        onClose={() => setScanReturnOpen(false)}
+        onPick={(saleId, returnLineIds) => {
+          setScanReturnOpen(false);
+          navigation.navigate("SaleDetail", {
+            id: saleId,
+            openReturn: true,
+            returnLineIds,
+          });
+        }}
+      />
       <SearchInput
         value={search}
         onChangeText={setSearch}

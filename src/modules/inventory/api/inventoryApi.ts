@@ -15,6 +15,7 @@ import {
   ScanResult,
   Paginated,
   ProductLedgerResult,
+  ProductPurchasesResult,
   ShortbookItem,
   AlternativesResult,
   PurchaseReturnPayload,
@@ -52,6 +53,14 @@ export const inventoryApi = {
       },
       () => localProductInventory(productId) as unknown as ProductInventory,
     ),
+  /** Purchase history + cheapest-supplier comparison for one medicine. */
+  productPurchases: async (productId: string) => {
+    const res = await apiClient.get<{
+      success: boolean;
+      data: ProductPurchasesResult;
+    }>(`/inventory/products/${productId}/purchases`);
+    return res.data.data;
+  },
   search: async (params: { q?: string; expiringInDays?: number }) => {
     const res = await apiClient.get<{ success: boolean; data: SearchResult }>(
       "/inventory/search",
