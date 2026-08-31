@@ -86,18 +86,27 @@ const fmtExp = (iso?: string | null) => {
 };
 
 /** "1x70 G": packs × base units per pack, in the base unit. */
+/** Width of the Qty column — "1x70 G" fits; "2x10 TABLET" abbreviates. */
+const QTY_W = 9;
+
 export function qtyText(l: Sale["lines"][number]): string {
   const factor = l.quantity > 0 ? l.baseQuantity / l.quantity : 1;
-  if (factor > 1 && Number.isInteger(factor)) {
-    const q = Number.isInteger(l.quantity)
-      ? String(l.quantity)
-      : l.quantity.toFixed(1);
-    return `${q}x${factor}${l.baseUnit ? " " + l.baseUnit.toUpperCase() : ""}`;
-  }
   const q = Number.isInteger(l.quantity)
     ? String(l.quantity)
-    : String(l.quantity);
-  return `${q} ${(l.unit || "").toUpperCase()}`;
+    : l.quantity.toFixed(1);
+  if (factor > 1 && Number.isInteger(factor)) {
+    const unit = (l.baseUnit || "").toUpperCase();
+    const full = `${q}x${factor}${unit ? " " + unit : ""}`;
+    // Column is 9 wide: keep the numbers, shorten the unit ("TABLET" → "TAB").
+    return full.length <= QTY_W
+      ? full
+      : `${q}x${factor} ${unit.slice(0, 3)}`.slice(0, QTY_W);
+  }
+  const unit = (l.unit || "").toUpperCase();
+  const full = `${q} ${unit}`;
+  return full.length <= QTY_W
+    ? full
+    : `${q} ${unit.slice(0, 3)}`.slice(0, QTY_W);
 }
 
 /** "GRO" — the first three letters of the maker, as the sample bill prints it. */
@@ -241,13 +250,16 @@ export function renderBillLines(
           rpad(money(l.lineTotal), 10),
       );
     }
-    // Further lots of a multi-batch line, indented under it.
+    // Further lots of a multi-batch line, aligned under the Batch column
+    // (Qty 9 + Desc 30 + Com 5 + three gutters = 47; tax layout 9+26+8+3 = 46).
     for (const a of (l.allocations || []).slice(1)) {
       line(
-        pad("", isBoS ? 46 : 45) +
+        (
+          pad("", isBoS ? 47 : 46) +
           pad(a.batchNumber || "", isBoS ? 11 : 10) +
           " " +
-          pad(fmtExp(a.expiryDate), 7),
+          fmtExp(a.expiryDate)
+        ).trimEnd(),
       );
     }
     const guide = opts.guideByProduct?.[l.productId];
@@ -295,7 +307,14 @@ export function renderBillLines(
     .filter(Boolean)
     .join(" ");
   const lic = [c?.drugLicenseNo, c?.drugLicenseNo2].filter(Boolean).join(", ");
-  line(twoUp(foot1, lic ? `Drug Lic. No: ${lic}` : ""));
+  const licText = lic ? `Drug Lic. No: ${lic}` : "";
+  // Two licence numbers plus the jurisdiction clause don't share 80 columns;
+  // never truncate a legal line — give each its own.
+  if (foot1.length + 1 + licText.length <= COLS) line(twoUp(foot1, licText));
+  else {
+    if (foot1) line(foot1);
+    if (licText) line(licText);
+  }
   if (isBoS) {
     line(
       "Composition taxable person, not eligible to collect tax on supplies.",

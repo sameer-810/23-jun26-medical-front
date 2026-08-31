@@ -11,5 +11,7 @@
       "@config/*": ["./src/config/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", "app.d.ts"]
+  "include": ["**/*.ts", "**/*.tsx", "app.d.ts"],
+  // Node-side test files run under tsx (`npm test`), not the app compiler.
+  "exclude": ["node_modules", "tests"]
 }
