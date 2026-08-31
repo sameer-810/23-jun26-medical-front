@@ -717,7 +717,10 @@ export default function NewSaleScreen() {
   const submit = (rxOverride?: string | null) => {
     if (!canSubmit) return;
     setQueuedNotice(null);
-    const rxId = rxOverride ?? prescriptionId;
+    // Only a real id counts. Called straight from a button's onPress this
+    // receives the press EVENT — a DOM element on web — which must never
+    // reach the payload (it is circular and cannot be serialised).
+    const rxId = typeof rxOverride === "string" ? rxOverride : prescriptionId;
     /**
      * Prescription gate: a live sale of a scheduled item stops here until a
      * prescription is on record. Offline, the bill goes through — the
@@ -1485,7 +1488,7 @@ export default function NewSaleScreen() {
         size="lg"
         loading={mut.isPending}
         disabled={!canSubmit}
-        onPress={submit}
+        onPress={() => submit()}
         icon={<ShoppingCart size={18} color="#FFFFFF" strokeWidth={2} />}
       />
       {wide ? (
