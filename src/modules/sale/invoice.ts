@@ -6,6 +6,7 @@ import {
   billToEscp,
   billToHtml,
   BillLine,
+  FORM,
 } from "@modules/sale/billText";
 
 /** Every figure on a tax invoice carries its paisa: ₹64.50, not ₹64.5. */
@@ -173,5 +174,11 @@ export async function printInvoice(
     : [renderBillLines(sale, profile, { guideByProduct })];
 
   if (await printRaw(billToEscp(copies))) return;
-  await printHtml(billToHtml(copies));
+  // Driver route: carry the 9.5 × 11 in form on the print job itself, so the
+  // desktop shell prints it silently at exact size and a browser's dialog
+  // starts from the right page.
+  await printHtml(billToHtml(copies), {
+    widthMm: FORM.widthIn * 25.4,
+    heightMm: FORM.heightIn * 25.4,
+  });
 }

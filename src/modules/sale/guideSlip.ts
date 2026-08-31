@@ -5,7 +5,13 @@
  */
 import { MedicineGuide } from "@modules/product/types";
 import { Sale } from "@modules/sale/types";
-import { billToEscp, billToHtml, BillLine, COLS } from "@modules/sale/billText";
+import {
+  billToEscp,
+  billToHtml,
+  BillLine,
+  COLS,
+  FORM,
+} from "@modules/sale/billText";
 import { printHtml, printRaw } from "@shared/print";
 
 const wrap = (s: string, w: number): string[] => {
@@ -67,7 +73,10 @@ export async function printGuideSlip(
 ) {
   const lines = guideSlipLines(sale, guides, shopName);
   if (await printRaw(billToEscp([lines]))) return;
-  await printHtml(billToHtml([lines]));
+  await printHtml(billToHtml([lines]), {
+    widthMm: FORM.widthIn * 25.4,
+    heightMm: FORM.heightIn * 25.4,
+  });
 }
 
 /** WhatsApp-friendly guide text appended under the bill summary. */

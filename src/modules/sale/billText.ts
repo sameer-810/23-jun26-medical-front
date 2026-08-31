@@ -334,25 +334,71 @@ export function renderBillLines(
 // ---- adapters --------------------------------------------------------------
 
 /**
- * ESC/P byte stream, as a Latin-1 string (every char < 256). ESC @ resets the
- * printer, ESC P selects 10 cpi, ESC E / ESC F bracket bold, FF ejects the
- * page so the tear-off lands on the perforation.
+ * The stationery: 9.5 × 11 in continuous fanfold — the one thing the client
+ * says never changes, whatever printer sits on the counter. 11 in at 6 lines
+ * per inch is 66 lines; we print at most 60 per form and leave the rest for
+ * the perforation. The ½ in tractor strips each side leave 8.5 in, of which a
+ * narrow-carriage head prints exactly 8 in = 80 columns at 10 cpi — so there
+ * is NO software left margin: the paper is positioned on the tractor, and
+ * any margin we added would wrap every line.
+ */
+export const FORM = {
+  widthIn: 9.5,
+  heightIn: 11,
+  linesPerForm: 66,
+  printableLines: 60,
+} as const;
+
+/** Split a bill into forms so no page break falls across a perforation. */
+export function paginate(
+  lines: BillLine[],
+  perPage = FORM.printableLines,
+): BillLine[][] {
+  if (lines.length <= perPage) return [lines];
+  const pages: BillLine[][] = [];
+  for (let i = 0; i < lines.length; i += perPage) {
+    const chunk = lines.slice(i, i + perPage);
+    if (i > 0) chunk.unshift({ text: "(continued)", bold: false });
+    pages.push(chunk.slice(0, perPage));
+  }
+  return pages;
+}
+
+/**
+ * ESC/P byte stream, as a Latin-1 string (every char < 256).
+ *
+ *   ESC @        reset to defaults
+ *   ESC P        10 cpi (80 columns across the 8 in print line)
+ *   ESC 2        1/6 in line spacing (66 lines per 11 in form)
+ *   ESC C NUL 11 form length 11 in — so FF lands on the perforation on ANY
+ *                printer, whatever its panel/DIP default (A4 defaults drift)
+ *   ESC N 3      skip 3 lines over the perforation if text ever runs long
+ *   ESC E / F    bold on / off
+ *   FF           eject to the top of the next form
  */
 export function billToEscp(copies: BillLine[][]): string {
   const ESC = "\x1b";
-  let s = `${ESC}@${ESC}P`;
+  let s = `${ESC}@${ESC}P${ESC}2${ESC}C\x00${String.fromCharCode(FORM.heightIn)}${ESC}N\x03`;
   for (const lines of copies) {
-    for (const l of lines) {
-      const text = l.text.replace(/[^\x20-\x7e]/g, "?");
-      s += l.bold ? `${ESC}E${text}${ESC}F` : text;
-      s += "\r\n";
+    for (const page of paginate(lines)) {
+      for (const l of page) {
+        const text = l.text.replace(/[^\x20-\x7e]/g, "?");
+        s += l.bold ? `${ESC}E${text}${ESC}F` : text;
+        s += "\r\n";
+      }
+      s += "\f";
     }
-    s += "\f";
   }
   return s;
 }
 
-/** Monospace HTML for browsers, phones, and any non-dot-matrix printer. */
+/**
+ * The same bill as HTML for browsers, phones and the Windows-driver route.
+ * The page is declared as the real form (9.5 × 11 in) with Courier at 12 pt —
+ * 12 pt Courier advances 0.1 in per character, i.e. 10 cpi, and a 12 pt line
+ * height is 6 lpi — so a driver set to "Custom 9.5 × 11 in, tractor" prints
+ * the identical grid the raw path does.
+ */
 export function billToHtml(copies: BillLine[][]): string {
   const esc = (t: string) =>
     t.replace(
@@ -360,19 +406,20 @@ export function billToHtml(copies: BillLine[][]): string {
       (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[ch]!,
     );
   const pages = copies
+    .flatMap((lines) => paginate(lines))
     .map(
-      (lines) =>
+      (page) =>
         `<pre class="bill">` +
-        lines
+        page
           .map((l) => (l.bold ? `<b>${esc(l.text)}</b>` : esc(l.text)))
           .join("\n") +
         `</pre>`,
     )
     .join(`<div class="cut"></div>`);
   return `<!doctype html><html><head><meta charset="utf-8"/><style>
-    @page { margin: 8mm; }
-    body { margin: 0; }
-    .bill { font: 11.5px/1.3 "Courier New", Courier, monospace; white-space: pre; margin: 0; color: #000; }
+    @page { size: ${FORM.widthIn}in ${FORM.heightIn}in; margin: 0.5in 0.75in; }
+    html, body { margin: 0; padding: 0; }
+    .bill { font: 12pt/12pt "Courier New", Courier, monospace; white-space: pre; margin: 0; color: #000; }
     .cut { page-break-after: always; }
   </style></head><body>${pages}</body></html>`;
 }

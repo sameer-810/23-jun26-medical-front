@@ -11,7 +11,9 @@ import {
   billToHtml,
   qtyText,
   comCode,
+  paginate,
   COLS,
+  FORM,
 } from "../src/modules/sale/billText";
 import type { Sale, InvoiceProfile } from "../src/modules/sale/types";
 
@@ -245,22 +247,24 @@ test("duplicate mode labels each copy and the ESC/P stream is printer-safe", () 
   for (const c of copies) for (const l of c) assert.ok(l.text.length <= COLS);
 
   const escp = billToEscp(copies);
-  assert.ok(escp.startsWith("\x1b@\x1bP"), "starts with reset + 10 cpi");
+  assert.ok(
+    escp.startsWith("\x1b@\x1bP\x1b2"),
+    "reset, 10 cpi, 1/6 in spacing",
+  );
+  assert.ok(escp.includes("\x1bC\x00\x0b"), "form length set to 11 inches");
+  assert.ok(escp.includes("\x1bN\x03"), "skip-over-perforation armed");
   assert.equal((escp.match(/\f/g) || []).length, 2, "one form feed per copy");
   // Bold brackets balance.
   assert.equal(
     (escp.match(/\x1bE/g) || []).length,
     (escp.match(/\x1bF/g) || []).length,
   );
-  // Nothing outside printable ASCII + the control codes we emit.
+  // Printable ASCII plus the control codes we emit: ESC, CR, LF, FF, and the
+  // NUL / small-integer parameters of ESC C (form length) and ESC N.
   for (const ch of escp) {
     const c = ch.charCodeAt(0);
     assert.ok(
-      c === 0x1b ||
-        c === 0x0a ||
-        c === 0x0d ||
-        c === 0x0c ||
-        (c >= 0x20 && c <= 0x7e),
+      c === 0x1b || c <= 0x0f || (c >= 0x20 && c <= 0x7e),
       `bad byte ${c}`,
     );
   }
@@ -268,6 +272,28 @@ test("duplicate mode labels each copy and the ESC/P stream is printer-safe", () 
   const html = billToHtml(copies);
   assert.match(html, /page-break-after: always/);
   assert.equal((html.match(/<pre class="bill">/g) || []).length, 2);
+});
+
+test("a long bill breaks at the form, never across the perforation", () => {
+  const big: Sale = {
+    ...sale,
+    lines: Array.from({ length: 70 }, (_, i) => ({
+      ...sale.lines[0],
+      id: `l${i}`,
+      productName: `Item ${i}`,
+    })),
+  };
+  const lines = renderBillLines(big, profile);
+  assert.ok(lines.length > FORM.printableLines);
+  const pages = paginate(lines);
+  assert.ok(pages.length >= 2);
+  for (const p of pages)
+    assert.ok(p.length <= FORM.printableLines, `page of ${p.length} lines`);
+  assert.equal(pages[1][0].text, "(continued)");
+  // One FF per form, for a single copy.
+  assert.equal((billToEscp([lines]).match(/\f/g) || []).length, pages.length);
+  // The HTML route declares the real stationery.
+  assert.match(billToHtml([lines]), /@page \{ size: 9\.5in 11in/);
 });
 
 test("guide lines print under their item when supplied", () => {

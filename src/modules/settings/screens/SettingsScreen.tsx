@@ -546,7 +546,8 @@ export default function SettingsScreen() {
                   { value: "a4", label: "A4 page (laser / inkjet)" },
                   {
                     value: "text80",
-                    label: "80-column text (dot-matrix, continuous paper)",
+                    label:
+                      "80-column text — dot-matrix on 9.5 × 11 in continuous paper",
                   },
                 ]}
               />
