@@ -126,7 +126,7 @@ export function renderBillLines(
   opts: BillTextOptions = {},
 ): BillLine[] {
   const c = profile?.company;
-  const docType = profile?.print?.documentType || "tax_invoice";
+  const docType = profile?.print?.documentType || "bill_of_supply";
   const isBoS = docType === "bill_of_supply";
   const out: BillLine[] = [];
   const line = (text: string, bold = false) => out.push({ text, bold });
@@ -139,13 +139,17 @@ export function renderBillLines(
     .toUpperCase();
   const addrFull = c?.pincode ? `${addr}-${c.pincode}` : addr;
   for (const l of wrap(addrFull, COLS)) line(center(l));
-  const contact = [
-    c?.phone ? `Ph: ${c.phone}` : "",
-    c?.gstin ? `GSTIN: ${c.gstin}` : "",
-  ]
-    .filter(Boolean)
-    .join("   ");
-  if (contact) line(center(contact));
+  // The client's Bill of Supply keeps the header to name + address + title;
+  // GSTIN and mobile live in the footer. The Tax Invoice shows contact up top.
+  if (!isBoS) {
+    const contact = [
+      c?.phone ? `Ph: ${c.phone}` : "",
+      c?.gstin ? `GSTIN: ${c.gstin}` : "",
+    ]
+      .filter(Boolean)
+      .join("   ");
+    if (contact) line(center(contact));
+  }
   const title = isBoS ? "BILL OF SUPPLY" : "TAX INVOICE";
   line(
     opts.copyLabel
@@ -153,25 +157,46 @@ export function renderBillLines(
       : center(title),
     true,
   );
-  line(rule("="));
+  line(rule(isBoS ? "-" : "="));
 
-  // Metadata grid
-  line(
-    twoUp(
-      `Date: ${fmtDate(sale.saleDate)} ${fmtTime(sale.saleDate)}`,
-      `Bill No: ${sale.invoiceNo}`,
-    ),
-  );
-  line(
-    twoUp(
-      `Name: ${(sale.customerName || "Walk-in").toUpperCase()}`,
-      sale.customerAddress ? `Addr: ${sale.customerAddress.toUpperCase()}` : "",
-    ),
-  );
-  const doct = sale.doctorName ? `Doct: ${sale.doctorName}` : "";
-  const mob = sale.customerMobile ? `Mob: ${sale.customerMobile}` : "";
-  if (doct || mob) line(twoUp(doct, mob));
-  if (sale.customerGstin) line(`Cust GSTIN: ${sale.customerGstin}`);
+  // Metadata grid — "Date : " / "Scheduled Bill No.: " exactly as the
+  // client's existing bills read, so nothing changes for their customers.
+  if (isBoS) {
+    line(
+      twoUp(
+        `Date : ${fmtDate(sale.saleDate)}`,
+        `Scheduled Bill No.: ${sale.invoiceNo}`,
+      ),
+    );
+    line(
+      twoUp(
+        `Name : ${(sale.customerName || "Walk-in").toUpperCase()}`,
+        sale.customerAddress
+          ? `Addr : ${sale.customerAddress.toUpperCase()}`
+          : "",
+      ),
+    );
+    if (sale.doctorName) line(`Doct : ${sale.doctorName}`);
+  } else {
+    line(
+      twoUp(
+        `Date: ${fmtDate(sale.saleDate)} ${fmtTime(sale.saleDate)}`,
+        `Bill No: ${sale.invoiceNo}`,
+      ),
+    );
+    line(
+      twoUp(
+        `Name: ${(sale.customerName || "Walk-in").toUpperCase()}`,
+        sale.customerAddress
+          ? `Addr: ${sale.customerAddress.toUpperCase()}`
+          : "",
+      ),
+    );
+    const doct = sale.doctorName ? `Doct: ${sale.doctorName}` : "";
+    const mob = sale.customerMobile ? `Mob: ${sale.customerMobile}` : "";
+    if (doct || mob) line(twoUp(doct, mob));
+    if (sale.customerGstin) line(`Cust GSTIN: ${sale.customerGstin}`);
+  }
   line(rule());
 
   // Items
@@ -274,7 +299,7 @@ export function renderBillLines(
     const less = Math.max(0, mrpVal - sale.grandTotal);
     line(
       twoUp(
-        `MRP Val: ${money(mrpVal)}     Less: ${money(less)}`,
+        `MRP Val : ${money(mrpVal)}        Less : ${money(less)}`,
         `Net Amount: ${money(sale.grandTotal)}`,
       ),
       true,
@@ -302,23 +327,42 @@ export function renderBillLines(
   // Footer
   const foot1 = [
     "E & O.E.",
-    c?.jurisdiction ? `Subject to ${c.jurisdiction} jurisdiction` : "",
+    c?.jurisdiction
+      ? `Subject to ${c.jurisdiction.toUpperCase()} jurisdiction`
+      : "",
   ]
     .filter(Boolean)
     .join(" ");
-  const lic = [c?.drugLicenseNo, c?.drugLicenseNo2].filter(Boolean).join(", ");
-  const licText = lic ? `Drug Lic. No: ${lic}` : "";
+  const lic = [c?.drugLicenseNo, c?.drugLicenseNo2].filter(Boolean).join(",");
+  const licText = lic ? `Drug Lic. No. ${lic}` : "";
+  const shop = (c?.legalName || "").toUpperCase();
+
+  if (isBoS) {
+    /**
+     * Mirrors the client's existing bill, line for line:
+     *   E & O.E. Subject to MUMBAI jurisdiction          For ASHOK MEDICAL
+     *   Drug Lic. No. 20/…,21/…
+     *   GSTIN : 27…                                          (signature)
+     *   MOBILE NO.-86525…                                       Pharmacist
+     */
+    line(twoUp(foot1, shop ? `For ${shop}` : ""));
+    if (licText) line(licText);
+    line(c?.gstin ? `GSTIN : ${c.gstin}` : "");
+    line(
+      twoUp(
+        `MOBILE NO.-${c?.mobile || c?.phone || ""}`,
+        c?.pharmacistName ? `${c.pharmacistName}, Pharmacist` : "Pharmacist",
+      ),
+    );
+    return out;
+  }
+
   // Two licence numbers plus the jurisdiction clause don't share 80 columns;
   // never truncate a legal line — give each its own.
   if (foot1.length + 1 + licText.length <= COLS) line(twoUp(foot1, licText));
   else {
     if (foot1) line(foot1);
     if (licText) line(licText);
-  }
-  if (isBoS) {
-    line(
-      "Composition taxable person, not eligible to collect tax on supplies.",
-    );
   }
   line(
     twoUp(

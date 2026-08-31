@@ -5,6 +5,8 @@ import {
   renderBillLines,
   billToEscp,
   billToHtml,
+  qtyText,
+  comCode,
   BillLine,
   FORM,
 } from "@modules/sale/billText";
@@ -16,9 +18,108 @@ const esc = (s: string) =>
     /[&<>]/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!,
   );
+const expMMYY = (iso?: string | null) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getFullYear()).slice(-2)}`;
+};
+const ddmmyyyy = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
+};
 
-/** Builds a GST-compliant A4 tax-invoice HTML for printing (SOW §9.1). */
+/**
+ * The A4 Bill of Supply — the client's counter format on a page printer:
+ * no tax anywhere, MRP Val / Less / Net, both licences, jurisdiction, GSTIN
+ * in the footer, "For <shop>" over the pharmacist's signature.
+ */
+function billOfSupplyHtml(sale: Sale, profile?: InvoiceProfile): string {
+  const c = profile?.company;
+  const shop = (c?.legalName || "").toUpperCase();
+  let mrpVal = 0;
+  const rows = sale.lines
+    .map((l) => {
+      mrpVal += (Number(l.mrp) || 0) * (Number(l.quantity) || 0);
+      const a = l.allocations?.[0];
+      const more = (l.allocations || [])
+        .slice(1)
+        .map(
+          (x) =>
+            `<div class="muted">${esc(x.batchNumber)} · ${expMMYY(x.expiryDate)}</div>`,
+        )
+        .join("");
+      return `
+    <tr>
+      <td>${esc(qtyText(l))}</td>
+      <td>${esc(l.productName.toUpperCase())}</td>
+      <td>${esc(comCode(l))}</td>
+      <td>${esc(a?.batchNumber || "")}${more}</td>
+      <td>${expMMYY(a?.expiryDate)}</td>
+      <td class="r">${money(l.lineTotal)}</td>
+    </tr>`;
+    })
+    .join("");
+  const less = Math.max(0, mrpVal - sale.grandTotal);
+  const lic = [c?.drugLicenseNo, c?.drugLicenseNo2].filter(Boolean).join(",");
+  const addr = [c?.addressLine1, c?.addressLine2, c?.city]
+    .filter(Boolean)
+    .join(", ")
+    .toUpperCase();
+
+  return `<!doctype html><html><head><meta charset="utf-8"/>
+  <style>
+    * { font-family: "Courier New", Courier, monospace; color: #000; }
+    body { padding: 24px 28px; font-size: 12px; }
+    .c { text-align:center; }
+    h1 { font-size: 16px; margin: 0; }
+    .title { font-weight:700; font-size: 14px; margin: 6px 0; }
+    .grid { display:flex; justify-content:space-between; margin: 6px 0; }
+    table { width:100%; border-collapse:collapse; margin-top:6px; }
+    th, td { padding:4px 6px; text-align:left; vertical-align:top; }
+    th { border-top:1px dashed #000; border-bottom:1px dashed #000; font-weight:700; }
+    tbody tr:last-child td { border-bottom:1px dashed #000; }
+    .r { text-align:right; }
+    .muted { font-size:10px; }
+    .totals { display:flex; justify-content:space-between; font-weight:700; margin:8px 0; padding-bottom:6px; border-bottom:1px dashed #000; }
+    .foot { display:flex; justify-content:space-between; margin-top:8px; }
+    .sign { text-align:right; }
+    .sign img { max-height:56px; max-width:200px; object-fit:contain; display:block; margin-left:auto; }
+    .signline { width:180px; height:36px; margin-left:auto; }
+  </style></head><body>
+    <h1 class="c">${esc(shop)}</h1>
+    <div class="c">${esc(addr)}${c?.pincode ? "-" + esc(c.pincode) : ""}</div>
+    <div class="c title">BILL OF SUPPLY</div>
+    <div class="grid"><span>Date : ${ddmmyyyy(sale.saleDate)}</span><span>Scheduled Bill No.: ${esc(sale.invoiceNo)}</span></div>
+    <div class="grid"><span>Name : ${esc((sale.customerName || "Walk-in").toUpperCase())}</span><span>${sale.customerAddress ? "Addr : " + esc(sale.customerAddress.toUpperCase()) : ""}</span></div>
+    ${sale.doctorName ? `<div>Doct : ${esc(sale.doctorName)}</div>` : ""}
+    <table>
+      <thead><tr><th>Qty</th><th>Description</th><th>Com</th><th>Batch</th><th>Exp</th><th class="r">Amount</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="totals"><span>MRP Val : ${money(mrpVal)}</span><span>Less : ${money(less)}</span><span>Net Amount: ${money(sale.grandTotal)}</span></div>
+    <div class="foot">
+      <div>
+        <div>E &amp; O.E. ${c?.jurisdiction ? "Subject to " + esc(c.jurisdiction.toUpperCase()) + " jurisdiction" : ""}</div>
+        ${lic ? `<div>Drug Lic. No. ${esc(lic)}</div>` : ""}
+        ${c?.gstin ? `<div>GSTIN : ${esc(c.gstin)}</div>` : ""}
+        <div>MOBILE NO.-${esc(c?.mobile || c?.phone || "")}</div>
+      </div>
+      <div class="sign">
+        <div>For ${esc(shop)}</div>
+        ${c?.signatureImage ? `<img src="${esc(c.signatureImage)}" alt="" />` : `<div class="signline"></div>`}
+        <div>${c?.pharmacistName ? esc(c.pharmacistName) + ", " : ""}Pharmacist</div>
+      </div>
+    </div>
+  </body></html>`;
+}
+
+/** Builds the A4 HTML for printing — Tax Invoice or Bill of Supply per settings. */
 export function invoiceHtml(sale: Sale, profile?: InvoiceProfile): string {
+  if ((profile?.print?.documentType || "bill_of_supply") === "bill_of_supply") {
+    return billOfSupplyHtml(sale, profile);
+  }
   const c = profile?.company;
   const intra = sale.taxType === "intra";
   const rows = sale.lines

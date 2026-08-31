@@ -178,10 +178,12 @@ test("the Bill of Supply carries the sample's fields", () => {
     .join("\n");
   assert.match(text, /ASHOK MEDICAL/);
   assert.match(text, /BILL OF SUPPLY/);
-  assert.match(text, /Bill No: SM-T1-0272/);
-  assert.match(text, /Name: MEHBOOB BEE/);
-  assert.match(text, /Addr: CHEMBUR/);
-  assert.match(text, /Doct: uday nayak/);
+  assert.match(text, /Date : 15-07-2026 {2,}Scheduled Bill No\.: SM-T1-0272/);
+  assert.match(text, /Name : MEHBOOB BEE/);
+  assert.match(text, /Addr : CHEMBUR/);
+  assert.match(text, /Doct : uday nayak/);
+  // Header carries no phone/GSTIN on the client's bill; they sit in the footer.
+  assert.doesNotMatch(text.split("BILL OF SUPPLY")[0], /Ph:|GSTIN/);
   assert.match(
     text,
     /1x70 G\s+OMNIDENT GEL 70GM\s+GRO\s+OM25118\s+10-27\s+156\.00/,
@@ -198,15 +200,17 @@ test("the Bill of Supply carries the sample's fields", () => {
   // MRP Val = 156 + 2×2317.01 = 4790.02; Less = MRP Val − Net.
   assert.match(
     text,
-    /MRP Val: 4790\.02\s+Less: 2663\.02\s+Net Amount: 2127\.00/,
+    /MRP Val : 4790\.02\s+Less : 2663\.02\s+Net Amount: 2127\.00/,
   );
-  assert.match(text, /Subject to Mumbai jurisdiction/);
-  assert.match(text, /Drug Lic\. No: 20\/MH-MZ3-440352, 21\/MH-MZ3-440353/);
-  assert.match(text, /Composition taxable person/);
-  assert.match(text, /Pharmacist Signature: _+/);
-  assert.match(text, /MOBILE NO: 8652586786/);
-  // A Bill of Supply must not show tax.
-  assert.doesNotMatch(text, /CGST|SGST|IGST/);
+  assert.match(
+    text,
+    /E & O\.E\. Subject to MUMBAI jurisdiction\s+For ASHOK MEDICAL/,
+  );
+  assert.match(text, /Drug Lic\. No\. 20\/MH-MZ3-440352,21\/MH-MZ3-440353/);
+  assert.match(text, /GSTIN : 27BNTPK2259R1Z9/);
+  assert.match(text, /MOBILE NO\.-8652586786\s+R\. Khan, Pharmacist/);
+  // A Bill of Supply must not show tax — the whole reason it exists.
+  assert.doesNotMatch(text, /CGST|SGST|IGST|Taxable/);
 });
 
 test("the Tax Invoice shows the GST split and no composition line", () => {
