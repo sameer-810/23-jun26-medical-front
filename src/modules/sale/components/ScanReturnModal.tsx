@@ -40,9 +40,10 @@ export function ScanReturnModal({ visible, onClose, onPick }: Props) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  const [lot, setLot] = useState<{ batchNumber: string; product: string } | null>(
-    null,
-  );
+  const [lot, setLot] = useState<{
+    batchNumber: string;
+    product: string;
+  } | null>(null);
   const [matches, setMatches] = useState<ScanReturnMatch[] | null>(null);
 
   const resolve = async (raw: string) => {
@@ -100,13 +101,18 @@ export function ScanReturnModal({ visible, onClose, onPick }: Props) {
     >
       <Pressable style={styles.backdrop} onPress={close}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <HStack align="center" justify="space-between" style={{ marginBottom: 12 }}>
+          <HStack
+            align="center"
+            justify="space-between"
+            style={{ marginBottom: 12 }}
+          >
             <VStack gap={0} flex={1}>
               <Text variant="h3" tone="primary">
                 Return by scan
               </Text>
               <Text variant="caption" tone="tertiary">
-                Scan the pack&apos;s shelf label to find the invoice it was sold on
+                Scan the pack&apos;s shelf label to find the invoice it was sold
+                on
               </Text>
             </VStack>
             <Pressable onPress={close} hitSlop={8} accessibilityLabel="Close">
@@ -142,7 +148,11 @@ export function ScanReturnModal({ visible, onClose, onPick }: Props) {
 
           {lot && matches && matches.length > 0 ? (
             <View style={{ marginTop: 12 }}>
-              <Text variant="label" tone="secondary" style={{ marginBottom: 6 }}>
+              <Text
+                variant="label"
+                tone="secondary"
+                style={{ marginBottom: 6 }}
+              >
                 Lot {lot.batchNumber}
                 {lot.product ? ` · ${lot.product}` : ""} — sold on:
               </Text>
@@ -169,8 +179,10 @@ export function ScanReturnModal({ visible, onClose, onPick }: Props) {
                       </HStack>
                       <Text variant="caption" tone="tertiary" numberOfLines={1}>
                         {m.customerName}
-                        {m.customerMobile ? ` · ${m.customerMobile}` : ""} ·{" "}
-                        {fmtDate(m.saleDate)} · {fmtMoney(m.grandTotal)}
+                        {m.customerMobile
+                          ? ` · ${m.customerMobile}`
+                          : ""} · {fmtDate(m.saleDate)} ·{" "}
+                        {fmtMoney(m.grandTotal)}
                       </Text>
                     </VStack>
                     <ChevronRight

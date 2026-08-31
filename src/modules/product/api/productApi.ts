@@ -6,6 +6,8 @@ import {
   Category,
   Brand,
   Paginated,
+  MedicineGuide,
+  ProductGuide,
 } from "@modules/product/types";
 import {
   withLocalFallback,
@@ -36,6 +38,22 @@ export const productApi = {
     const res = await apiClient.get<{ success: boolean; data: Product }>(
       `/products/${id}`,
     );
+    return res.data.data;
+  },
+  /** The customer-facing Medicine Guide for one product. */
+  guide: async (id: string) => {
+    const res = await apiClient.get<{ success: boolean; data: ProductGuide }>(
+      `/products/${id}/guide`,
+    );
+    return res.data.data;
+  },
+  /** Guides for the products on one bill, keyed by product id. */
+  guides: async (ids: string[]) => {
+    if (!ids.length) return {} as Record<string, MedicineGuide>;
+    const res = await apiClient.get<{
+      success: boolean;
+      data: Record<string, MedicineGuide>;
+    }>("/products/guides", { params: { ids: ids.join(",") } });
     return res.data.data;
   },
   create: async (payload: ProductPayload) => {

@@ -36,6 +36,9 @@ import { useProducts } from "@modules/product/hooks/useProducts";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { AlternativeItem } from "@modules/inventory/types";
 import { useScanGun } from "@shared/useScanGun";
+import { TextField } from "@shared/ui/TextField";
+import { RxGateModal } from "@modules/sale/components/RxGateModal";
+import { useOfflineStore } from "@shared/offline/useOfflineStore";
 import {
   useCustomers,
   useCreateCustomer,
@@ -181,6 +184,11 @@ export default function NewSaleScreen() {
 
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerTerm, setCustomerTerm] = useState("");
+  // "Doct:" on the bill and the prescriber in the Schedule H register.
+  const [doctorName, setDoctorName] = useState("");
+  // The prescription this sale is dispensed against, once the gate has run.
+  const [prescriptionId, setPrescriptionId] = useState<string | null>(null);
+  const [rxGateOpen, setRxGateOpen] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setCustomerTerm(customerQuery.trim()), 250);
     return () => clearTimeout(t);
@@ -692,12 +700,45 @@ export default function NewSaleScreen() {
     blankQtyLines.length === 0 &&
     (!isFreeSale || ackFreeSale) &&
     !mut.isPending;
-  const submit = () => {
+  /**
+   * Items the law says need a doctor's prescription: Schedule H / H1 / X or
+   * flagged Rx. Judged from the product rows the screen already holds.
+   */
+  const rxItems = validLines
+    .map((l) => knownProducts[l.productId])
+    .filter(
+      (p) =>
+        Boolean(p) &&
+        (p.prescriptionRequired ||
+          ["H", "H1", "X"].includes(String(p.scheduleDrug || ""))),
+    )
+    .map((p) => p.name);
+
+  const submit = (rxOverride?: string | null) => {
     if (!canSubmit) return;
     setQueuedNotice(null);
+    const rxId = rxOverride ?? prescriptionId;
+    /**
+     * Prescription gate: a live sale of a scheduled item stops here until a
+     * prescription is on record. Offline, the bill goes through — the
+     * server accepts a replayed offline bill with the doctor's name and the
+     * register still gets its entry; the pharmacy can switch enforcement
+     * off in Settings.
+     */
+    if (
+      rxItems.length > 0 &&
+      !rxId &&
+      invoiceProfile?.rx?.enforce !== false &&
+      useOfflineStore.getState().online
+    ) {
+      setRxGateOpen(true);
+      return;
+    }
     mut.mutate(
       {
         customerId,
+        doctorName: doctorName.trim() || undefined,
+        prescriptionId: rxId || undefined,
         taxType,
         paymentMode: paymentMode as never,
         lines: validLines,
@@ -709,6 +750,8 @@ export default function NewSaleScreen() {
           // below are captured render values and stay valid after this reset.
           setLines([]);
           setCustomerId(null);
+          setDoctorName("");
+          setPrescriptionId(null);
           setPaymentMode("cash");
           setRefillDays("");
           /**
@@ -1189,6 +1232,13 @@ export default function NewSaleScreen() {
           }}
           allowClear
         />
+        <TextField
+          label="Doctor (optional)"
+          placeholder="Prescribing doctor — prints as Doct: on the bill"
+          value={doctorName}
+          onChangeText={setDoctorName}
+          autoCapitalize="words"
+        />
         {/* Only once a customer is named — there is nobody to ring back on a
             walk-in sale, so the control would just be noise. */}
         {customerId ? (
@@ -1389,6 +1439,28 @@ export default function NewSaleScreen() {
         <Banner
           tone="danger"
           message={apiErrorMessage(mut.error)}
+          style={{ marginBottom: 12 }}
+        />
+      ) : null}
+      <RxGateModal
+        visible={rxGateOpen}
+        customerId={customerId}
+        customerName={selectedCustomer?.name}
+        rxItems={rxItems}
+        doctorName={doctorName}
+        onDone={(id, doc) => {
+          setPrescriptionId(id);
+          if (doc) setDoctorName(doc);
+          setRxGateOpen(false);
+          // Continue the sale the pharmacist already asked for.
+          submit(id);
+        }}
+        onCancel={() => setRxGateOpen(false)}
+      />
+      {prescriptionId && rxItems.length > 0 ? (
+        <Banner
+          tone="success"
+          message="Prescription attached — this sale goes into the Schedule H register."
           style={{ marginBottom: 12 }}
         />
       ) : null}

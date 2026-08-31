@@ -473,7 +473,9 @@ export default function ReceiveStockScreen() {
         product: lite,
         knownLot: Boolean(lot),
         batchNumber: lot?.batchNumber || "",
-        expiryDate: lot?.expiryDate ? isoToDate(lot.expiryDate).slice(0, 7) : "",
+        expiryDate: lot?.expiryDate
+          ? isoToDate(lot.expiryDate).slice(0, 7)
+          : "",
         mrp: lot?.mrp ? String(lot.mrp) : "",
         purchasePrice: lot?.purchasePrice ? String(lot.purchasePrice) : "",
       });

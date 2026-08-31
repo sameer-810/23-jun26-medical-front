@@ -89,3 +89,19 @@ export interface Paginated<T> {
   data: T[];
   meta: { total: number; pages: number; page: number };
 }
+
+/** Customer-facing Medicine Guide, condensed from the catalogue. */
+export interface MedicineGuide {
+  use: string;
+  sideEffects: string;
+  warnings: string;
+  storage: string;
+  prescriptionRequired: boolean;
+}
+
+export interface ProductGuide {
+  productId: string;
+  name: string;
+  guide: MedicineGuide | null;
+  source: { catalogSku: string; manufacturerName: string } | null;
+}

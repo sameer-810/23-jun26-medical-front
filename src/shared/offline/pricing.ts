@@ -15,6 +15,10 @@ export interface OfflinePriceLineInput {
   productName: string;
   sku?: string;
   hsnCode?: string;
+  mrp?: number;
+  manufacturerName?: string;
+  brandName?: string;
+  baseUnit?: string;
   unit: string;
   /** Base units per sale unit (1 when selling the base unit). */
   factor: number;
@@ -30,6 +34,10 @@ export interface OfflinePricedSale {
     productName: string;
     sku: string;
     hsnCode: string;
+    mrp: number;
+    manufacturerName: string;
+    brandName: string;
+    baseUnit: string;
     unit: string;
     quantity: number;
     baseQuantity: number;
@@ -102,6 +110,10 @@ export function priceSaleLocally(
       productName: line.productName,
       sku: line.sku || "",
       hsnCode: line.hsnCode || "",
+      mrp: line.mrp || 0,
+      manufacturerName: line.manufacturerName || "",
+      brandName: line.brandName || "",
+      baseUnit: line.baseUnit || "",
       unit: line.unit,
       quantity: line.quantity,
       baseQuantity: round3(line.quantity * line.factor),

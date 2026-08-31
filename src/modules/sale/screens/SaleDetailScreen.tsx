@@ -1,8 +1,18 @@
 import React, { useState } from "react";
 import { View } from "react-native";
 import { useRoute } from "@react-navigation/native";
-import { Printer, Undo2, MapPin, MessageCircle } from "lucide-react-native";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Printer,
+  Undo2,
+  MapPin,
+  MessageCircle,
+  BookOpen,
+} from "lucide-react-native";
 import { useSale, useInvoiceProfile } from "@modules/sale/hooks/useSales";
+import { productApi } from "@modules/product/api/productApi";
+import { GuideModal } from "@modules/sale/components/GuideModal";
+import { guideShareText } from "@modules/sale/guideSlip";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { printInvoice } from "@modules/sale/invoice";
@@ -33,6 +43,25 @@ export default function SaleDetailScreen() {
   const id = route.params?.id as string;
   const { data: sale, isLoading, isError, error } = useSale(id);
   const { data: profile } = useInvoiceProfile();
+  // Medicine guides for the items on this bill — for the slip, the share
+  // text, and the one-line "Use:" the bill prints when the shop wants it.
+  const productIds = (sale?.lines || []).map((l) => l.productId);
+  const guidesQ = useQuery({
+    queryKey: ["product-guides", productIds.join(",")],
+    queryFn: () => productApi.guides(productIds),
+    enabled: productIds.length > 0,
+    staleTime: 10 * 60_000,
+  });
+  const guides = guidesQ.data || {};
+  const [guideOpen, setGuideOpen] = useState(false);
+  const guideUseLines = () =>
+    profile?.print?.guideOnBill
+      ? Object.fromEntries(
+          Object.entries(guides)
+            .filter(([, g]) => g.use)
+            .map(([pid, g]) => [pid, g.use]),
+        )
+      : undefined;
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canReturn = hasPermission(PERMISSIONS.SALES_MANAGE);
   const shopName = useAuthStore((s) => s.organization?.name) || "Pharmacy";
@@ -101,7 +130,7 @@ export default function SaleDetailScreen() {
       sale.saleDate,
     )}\n\n${items}\n\n*Total: ${fmtMoneyExact(
       sale.grandTotal,
-    )}*\nThank you for your visit!`;
+    )}*\nThank you for your visit!${guideShareText(sale, guides)}`;
   };
 
   return (
@@ -140,7 +169,20 @@ export default function SaleDetailScreen() {
             icon={
               <Printer size={16} color={palette.text.primary} strokeWidth={2} />
             }
-            onPress={() => printInvoice(sale, profile)}
+            onPress={() => printInvoice(sale, profile, guideUseLines())}
+          />
+          <Button
+            label="Guide"
+            variant="secondary"
+            fullWidth={false}
+            icon={
+              <BookOpen
+                size={16}
+                color={palette.text.primary}
+                strokeWidth={2}
+              />
+            }
+            onPress={() => setGuideOpen(true)}
           />
           {canReturn && !fullyReturned && (
             <Button
@@ -321,6 +363,13 @@ export default function SaleDetailScreen() {
         </>
       )}
 
+      <GuideModal
+        visible={guideOpen}
+        sale={sale}
+        guides={guides}
+        shopName={shopName}
+        onClose={() => setGuideOpen(false)}
+      />
       <ReturnModal
         visible={returnOpen}
         sale={sale}

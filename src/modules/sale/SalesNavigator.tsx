@@ -4,12 +4,14 @@ import NewSaleScreen from "@modules/sale/screens/NewSaleScreen";
 import SalesListScreen from "@modules/sale/screens/SalesListScreen";
 import SaleDetailScreen from "@modules/sale/screens/SaleDetailScreen";
 import OfflineSyncScreen from "@modules/sale/screens/OfflineSyncScreen";
+import RxRegisterScreen from "@modules/sale/screens/RxRegisterScreen";
 
 export type SaleStackParamList = {
   NewSale: undefined;
   SalesList: undefined;
   SaleDetail: { id: string };
   OfflineSync: undefined;
+  RxRegister: undefined;
 };
 
 const Stack = createNativeStackNavigator<SaleStackParamList>();
@@ -29,6 +31,7 @@ export default function SalesNavigator() {
       <Stack.Screen name="SalesList" component={SalesListScreen} />
       <Stack.Screen name="SaleDetail" component={SaleDetailScreen} />
       <Stack.Screen name="OfflineSync" component={OfflineSyncScreen} />
+      <Stack.Screen name="RxRegister" component={RxRegisterScreen} />
     </Stack.Navigator>
   );
 }

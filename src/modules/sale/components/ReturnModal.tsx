@@ -41,7 +41,8 @@ export function ReturnModal({
       // One sale unit, in base units (a strip of 10 tablets → 10).
       const oneUnit = l.quantity > 0 ? l.baseQuantity / l.quantity : 1;
       const suggested = Math.min(returnable, oneUnit);
-      if (suggested > 0) initial[id] = String(Math.round(suggested * 1000) / 1000);
+      if (suggested > 0)
+        initial[id] = String(Math.round(suggested * 1000) / 1000);
     }
     return initial;
   });

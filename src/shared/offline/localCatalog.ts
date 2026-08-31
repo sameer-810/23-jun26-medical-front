@@ -43,6 +43,7 @@ export interface LocalProduct extends BaseRow {
   saltComposition?: string;
   categoryName?: string;
   brandName?: string;
+  manufacturerName?: string;
   baseUnit: string;
   packs: { unit: string; factor: number }[];
   sellingPrice: number;

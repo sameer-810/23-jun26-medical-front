@@ -43,12 +43,17 @@ interface DesktopBridge {
   listPrinters?: () => Promise<
     { name: string; displayName?: string; isDefault?: boolean }[]
   >;
+  /** Raw bytes to a shared printer / port — dot-matrix text bills. */
+  printRaw?: (req: {
+    data: string;
+    target: string;
+  }) => Promise<{ ok: boolean; reason?: string }>;
 }
 
 function desktop(): DesktopBridge | null {
   if (typeof window === "undefined") return null;
   const bridge = (window as unknown as { medstock?: DesktopBridge }).medstock;
-  return bridge?.printExact ? bridge : null;
+  return bridge?.printExact || bridge?.printRaw ? bridge : null;
 }
 
 /** Is an exact-size, no-dialog print available right now? */
@@ -165,6 +170,54 @@ export function setLabelScale(scale: number | null): void {
     }
   } catch {
     // Private-mode browsers throw; printing uncalibrated is still printing.
+  }
+}
+
+/**
+ * Where text bills go on THIS machine: a Windows printer share
+ * (`\\localhost\LX310`) or a port (`LPT1`). Per machine, like the label
+ * printer — it names hardware plugged into this counter. Empty = no raw
+ * path; bills print through the normal (graphics) route instead.
+ */
+const BILL_PRINTER_KEY = "plusveda.billPrinter";
+
+export function getBillPrinter(): string | undefined {
+  try {
+    return localStorage.getItem(BILL_PRINTER_KEY) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function setBillPrinter(target: string | null): void {
+  try {
+    if (target && target.trim())
+      localStorage.setItem(BILL_PRINTER_KEY, target.trim());
+    else localStorage.removeItem(BILL_PRINTER_KEY);
+  } catch {
+    // Private-mode browsers throw; the graphics path still prints.
+  }
+}
+
+/** Can this machine push raw bytes to a printer right now? */
+export function canPrintRaw(): boolean {
+  return Platform.OS === "web" && !!desktop()?.printRaw && !!getBillPrinter();
+}
+
+/**
+ * Send raw printer bytes (ESC/P text) to the configured bill printer.
+ * Resolves false when no raw path exists or the shell couldn't deliver —
+ * the caller then prints the HTML rendering instead.
+ */
+export async function printRaw(data: string): Promise<boolean> {
+  const bridge = desktop();
+  const target = getBillPrinter();
+  if (!bridge?.printRaw || !target) return false;
+  try {
+    const res = await bridge.printRaw({ data, target });
+    return !!res?.ok;
+  } catch {
+    return false;
   }
 }
 

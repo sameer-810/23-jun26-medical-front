@@ -12,7 +12,14 @@ export interface Settings {
     email: string;
     logoUrl: string;
     drugLicenseNo: string;
+    /** Second retail licence (Form 20 + Form 21 both print on the bill). */
+    drugLicenseNo2?: string;
     gstin: string;
+    /** "Subject to <city> jurisdiction" on the bill. */
+    jurisdiction?: string;
+    pharmacistName?: string;
+    /** Footer mobile, when different from the landline. */
+    mobile?: string;
     /** Owner signature / shop stamp printed on the invoice, as a data URI. */
     signatureImage?: string;
     signatureLabel?: string;
@@ -22,6 +29,12 @@ export interface Settings {
     defaultRatePct: number;
     priceIncludesTax: boolean;
     invoicePrefix: string;
+  };
+  print?: {
+    documentType: "tax_invoice" | "bill_of_supply";
+    layout: "a4" | "text80";
+    copies: "single" | "duplicate";
+    guideOnBill: boolean;
   };
   currency: string;
   expiryAlertDays: number[];
@@ -45,6 +58,7 @@ export interface Settings {
 export type SettingsPatch = {
   company?: Partial<Settings["company"]>;
   tax?: Partial<Settings["tax"]>;
+  print?: Partial<NonNullable<Settings["print"]>>;
   currency?: string;
   expiryAlertDays?: number[];
   alertChannels?: Partial<Settings["alertChannels"]>;

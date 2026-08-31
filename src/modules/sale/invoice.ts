@@ -1,6 +1,12 @@
 import { Sale, InvoiceProfile } from "@modules/sale/types";
-import { printHtml } from "@shared/print";
+import { printHtml, printRaw } from "@shared/print";
 import { fmtMoneyExact, fmtDateTime } from "@shared/format";
+import {
+  renderBillLines,
+  billToEscp,
+  billToHtml,
+  BillLine,
+} from "@modules/sale/billText";
 
 /** Every figure on a tax invoice carries its paisa: ₹64.50, not ₹64.5. */
 const money = fmtMoneyExact;
@@ -117,6 +123,55 @@ export function invoiceHtml(sale: Sale, profile?: InvoiceProfile): string {
   </body></html>`;
 }
 
-export async function printInvoice(sale: Sale, profile?: InvoiceProfile) {
-  await printHtml(invoiceHtml(sale, profile));
+/**
+ * Print a bill the way this pharmacy has configured it.
+ *
+ *  layout "a4"     → the existing HTML invoice (one page per copy).
+ *  layout "text80" → the 80-column text bill: raw ESC/P to the dot-matrix
+ *                    printer when this machine has one configured, else the
+ *                    same text as a monospace HTML page.
+ *  copies          → "duplicate" adds a labelled PHARMACY COPY.
+ *
+ * `guideByProduct` carries the Medicine Guide's one-line "Use:" per item.
+ */
+export async function printInvoice(
+  sale: Sale,
+  profile?: InvoiceProfile,
+  guideByProduct?: Record<string, string>,
+) {
+  const layout = profile?.print?.layout || "a4";
+  const duplicate = profile?.print?.copies === "duplicate";
+
+  if (layout !== "text80") {
+    const html = invoiceHtml(sale, profile);
+    if (!duplicate) {
+      await printHtml(html);
+      return;
+    }
+    // Two copies in ONE document — the print pipeline has no copies knob.
+    const body = html
+      .replace(/^[\s\S]*?<body>/, "")
+      .replace(/<\/body>[\s\S]*$/, "");
+    const head = html.slice(0, html.indexOf("<body>") + 6);
+    await printHtml(
+      `${head}${body}<div style="page-break-after:always"></div>${body}</body></html>`,
+    );
+    return;
+  }
+
+  const copies: BillLine[][] = duplicate
+    ? [
+        renderBillLines(sale, profile, {
+          copyLabel: "CUSTOMER COPY",
+          guideByProduct,
+        }),
+        renderBillLines(sale, profile, {
+          copyLabel: "PHARMACY COPY",
+          guideByProduct,
+        }),
+      ]
+    : [renderBillLines(sale, profile, { guideByProduct })];
+
+  if (await printRaw(billToEscp(copies))) return;
+  await printHtml(billToHtml(copies));
 }

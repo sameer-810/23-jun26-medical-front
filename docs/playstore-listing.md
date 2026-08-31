@@ -10,14 +10,14 @@ features the app lacks, and overpromising earns refunds and one-star reviews.
 
 ## 0. Values you must confirm first
 
-| Field                | Value used here                                                 | Check                                                                           |
-| -------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Developer / company  | FiveM Infotech                                                  | taken from the AshShifa launch doc                                              |
-| Public support email | `5fivempvt@gmail.com`                                           | same source                                                                     |
-| Privacy policy URL   | `https://portal.plusveda.online/privacy-policy.html`            | live, 200 OK                                                                    |
-| Data deletion URL    | `https://portal.plusveda.online/delete-account.html`            | live, 200 OK                                                                    |
-| Package name         | `com.medstock.app`                                              | matches the EAS keystore `99:BE:F7:38…` — create the Play app with THIS package |
-| Reviewer login       | `<REVIEWER_EMAIL>` / `<REVIEWER_PASSWORD>`                      | created and tested — see §5; the real values are never committed                |
+| Field                | Value used here                                      | Check                                                                           |
+| -------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Developer / company  | FiveM Infotech                                       | taken from the AshShifa launch doc                                              |
+| Public support email | `5fivempvt@gmail.com`                                | same source                                                                     |
+| Privacy policy URL   | `https://portal.plusveda.online/privacy-policy.html` | live, 200 OK                                                                    |
+| Data deletion URL    | `https://portal.plusveda.online/delete-account.html` | live, 200 OK                                                                    |
+| Package name         | `com.medstock.app`                                   | matches the EAS keystore `99:BE:F7:38…` — create the Play app with THIS package |
+| Reviewer login       | `<REVIEWER_EMAIL>` / `<REVIEWER_PASSWORD>`           | created and tested — see §5; the real values are never committed                |
 
 ---
 
@@ -110,13 +110,13 @@ Questions or help: 5fivempvt@gmail.com
 
 ## 3. Store settings
 
-| Field              | Value                                       |
-| ------------------ | ------------------------------------------- |
-| App category       | Business                                    |
-| Tags               | Business tools, Finance & accounting        |
-| Email address      | `5fivempvt@gmail.com`                       |
-| Website (optional) | `https://www.plusveda.online`                |
-| External marketing | Leave unticked unless you plan Google Ads   |
+| Field              | Value                                     |
+| ------------------ | ----------------------------------------- |
+| App category       | Business                                  |
+| Tags               | Business tools, Finance & accounting      |
+| Email address      | `5fivempvt@gmail.com`                     |
+| Website (optional) | `https://www.plusveda.online`             |
+| External marketing | Leave unticked unless you plan Google Ads |
 
 ---
 

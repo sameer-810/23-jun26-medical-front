@@ -133,7 +133,11 @@ function Form({
 
   return (
     <View style={styles.panel}>
-      <HStack align="center" justify="space-between" style={{ marginBottom: 8 }}>
+      <HStack
+        align="center"
+        justify="space-between"
+        style={{ marginBottom: 8 }}
+      >
         <VStack gap={0} flex={1}>
           <Text variant="label-lg" tone="primary" numberOfLines={1}>
             {entry.product.name}
@@ -195,8 +199,8 @@ function Form({
         />
       </HStack>
       <Text variant="caption" tone="tertiary" style={{ marginTop: 6 }}>
-        Enter moves to the next box; Enter on MRP adds the line and returns
-        to the scanner.
+        Enter moves to the next box; Enter on MRP adds the line and returns to
+        the scanner.
       </Text>
     </View>
   );

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, useWindowDimensions } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Plus, Receipt, Undo2 } from "lucide-react-native";
+import { Plus, Receipt, Undo2, ClipboardList } from "lucide-react-native";
 import { useSales } from "@modules/sale/hooks/useSales";
 import { SaleListItem } from "@modules/sale/types";
 import { ScanReturnModal } from "@modules/sale/components/ScanReturnModal";
@@ -179,11 +179,31 @@ export default function SalesListScreen() {
       right={
         <HStack gap={8}>
           <Button
+            label="Rx register"
+            size="sm"
+            variant="ghost"
+            fullWidth={false}
+            icon={
+              <ClipboardList
+                size={16}
+                color={palette.text.secondary}
+                strokeWidth={2.2}
+              />
+            }
+            onPress={() => navigation.navigate("RxRegister")}
+          />
+          <Button
             label="Return by scan"
             size="sm"
             variant="secondary"
             fullWidth={false}
-            icon={<Undo2 size={16} color={palette.text.secondary} strokeWidth={2.2} />}
+            icon={
+              <Undo2
+                size={16}
+                color={palette.text.secondary}
+                strokeWidth={2.2}
+              />
+            }
             onPress={() => setScanReturnOpen(true)}
           />
           <Button

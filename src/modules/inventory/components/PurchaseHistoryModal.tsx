@@ -68,9 +68,7 @@ function SupplierRow({ row }: { row: SupplierComparisonRow }) {
           <StatusChip
             tone="success"
             label={
-              row.deltaPct < 0
-                ? `Cheapest (${row.deltaPct}%)`
-                : "Only supplier"
+              row.deltaPct < 0 ? `Cheapest (${row.deltaPct}%)` : "Only supplier"
             }
           />
         ) : (
@@ -139,7 +137,11 @@ export function PurchaseHistoryModal({
     >
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <HStack align="center" justify="space-between" style={{ marginBottom: 4 }}>
+          <HStack
+            align="center"
+            justify="space-between"
+            style={{ marginBottom: 4 }}
+          >
             <VStack gap={0} flex={1}>
               <Text variant="h3" tone="primary" numberOfLines={1}>
                 {q.data?.product.name || productName || "Purchase history"}
@@ -170,7 +172,10 @@ export function PurchaseHistoryModal({
                 />
                 {q.data?.suppliers.length ? (
                   q.data.suppliers.map((s) => (
-                    <SupplierRow key={`${s.supplierId}-${s.supplierName}`} row={s} />
+                    <SupplierRow
+                      key={`${s.supplierId}-${s.supplierName}`}
+                      row={s}
+                    />
                   ))
                 ) : (
                   <Text variant="body-sm" tone="tertiary">
@@ -194,7 +199,10 @@ export function PurchaseHistoryModal({
                   style={{ marginTop: 16 }}
                 />
                 {q.data?.purchases.map((p) => (
-                  <PurchaseRow key={`${p.receiptId}-${p.batchNumber}`} line={p} />
+                  <PurchaseRow
+                    key={`${p.receiptId}-${p.batchNumber}`}
+                    line={p}
+                  />
                 ))}
               </>
             )}

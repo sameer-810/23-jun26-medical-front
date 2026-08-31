@@ -5,6 +5,7 @@ export interface SaleAllocation {
   batchNumber: string;
   locationId: string | null;
   locationCode: string;
+  expiryDate?: string | null;
   baseQty: number;
   returnedQty: number;
 }
@@ -20,6 +21,11 @@ export interface SaleLine {
   productName: string;
   sku: string;
   hsnCode: string;
+  /** Bill snapshots (absent on sales written before they existed). */
+  mrp?: number;
+  manufacturerName?: string;
+  brandName?: string;
+  baseUnit?: string;
   unit: string;
   quantity: number;
   baseQuantity: number;
@@ -68,6 +74,9 @@ export interface Sale {
   customerName: string;
   customerMobile: string;
   customerGstin: string;
+  customerAddress?: string;
+  doctorName?: string;
+  prescriptionId?: string | null;
   saleDate: string;
   taxType: "intra" | "inter";
   priceIncludesTax: boolean;
@@ -120,6 +129,10 @@ export interface CreateSalePayload {
   customerId?: string | null;
   customerName?: string;
   customerMobile?: string;
+  customerAddress?: string;
+  /** "Doct:" on the bill; the Schedule H register's prescriber. */
+  doctorName?: string;
+  prescriptionId?: string | null;
   taxType?: "intra" | "inter";
   paymentMode?: "cash" | "card" | "upi" | "credit";
   notes?: string;
@@ -168,7 +181,11 @@ export interface InvoiceProfile {
     phone: string;
     email: string;
     drugLicenseNo: string;
+    drugLicenseNo2?: string;
     gstin: string;
+    jurisdiction?: string;
+    pharmacistName?: string;
+    mobile?: string;
     /** Data URI of the owner signature / shop stamp, printed on the invoice. */
     signatureImage?: string;
     signatureLabel?: string;
@@ -178,7 +195,18 @@ export interface InvoiceProfile {
     invoicePrefix: string;
     priceIncludesTax?: boolean;
   };
+  print?: PrintSettings;
+  rx?: { enforce: boolean; validityMonths: number };
   currency: string;
+}
+
+export interface PrintSettings {
+  /** Legal document type — a fact about the GST registration, not a look. */
+  documentType: "tax_invoice" | "bill_of_supply";
+  /** A4 page, or 80-column text for a dot-matrix printer. */
+  layout: "a4" | "text80";
+  copies: "single" | "duplicate";
+  guideOnBill: boolean;
 }
 
 export interface Paginated<T> {

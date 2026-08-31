@@ -162,6 +162,7 @@ const linking = {
               SalesList: "",
               NewSale: "new",
               OfflineSync: "offline",
+              RxRegister: "rx-register",
               SaleDetail: ":id",
             },
           },

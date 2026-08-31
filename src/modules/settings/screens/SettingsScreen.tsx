@@ -8,7 +8,10 @@ import {
   BellRing,
   DatabaseBackup,
   Boxes,
+  Printer,
 } from "lucide-react-native";
+import { ControlledSelect } from "@shared/form/ControlledSelect";
+import { getBillPrinter, setBillPrinter } from "@shared/print";
 import {
   useSettings,
   useUpdateSettings,
@@ -34,7 +37,38 @@ import {
   Banner,
   StatusChip,
   ConfirmDialog,
+  TextField,
 } from "@shared/ui";
+
+/**
+ * Which printer THIS machine sends text bills to. Per machine, not per org —
+ * it names hardware on this counter — so it lives in localStorage beside the
+ * label-printer choice, and only shows where the desktop shell can use it.
+ */
+function BillPrinterField() {
+  const [value, setValue] = useState(() => getBillPrinter() || "");
+  if (Platform.OS !== "web") return null;
+  return (
+    <VStack gap={6}>
+      <TextField
+        label="Dot-matrix printer on this PC (desktop app only)"
+        value={value}
+        onChangeText={(v) => {
+          setValue(v);
+          setBillPrinter(v);
+        }}
+        placeholder="\\\\localhost\\LX310  or  LPT1"
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      <Text variant="caption" tone="tertiary">
+        Share the printer in Windows (Printer properties → Sharing) and enter
+        \\localhost\ShareName, or the port it is on. Bills then print as plain
+        text in seconds. Leave empty to print through the normal print dialog.
+      </Text>
+    </VStack>
+  );
+}
 
 /** A themed on/off row bound to a react-hook-form boolean field. */
 function SwitchRow({ control, name }: { control: any; name: string }) {
@@ -73,8 +107,16 @@ export default function SettingsScreen() {
       phone: "",
       email: "",
       drugLicenseNo: "",
+      drugLicenseNo2: "",
       gstin: "",
+      jurisdiction: "",
+      pharmacistName: "",
+      mobile: "",
       signatureLabel: "",
+      documentType: "tax_invoice" as const,
+      printLayout: "a4" as const,
+      printCopies: "single" as const,
+      guideOnBill: false,
       taxEnabled: true,
       defaultRatePct: "12",
       invoicePrefix: "INV",
@@ -147,8 +189,16 @@ export default function SettingsScreen() {
         phone: data.company.phone,
         email: data.company.email,
         drugLicenseNo: data.company.drugLicenseNo,
+        drugLicenseNo2: data.company.drugLicenseNo2 || "",
         gstin: data.company.gstin,
+        jurisdiction: data.company.jurisdiction || "",
+        pharmacistName: data.company.pharmacistName || "",
+        mobile: data.company.mobile || "",
         signatureLabel: data.company.signatureLabel || "",
+        documentType: data.print?.documentType || "tax_invoice",
+        printLayout: data.print?.layout || "a4",
+        printCopies: data.print?.copies || "single",
+        guideOnBill: Boolean(data.print?.guideOnBill),
         taxEnabled: data.tax.enabled,
         defaultRatePct: String(data.tax.defaultRatePct),
         invoicePrefix: data.tax.invoicePrefix,
@@ -179,9 +229,19 @@ export default function SettingsScreen() {
           phone: f.phone,
           email: f.email,
           drugLicenseNo: f.drugLicenseNo,
+          drugLicenseNo2: f.drugLicenseNo2,
           gstin: f.gstin,
+          jurisdiction: f.jurisdiction,
+          pharmacistName: f.pharmacistName,
+          mobile: f.mobile,
           signatureLabel: f.signatureLabel,
           signatureImage: signature,
+        },
+        print: {
+          documentType: f.documentType,
+          layout: f.printLayout,
+          copies: f.printCopies,
+          guideOnBill: f.guideOnBill,
         },
         tax: {
           enabled: f.taxEnabled,
@@ -335,6 +395,44 @@ export default function SettingsScreen() {
               />
             </View>
           </HStack>
+          {/* A retail pharmacy holds two licences (Forms 20 and 21) and the
+              bill prints both; the jurisdiction line is the shop's city. */}
+          <HStack gap={12}>
+            <View style={{ flex: 1 }}>
+              <ControlledTextField
+                control={control}
+                name="drugLicenseNo2"
+                label="Drug license no. 2 (optional)"
+                placeholder="21/MH-MZ3-…"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ControlledTextField
+                control={control}
+                name="jurisdiction"
+                label="Jurisdiction city"
+                placeholder="Mumbai"
+              />
+            </View>
+          </HStack>
+          <HStack gap={12}>
+            <View style={{ flex: 1 }}>
+              <ControlledTextField
+                control={control}
+                name="pharmacistName"
+                label="Registered pharmacist"
+                placeholder="Name under the signature line"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ControlledTextField
+                control={control}
+                name="mobile"
+                label="Mobile (bill footer)"
+                keyboardType="phone-pad"
+              />
+            </View>
+          </HStack>
 
           {/*
             Owner signature / shop stamp for the invoice footer.
@@ -406,6 +504,80 @@ export default function SettingsScreen() {
               />
             ) : null}
           </VStack>
+        </VStack>
+      </Card>
+
+      {/* Printing */}
+      <SectionHeader
+        icon={Printer}
+        title="Bill printing"
+        subtitle="Document type, paper, and copies"
+      />
+      <Card style={{ marginBottom: 24 }}>
+        <VStack gap={16}>
+          <ControlledSelect
+            control={control}
+            name="documentType"
+            label="Document type"
+            options={[
+              {
+                value: "tax_invoice",
+                label:
+                  "Tax Invoice — shows the GST split (regular GST dealers)",
+              },
+              {
+                value: "bill_of_supply",
+                label:
+                  "Bill of Supply — no tax shown (composition scheme / exempt)",
+              },
+            ]}
+          />
+          <Text variant="caption" tone="tertiary">
+            This follows your GST registration, not a preference: a composition
+            dealer must issue a Bill of Supply and may not show tax on it.
+          </Text>
+          <HStack gap={12}>
+            <View style={{ flex: 1 }}>
+              <ControlledSelect
+                control={control}
+                name="printLayout"
+                label="Bill layout"
+                options={[
+                  { value: "a4", label: "A4 page (laser / inkjet)" },
+                  {
+                    value: "text80",
+                    label: "80-column text (dot-matrix, continuous paper)",
+                  },
+                ]}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ControlledSelect
+                control={control}
+                name="printCopies"
+                label="Copies"
+                options={[
+                  { value: "single", label: "Single — customer copy only" },
+                  {
+                    value: "duplicate",
+                    label: "Duplicate — customer + pharmacy copy",
+                  },
+                ]}
+              />
+            </View>
+          </HStack>
+          <HStack align="center" justify="space-between">
+            <VStack gap={2} flex={1}>
+              <Text variant="label" tone="primary">
+                Medicine guide line on the bill
+              </Text>
+              <Text variant="caption" tone="tertiary">
+                One &quot;Use:&quot; line under each item that has a guide.
+              </Text>
+            </VStack>
+            <SwitchRow control={control} name="guideOnBill" />
+          </HStack>
+          <BillPrinterField />
         </VStack>
       </Card>
 
