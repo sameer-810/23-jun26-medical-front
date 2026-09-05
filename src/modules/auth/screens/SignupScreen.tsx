@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Pressable } from "react-native";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,7 +21,16 @@ import { palette, radius } from "@shared/designSystem";
 import { Text, VStack, HStack, Button, ChipsRow } from "@shared/ui";
 import { AuthLayout } from "@modules/auth/components/AuthLayout";
 
-type Nav = { navigate: (s: string) => void };
+type Nav = {
+  navigate: (s: string, params?: object) => void;
+  /**
+   * Replace, not push, on the way to the pricing page: the form is submitted
+   * and the workspace exists, so Back must not return to a filled-in form
+   * whose only button would try to register the same shop twice.
+   */
+  replace: (s: string, params?: object) => void;
+};
+type Route = { params?: { plan?: string } };
 
 const INDUSTRIES = [
   { key: "pharmacy", label: "Pharmacy" },
@@ -33,10 +42,26 @@ const INDUSTRIES = [
   { key: "other", label: "Other" },
 ];
 
-export default function SignupScreen({ navigation }: { navigation: Nav }) {
+export default function SignupScreen({
+  navigation,
+  route,
+}: {
+  navigation: Nav;
+  route?: Route;
+}) {
   const [industry, setIndustry] = useState("pharmacy");
   const [show, setShow] = useState(false);
   const mut = useSignup();
+
+  /**
+   * Which price card they clicked to get here — `?plan=12m`, set by every
+   * button on the public price list.
+   *
+   * It is carried, not enforced: an unknown or missing code changes nothing
+   * about the registration. These links arrive forwarded on WhatsApp weeks
+   * after they were sent, and a stale one must not be able to fail a signup.
+   */
+  const requestedPlan = route?.params?.plan?.trim() || undefined;
   const { control, handleSubmit } = useForm({
     resolver: zodResolver(signupSchema),
     mode: "onTouched",
@@ -61,18 +86,27 @@ export default function SignupScreen({ navigation }: { navigation: Nav }) {
       personalEmail: d.personalEmail.trim(),
       phone: d.phone.trim(),
       password: d.password,
+      planCode: requestedPlan,
     }),
   );
 
   /**
-   * Registered, and now waiting.
+   * Registered — on to the plans.
    *
-   * This replaces the old behaviour of dropping straight into the dashboard.
-   * It has to be unmistakably a GOOD outcome — the form worked — while being
-   * equally clear that there is nothing to log into yet, because the next
-   * thing this person will try is signing in, and a vague confirmation earns a
-   * support call when that fails.
+   * The workspace exists and is queued for approval; the client asked for the
+   * full price list to be what a new registration lands on, so the "awaiting
+   * approval" message moved there rather than being said twice. The Pricing
+   * screen still leads with it: it has to be unmistakably a GOOD outcome (the
+   * form worked) while being equally clear that there is nothing to log into
+   * yet, because the next thing this person tries is signing in.
    */
+  useEffect(() => {
+    if (!mut.isSuccess) return;
+    navigation.replace("Pricing", { plan: requestedPlan, pending: true });
+  }, [mut.isSuccess, navigation, requestedPlan]);
+
+  /* One frame, at most — but never a blank screen, and never the form again
+     with no sign that it worked, if the redirect is somehow blocked. */
   if (mut.isSuccess) {
     return (
       <AuthLayout
@@ -93,23 +127,20 @@ export default function SignupScreen({ navigation }: { navigation: Nav }) {
                   Your workspace is awaiting approval
                 </Text>
                 <Text variant="body-sm" tone="secondary">
-                  You won&apos;t be able to sign in until our team activates it.
-                  We&apos;ll email you as soon as that&apos;s done — usually
-                  within one working day.
+                  Taking you to the plans…
                 </Text>
               </VStack>
             </HStack>
           </View>
 
-          <Text variant="body-sm" tone="tertiary">
-            We&apos;ll contact you on the phone number and personal email you
-            entered. Nothing else is needed from you right now.
-          </Text>
-
           <Button
-            label="Back to sign in"
-            variant="secondary"
-            onPress={() => navigation.navigate("Login")}
+            label="See the plans"
+            onPress={() =>
+              navigation.navigate("Pricing", {
+                plan: requestedPlan,
+                pending: true,
+              })
+            }
           />
         </VStack>
       </AuthLayout>

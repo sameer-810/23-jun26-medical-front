@@ -34,6 +34,10 @@ export interface AdminOrgSettings {
   deviceLimit: number;
   deviceLimitSource: "pharmacy" | "plan" | "platform";
   deviceLimitOverride: number;
+  /** Staff seats. 0 = no limit anywhere, which is genuinely unlimited. */
+  userLimit: number;
+  userLimitSource: "pharmacy" | "plan" | "unlimited";
+  userLimitOverride: number;
   geminiConfigured: boolean;
   geminiKeyMasked: string;
   geminiModel: string;
@@ -84,6 +88,8 @@ export interface UpdatePharmacyInput {
   drugLicenseNo?: string;
   /** 0 clears the override and falls back to the plan / platform default. */
   maxDevicesPerUser?: number;
+  /** 0 clears the override and falls back to the plan's seat quota. */
+  maxUsers?: number;
   /** "" removes this pharmacy's key so it uses the platform key. */
   geminiApiKey?: string;
   geminiModel?: string;
@@ -146,8 +152,25 @@ export interface Plan {
   name: string;
   code: string;
   description: string;
+  /** The headline rate the card leads with — ₹225 on the 12-month plan. */
   priceMonthly: number;
+  /** Legacy, predates termMonths/priceTotal. Nothing reads it. */
   priceYearly: number;
+
+  /* How the plan is sold: a term, and one payment for it. */
+  termMonths: number;
+  /** Rupees, paid once, for the whole term. The number that is charged. */
+  priceTotal: number;
+  /** Struck-through "Instead of". 0 = derive from the 1-month plan. */
+  referencePrice: number;
+  /** e.g. "Save 78%". Blank = derive it from the discount. */
+  badge: string;
+  /** The one line under the plan name on the card. */
+  tagline: string;
+  /** The single raised "Best value" card. Promoting one demotes the rest. */
+  isFeatured: boolean;
+  sortOrder: number;
+
   maxUsers: number;
   maxProducts: number;
   features: string[];

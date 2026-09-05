@@ -33,6 +33,14 @@ export interface SignupPayload {
   /** The owner's own address, distinct from the shop's shared login email. */
   personalEmail: string;
   password: string;
+  /**
+   * The plan card they clicked, arriving as `?plan=12m` on the signup URL.
+   *
+   * Not a purchase — nothing is charged at signup and the workspace still
+   * waits for approval. It rides along so the quotation call opens with the
+   * right number instead of "which one were you looking at?".
+   */
+  planCode?: string;
 }
 
 /**

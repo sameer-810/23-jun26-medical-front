@@ -30,6 +30,7 @@ export default function EditPharmacyScreen() {
       gstin: "",
       drugLicenseNo: "",
       maxDevicesPerUser: "",
+      maxUsers: "",
       geminiApiKey: "",
       geminiModel: "",
     },
@@ -49,6 +50,9 @@ export default function EditPharmacyScreen() {
         maxDevicesPerUser: org.settings?.deviceLimitOverride
           ? String(org.settings.deviceLimitOverride)
           : "",
+        maxUsers: org.settings?.userLimitOverride
+          ? String(org.settings.userLimitOverride)
+          : "",
         // Never pre-filled: we only ever hold a mask, and pushing the mask back
         // would save the literal "AIzaSy…7Xq2" as the key.
         geminiApiKey: "",
@@ -60,13 +64,14 @@ export default function EditPharmacyScreen() {
 
   const submit = handleSubmit((f) => {
     setServerError(null);
-    const { maxDevicesPerUser, geminiApiKey, ...rest } = f;
+    const { maxDevicesPerUser, maxUsers, geminiApiKey, ...rest } = f;
     const body: UpdatePharmacyInput = {
       ...rest,
       // "" clears the override and hands the pharmacy back to its plan.
       maxDevicesPerUser: maxDevicesPerUser.trim()
         ? Number(maxDevicesPerUser)
         : 0,
+      maxUsers: maxUsers.trim() ? Number(maxUsers) : 0,
     };
     // Only send the key when one was typed. Sending "" would DELETE the saved
     // key, so simply editing the phone number must not wipe it.
@@ -162,6 +167,40 @@ export default function EditPharmacyScreen() {
             label="Device limit for this pharmacy"
             keyboardType="number-pad"
             placeholder="Leave blank to use the plan / platform default"
+          />
+        </VStack>
+      </Card>
+
+      {/* ---- Staff accounts ----
+          The limit was always ENFORCED — every path that creates a member goes
+          through createUser, which refuses past the quota. What was missing was
+          any way to SET it per pharmacy from here: the field did not exist, and
+          the console's patch dropped maxUsers on the floor. */}
+      <Card style={{ marginBottom: 16 }}>
+        <VStack gap={14}>
+          <VStack gap={2}>
+            <Text variant="label-lg" tone="primary">
+              Staff accounts
+            </Text>
+            <Text variant="caption" tone="tertiary">
+              Maximum staff user accounts allowed for this pharmacy.
+              {settings
+                ? settings.userLimit
+                  ? `  Currently ${settings.userLimit} — from ${
+                      settings.userLimitSource === "pharmacy"
+                        ? "this pharmacy"
+                        : "its plan"
+                    }.`
+                  : "  Currently unlimited — no plan quota and no override."
+                : ""}
+            </Text>
+          </VStack>
+          <ControlledTextField
+            control={control}
+            name="maxUsers"
+            label="User limit for this pharmacy"
+            keyboardType="number-pad"
+            placeholder="Leave blank to use the plan quota"
           />
         </VStack>
       </Card>

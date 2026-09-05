@@ -4,6 +4,7 @@ import { CreditCard, Plus } from "lucide-react-native";
 import { usePlans } from "@modules/admin/hooks/useAdmin";
 import { AdminNav } from "@modules/admin/components/AdminNav";
 import type { Plan } from "@modules/admin/types";
+import { fmtMoney } from "@shared/format";
 import {
   Screen,
   Text,
@@ -53,12 +54,15 @@ export default function PlansScreen() {
     {
       key: "priceMonthly",
       header: "Price",
-      width: 180,
+      width: 200,
       sortable: true,
       sortValue: (p) => p.priceMonthly,
+      /* The rate the card leads with, then the term and the one payment for
+         it — "₹225/mo · ₹2,700 for 12mo". The old cell read "₹225/mo ·
+         ₹0/yr", because priceYearly predates terms and nothing sets it. */
       render: (p) => (
         <Text variant="body-sm" tone="secondary">
-          ₹{p.priceMonthly}/mo · ₹{p.priceYearly}/yr
+          {planPriceLine(p)}
         </Text>
       ),
     },
@@ -125,6 +129,13 @@ export default function PlansScreen() {
   );
 }
 
+/** "₹225/mo · ₹2,700 for 12mo" — the two figures that define a plan. */
+function planPriceLine(p: Plan) {
+  const rate = fmtMoney(p.priceMonthly || 0);
+  if (!p.priceTotal) return `${rate}/mo`;
+  return `${rate}/mo · ${fmtMoney(p.priceTotal)} for ${p.termMonths || 1}mo`;
+}
+
 function ListSkeleton() {
   return (
     <VStack gap={10}>
@@ -163,7 +174,7 @@ function PlanRow({ plan, onPress }: { plan: Plan; onPress: () => void }) {
         </HStack>
         <HStack gap={16} style={{ flexWrap: "wrap" }}>
           <Text variant="body-sm" tone="secondary">
-            ₹{plan.priceMonthly}/mo · ₹{plan.priceYearly}/yr
+            {planPriceLine(plan)}
           </Text>
           <Text variant="body-sm" tone="secondary">
             Users: {plan.maxUsers || "∞"} · Products: {plan.maxProducts || "∞"}

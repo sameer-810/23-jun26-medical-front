@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, Switch, StyleSheet } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trash2 } from "lucide-react-native";
 import {
@@ -14,7 +14,15 @@ import { planSchema, optionalNumber } from "@modules/admin/admin.validation";
 import { apiErrorMessage } from "@shared/api/apiClient";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
-import { Screen, Text, VStack, Card, Button, ConfirmDialog } from "@shared/ui";
+import {
+  Screen,
+  Text,
+  VStack,
+  HStack,
+  Card,
+  Button,
+  ConfirmDialog,
+} from "@shared/ui";
 
 export default function PlanFormScreen() {
   const navigation = useNavigation<any>();
@@ -42,6 +50,13 @@ export default function PlanFormScreen() {
       maxUsers: "",
       maxProducts: "",
       features: "",
+      termMonths: "",
+      priceTotal: "",
+      referencePrice: "",
+      badge: "",
+      tagline: "",
+      sortOrder: "",
+      isFeatured: false,
     },
   });
 
@@ -56,6 +71,14 @@ export default function PlanFormScreen() {
         maxUsers: String(plan.maxUsers ?? ""),
         maxProducts: String(plan.maxProducts ?? ""),
         features: (plan.features || []).join(", "),
+        termMonths: String(plan.termMonths ?? ""),
+        priceTotal: String(plan.priceTotal ?? ""),
+        // Blank means "derive it". Showing a 0 would read as a real ₹0 anchor.
+        referencePrice: plan.referencePrice ? String(plan.referencePrice) : "",
+        badge: plan.badge || "",
+        tagline: plan.tagline || "",
+        sortOrder: String(plan.sortOrder ?? ""),
+        isFeatured: Boolean(plan.isFeatured),
       });
   }, [plan, reset]);
 
@@ -70,6 +93,15 @@ export default function PlanFormScreen() {
       priceYearly: optionalNumber(f.priceYearly),
       maxUsers: optionalNumber(f.maxUsers),
       maxProducts: optionalNumber(f.maxProducts),
+      termMonths: optionalNumber(f.termMonths),
+      priceTotal: optionalNumber(f.priceTotal),
+      // 0, not undefined: clearing this box must actively drop a stored
+      // override so the anchor goes back to being derived.
+      referencePrice: f.referencePrice.trim() ? Number(f.referencePrice) : 0,
+      badge: f.badge.trim(),
+      tagline: f.tagline.trim(),
+      sortOrder: optionalNumber(f.sortOrder),
+      isFeatured: f.isFeatured,
       features: f.features
         .split(",")
         .map((s) => s.trim())
@@ -124,16 +156,97 @@ export default function PlanFormScreen() {
           />
           <ControlledTextField
             control={control}
-            name="priceMonthly"
-            label="Price / month (₹)"
+            name="tagline"
+            label="Tagline (the line under the plan name on the card)"
+          />
+        </VStack>
+      </Card>
+
+      {/* ---- How the plan is sold ----
+          A term and one payment for it. These two are what a price card is
+          built from; the model could not express a 3- or 6-month term at all
+          before this, which is why the console only ever held one plan. */}
+      <Card style={{ marginBottom: 16 }}>
+        <VStack gap={16}>
+          <VStack gap={2}>
+            <Text variant="label-lg" tone="primary">
+              How it&apos;s sold
+            </Text>
+            <Text variant="caption" tone="tertiary">
+              The term and the one payment for it. Leave the anchor and badge
+              blank and they derive themselves from the 1-month plan, so a
+              change to the monthly price moves every discount with it.
+            </Text>
+          </VStack>
+          <ControlledTextField
+            control={control}
+            name="termMonths"
+            label="Term (months)"
+            keyboardType="number-pad"
+          />
+          <ControlledTextField
+            control={control}
+            name="priceTotal"
+            label="Once total (₹) — what is actually charged"
             keyboardType="numeric"
           />
           <ControlledTextField
             control={control}
-            name="priceYearly"
-            label="Price / year (₹)"
+            name="priceMonthly"
+            label="Price / month (₹) — the headline rate on the card"
             keyboardType="numeric"
           />
+          <ControlledTextField
+            control={control}
+            name="referencePrice"
+            label="Strikethrough 'Instead of' (₹) — blank to derive"
+            keyboardType="numeric"
+          />
+          <ControlledTextField
+            control={control}
+            name="badge"
+            label="Discount tag — blank to derive, e.g. Save 78%"
+          />
+          <ControlledTextField
+            control={control}
+            name="sortOrder"
+            label="Card order (low first)"
+            keyboardType="number-pad"
+          />
+          <HStack gap={12} align="center" justify="space-between">
+            <VStack gap={2} flex={1}>
+              <Text variant="body" tone="secondary">
+                Best value
+              </Text>
+              <Text variant="caption" tone="tertiary">
+                The one raised card. Turning this on turns it off everywhere
+                else — a list that recommends two plans recommends neither.
+              </Text>
+            </VStack>
+            <Controller
+              control={control}
+              name="isFeatured"
+              render={({ field }) => (
+                <Switch
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  trackColor={{
+                    false: palette.neutral[300],
+                    true: palette.teal[400],
+                  }}
+                  thumbColor={
+                    field.value ? palette.teal[600] : palette.neutral[50]
+                  }
+                />
+              )}
+            />
+          </HStack>
+        </VStack>
+      </Card>
+
+      {/* ---- Quotas ---- */}
+      <Card style={{ marginBottom: 16 }}>
+        <VStack gap={16}>
           <ControlledTextField
             control={control}
             name="maxUsers"
@@ -145,6 +258,12 @@ export default function PlanFormScreen() {
             name="maxProducts"
             label="Max products (0 = unlimited)"
             keyboardType="number-pad"
+          />
+          <ControlledTextField
+            control={control}
+            name="priceYearly"
+            label="Price / year (₹) — legacy, nothing reads it"
+            keyboardType="numeric"
           />
           <ControlledTextField
             control={control}

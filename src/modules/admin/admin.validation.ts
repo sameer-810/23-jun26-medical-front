@@ -87,6 +87,17 @@ export const planSchema = z.object({
   maxUsers: optionalWhole,
   maxProducts: optionalWhole,
   features: freeText,
+
+  /* How the plan is sold. `termMonths` and `priceTotal` are the two figures a
+     price card is actually built from; the rest are decorations that derive
+     themselves when left blank — see planDisplay.js on the server. */
+  termMonths: optionalWhole,
+  priceTotal: optionalNonNegative,
+  referencePrice: optionalNonNegative,
+  badge: freeText,
+  tagline: freeText,
+  sortOrder: optionalWhole,
+  isFeatured: z.boolean(),
 });
 
 export type PlanValues = z.infer<typeof planSchema>;
