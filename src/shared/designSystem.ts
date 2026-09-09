@@ -1,35 +1,20 @@
 /**
  * Plusveda Design System — "quiet premium" (2026 rev).
  *
- * WHAT CHANGED AND WHY
- * --------------------
- * The previous system was a consumer-app language — Poppins headings, 26px KPI
- * numbers in 104px colour-coded cards, gradient hero banners, 24px gutters,
- * 44px minimum buttons — applied to a data-dense trade tool. On a chemist's
- * counter PC that reads as a toy, and on a phone one number filled a third of
- * the screen. The verdict from the client was blunt and correct: big cards,
- * loose spacing, junior.
+ * The previous system was a consumer-app language (Poppins headings, 26px KPI
+ * numbers in 104px colour-coded cards, gradient banners) applied to a
+ * data-dense trade tool. The client's verdict: big cards, loose spacing,
+ * junior. The fix is DENSITY and RESTRAINT, not new colours:
  *
- * The fix is not new colours. It is DENSITY and RESTRAINT, which is what every
- * business tool people call beautiful actually has in common (Stripe, Linear,
- * Shopify Polaris, Vercel Geist, Mercury):
+ *   1. Body text 13–14px, page titles 20px.
+ *   2. One typeface. Inter carries everything; Poppins is gone.
+ *   3. Weights stop at 600.
+ *   4. Radii locked to 4 / 6 / 8 / 10 / 12.
+ *   5. Borders, not shadows. Shadow is for things that genuinely float.
+ *   6. The brand green is an ACCENT — primary action, active nav, links,
+ *      focus. ~90% of pixels should be neutral.
  *
- *   1. Body text sits at 13–14px, not 14.5–16. Page titles at 20px, not 23.
- *   2. One typeface. Poppins is gone; Inter carries everything. A second
- *      "friendly" display family is the loudest junior tell there is.
- *   3. Weights stop at 600. Nothing in this app is 700+ any more.
- *   4. Radii are locked to 4 / 6 / 8 / 10 / 12. Mixed 14/18/22 radii on
- *      neighbouring surfaces is what makes a screen look assembled by hand.
- *   5. Borders, not shadows. A resting card is a white plane with a 1px
- *      hairline on a tinted canvas. Shadow is reserved for things that genuinely
- *      float (menus, dialogs, the FAB).
- *   6. The brand green is an ACCENT, not a surface. It marks the primary action,
- *      the active nav row, links and focus — and nothing else. Roughly 90% of
- *      pixels on any screen should be neutral. Colour that isn't carrying a
- *      status meaning is noise.
- *
- * The token *keys* are unchanged, so all ~618 `palette.*`, 138 `radius.*` and
- * every `<Text variant>` call-site re-skins from these values alone.
+ * Token keys are unchanged, so every existing call-site re-skins from here.
  */
 
 export const palette = {
@@ -155,23 +140,15 @@ export const brand = palette.teal;
 /**
  * Dark surfaces, ink and borders.
  *
- * NOT AN INVERSION. A flipped light theme gives you pure black behind pure
- * white, which on OLED smears and — for the astigmatic ~40% of adults — makes
- * light text halo badly. This is the standard elevation model instead: a very
- * dark desaturated ground, with each layer above it slightly lighter rather
- * than separated by shadow, and text that tops out near #E8EDEC rather than
- * white.
+ * NOT AN INVERSION — pure black behind pure white smears on OLED and haloes
+ * for astigmatic readers. This is the elevation model: a dark desaturated
+ * ground with each layer slightly lighter, text topping out near #E8EDEC.
+ * Semantic colours are re-tuned, not reused, keeping the same 4.5:1 floor.
  *
- * The semantic colours are re-tuned rather than reused: `success.bg` #E4F5EE is
- * a pale mint that becomes a glowing slab on a dark ground, so the dark set
- * uses deep desaturated fills with light text and keeps the same 4.5:1 floor.
- *
- * A caution worth recording, because it argues against ever defaulting to this:
- * the reading research (Piepenbrock 2013/2014, and NN/g's review of it) finds
- * light-on-dark measurably WORSE for proofreading accuracy in normally-sighted
- * people. This app displays batch numbers, dosages and expiry dates, where a
- * misread has consequences. Dark mode belongs here as an option that follows
- * the OS — never as the default.
+ * Worth recording: the reading research (Piepenbrock 2013/2014, NN/g's review)
+ * finds light-on-dark measurably worse for proofreading accuracy. This app
+ * shows batch numbers, dosages and expiry dates — dark mode belongs here as an
+ * option that follows the OS, never as the default.
  */
 export const darkPalette = {
   ink: {

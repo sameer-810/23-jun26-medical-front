@@ -56,34 +56,28 @@ const MAX_LABELS = 300;
 /*
  * WHY THE LAYOUT IS SHAPED THE WAY IT IS
  *
- * 38x15mm has to carry two symbols, and on a 203dpi head (8 dots/mm, the
- * resolution of nearly every Indian pharmacy label printer) both are close to
- * their floor. Denso Wave — who invented QR — recommend 4+ printer dots per
- * module for stable printing, i.e. a 0.5mm module, i.e. a 10.5mm symbol for the
- * 21x21 version-1 QR our 9-character code needs. That does not fit UNDER the
- * text. It does fit BESIDE it:
+ * 38x15mm has to carry two symbols, and on a 203dpi head both are near their
+ * floor. Denso Wave recommend 4+ printer dots per module, i.e. a 10.5mm symbol
+ * for the version-1 QR our 9-character code needs. That does not fit UNDER the
+ * text. It fits BESIDE it:
  *
  *   +--------------------------------------+
- *   | [QR]  MedStock Demo Pharmacy         |   QR beside a 4-row text column
+ *   | [QR]  MedStock Demo Pharmacy         |
  *   | [QR]  HUMAN ACTRAPID 40IU VIAL...    |
  *   | [QR]  BATCH B-70955  EXP 03/28       |
  *   | [QR]  MRP Rs 18.13                   |
- *   | |||| ||| |||| || ||| |||| || ||||||  |   Code128 across the FULL width
+ *   | |||| ||| |||| || ||| |||| || ||||||  |   Code128, FULL width
  *   |             B00000112                |
  *   +--------------------------------------+
  *
- * Stacking them would have starved both. Side-by-side, the QR gets the whole
- * height of the upper band and the Code128 keeps the whole width of the label —
- * which matters more for a 1D symbol, because its width IS its data. The cost
- * is the product-name column, now ~25mm instead of 35mm; a long name truncates
- * sooner. That is the trade the geometry forces, and the name is the one field
- * on here that a human can recover by looking at the box.
+ * Stacking would starve both. Side by side, the QR gets the upper band's full
+ * height and the Code128 keeps the full width — which matters more for a 1D
+ * symbol, whose width IS its data. The cost is a ~25mm name column, so long
+ * names truncate; the name is the one field a human can read off the box.
  *
- * Measured on the rendered output at 203dpi: QR module ~2.5 dots, Code128
- * X-dimension ~0.30mm (~2.4 dots). Both decode (there is a decode test in the
- * scratchpad rig), but neither has margin to spare — so if you grow a font or
- * add a row here, re-run a real scan before shipping it. On a 300dpi printer
- * the same artwork lands near 4 dots per module and is comfortable.
+ * Measured at 203dpi: QR module ~2.5 dots, Code128 X-dimension ~0.30mm. Both
+ * decode with no margin to spare — grow a font or add a row here and re-run a
+ * real scan before shipping.
  */
 
 const esc = (s: string) =>
@@ -213,18 +207,15 @@ export async function buildLabelSheetHtml(
 /**
  * Wrap finished labels in the print document.
  *
- * `scale` is the calibration factor from `getLabelScale()`, and it pre-enlarges
- * BOTH the page and the artwork so that a pipeline which shrinks by 1/scale
- * lands on a physically correct 38x15mm sticker. The page has to grow with the
- * artwork — scaling the content alone inside a fixed page would just push it
- * over the edge and get it clipped, since a browser scales the whole page box,
- * not the content within it. At the default scale of 1 both multiplications are
- * no-ops and this is the plain, uncalibrated document.
+ * `scale` comes from `getLabelScale()` and pre-enlarges BOTH the page and the
+ * artwork, so a pipeline that shrinks by 1/scale lands on a physically correct
+ * 38x15mm sticker. The page must grow with the artwork — a browser scales the
+ * whole page box, so scaling content inside a fixed page just clips it. At
+ * scale 1 both multiplications are no-ops.
  *
- * The artwork itself is never re-laid-out: it stays authored at exactly 38x15mm
- * and gets a transform. That keeps every millimetre in the stylesheet below
- * meaning a real millimetre on the sticker, which is the only way the barcode
- * geometry stays reviewable.
+ * The artwork is never re-laid-out: it stays authored at exactly 38x15mm and
+ * gets a transform, so every millimetre in the stylesheet is a real millimetre
+ * and the barcode geometry stays reviewable.
  */
 function labelDocument(cells: string, scale: number): string {
   const s = Number.isFinite(scale) && scale > 0 ? scale : 1;
@@ -292,18 +283,17 @@ function labelDocument(cells: string, scale: number): string {
        off the sticker, so it keeps the larger type. */
     .mrp { font-size: 6pt; font-weight: 700; line-height: 1.2; margin-top: .1mm; white-space: nowrap; }
 
-    /* The Code128 keeps the FULL width of the label, because for a 1D symbol
-       width IS data — the same code squeezed into a column beside the QR would
-       drop the X-dimension to ~1.3 dots and stop scanning. At full width it
-       lands near 0.30mm (~2.4 dots), which decodes.
-       2mm of white each side is its QUIET ZONE. Code128 is unreadable without
-       one — the scanner needs blank space to find where the symbol starts and
-       ends. This was missing, and is a classic cause of "the scanner won't
-       read it".
-       There is no human-readable code line under the bars any more: adding the
-       QR cost ~1.5mm of height, and of everything on here the printed
-       "B00000112" was the only field already carried by BOTH symbols. It was
-       the right thing to spend. */
+    /* The Code128 keeps the FULL width: for a 1D symbol width IS data, and
+           squeezed beside the QR its X-dimension drops to ~1.3 dots and stops
+           scanning. At full width it lands near 0.30mm (~2.4 dots), which decodes.
+
+           The 2mm of white each side is its QUIET ZONE — Code128 is unreadable
+           without one, and this was missing. Classic cause of "the scanner won't
+           read it".
+
+           No human-readable code line under the bars: the QR cost ~1.5mm of
+           height, and "B00000112" was the only field already carried by both
+           symbols. */
     .barcode { flex: none; height: 4.6mm; padding: .45mm 2mm 0; }
     .barcode svg { width: 100%; height: 100%; display: block; }
   </style></head>

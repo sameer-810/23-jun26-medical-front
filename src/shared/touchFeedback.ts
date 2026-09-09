@@ -1,39 +1,23 @@
 /**
  * Touch feedback — the physical half of an interaction.
  *
- * WHY THIS EXISTS
- * ---------------
- * The client's complaint about the phone app was that it is not *interactive*,
- * measured against the big consumer pharmacy apps. Read literally — which is how
- * it was meant — that is not a request for more colour. It is that nothing in
- * this app answers a finger. Before this file, `expo-haptics` was imported in
- * exactly one place in a 59-screen product: the barcode scanner. Every other
- * tap in the app — completing a sale, writing off a batch, switching a tab —
- * landed in silence.
+ * The client said the phone app was not *interactive*. Before this file,
+ * `expo-haptics` was imported in one place across 59 screens (the scanner);
+ * every other tap — completing a sale, writing off a batch — landed in
+ * silence. A pharmacist bills with the phone in one hand and a strip in the
+ * other, often without looking straight at it, so a confirmation they can feel
+ * is the difference between knowing and checking.
  *
- * That matters more here than in most products. A pharmacist bills with the
- * phone in one hand and a strip of tablets in the other, often without looking
- * straight at the screen. A confirmation they can *feel* is the difference
- * between knowing the item was added and checking the list to be sure.
+ * NOT a re-skin: the design system's restraint ("big cards, loose spacing,
+ * junior" was the rejected version) stays. Density and responsiveness are not
+ * opposites.
  *
- * WHAT THIS IS NOT
- * ----------------
- * It is deliberately not a re-skin. The design system's opening note records the
- * same client rejecting a consumer-app look — "big cards, loose spacing, junior"
- * — and the restraint that replaced it is correct and is kept. Density and
- * responsiveness are not opposites: Linear and Stripe are among the densest
- * interfaces shipping and among the most alive. This adds the second half
- * without touching the first.
- *
- * RULES
- * -----
- *  · Never throws, never blocks. A missing haptics engine (emulator, web, some
- *    Android builds) must degrade to nothing, never to a crash in a checkout.
- *  · Intensity carries meaning. `select` for navigating, `impact` for committing
- *    something, `success`/`warning`/`error` for outcomes. A phone that buzzes
- *    identically for everything is noise, and users turn it off.
- *  · Honour the OS. Reduced-motion and silent-mode users have asked for less;
- *    `setHapticsEnabled(false)` exists so a setting can turn it off outright.
+ * Rules:
+ *  · Never throws, never blocks — a missing haptics engine degrades to
+ *    nothing, never to a crash in a checkout.
+ *  · Intensity carries meaning: `select` to navigate, `impact` to commit,
+ *    `success`/`warning`/`error` for outcomes. Identical buzzing is noise.
+ *  · Honour the OS, and `setHapticsEnabled(false)` turns it off outright.
  */
 import { Platform } from "react-native";
 
@@ -61,12 +45,9 @@ export function hapticsEnabled() {
 }
 
 /**
- * Web vibration durations, in ms.
- *
- * `navigator.vibrate` is Android-Chrome only — iOS Safari has never supported
- * it and desktop browsers ignore it. That is fine: this is a progressive
- * enhancement, and the same call is a no-op everywhere else rather than a
- * feature detection branch at every call site.
+ * Web vibration durations, in ms. `navigator.vibrate` is Android-Chrome only —
+ * a no-op everywhere else, which is why this is a progressive enhancement
+ * rather than a feature-detection branch at every call site.
  */
 const WEB_PATTERN: Record<FeedbackTone, number | number[]> = {
   select: 8,

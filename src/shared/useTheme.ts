@@ -1,45 +1,25 @@
 /**
- * useTheme — the colour set for the OS appearance the device is currently in.
+ * useTheme — the colour set for the OS appearance the device is in.
  *
- * ---------------------------------------------------------------------------
- * STATUS: FOUNDATION ONLY. Dark mode is NOT switched on yet.
- * ---------------------------------------------------------------------------
+ * STATUS: FOUNDATION ONLY. Dark mode is not switched on. `app.json` pins
+ * `userInterfaceStyle: "light"`, so this always returns the light set.
+ * Flipping it is one line, but do not until the migration below is done — a
+ * half-migrated app gives you white cards punched into a dark page.
  *
- * `app.json` still pins `userInterfaceStyle: "light"`, so `useColorScheme()`
- * always reports light and this hook always returns the light set. Flipping it
- * to "automatic" is a one-line change — but do not make that change until the
- * migration below is finished, because a half-migrated app in dark mode is
- * strictly worse than a light-only one: you get white cards punched into a dark
- * page, which is harder to read than either theme done properly.
+ * WHY THE MIGRATION IS NOT TRIVIAL: 51 files declare `StyleSheet.create` at
+ * MODULE SCOPE with palette values baked in. Module scope runs once, at import,
+ * so those styles cannot observe a theme change — they have to move inside the
+ * component:
  *
- * WHY THE MIGRATION IS NOT TRIVIAL
- *
- * The app has 622 `palette.*` references across 93 files, and 51 of those files
- * declare `StyleSheet.create({...})` at MODULE SCOPE with palette values baked
- * in. Module scope runs once, at import, before any component mounts — so those
- * styles physically cannot observe a theme change. No provider, context or
- * proxy fixes that; the styles have to move inside the component.
- *
- * THE MIGRATION, per file:
- *
- *   // before — evaluated once at import, frozen to the light palette
- *   const styles = StyleSheet.create({
- *     row: { backgroundColor: palette.surface.primary },
- *   });
- *
- *   // after — re-evaluated whenever the scheme changes
  *   const useStyles = makeStyles((t) => ({
  *     row: { backgroundColor: t.surface.primary },
  *   }));
- *   // ...then inside the component:
- *   const styles = useStyles();
  *
- * Order to do it in: `shared/ui/*` first (28 files, and they carry most of the
- * app's surface area), then the screens by traffic. Only once every file that
- * paints a background or a text colour is converted should `app.json` change.
+ * Order: `shared/ui/*` first (28 files, most of the surface area), then screens
+ * by traffic. Only then change app.json.
  *
- * Until then this hook is safe to adopt in new code — it returns exactly the
- * light values the static `palette` export already returns.
+ * Safe to adopt in new code meanwhile — it returns the same light values as
+ * the static `palette` export.
  */
 import { useMemo } from "react";
 import { useColorScheme, StyleSheet } from "react-native";
