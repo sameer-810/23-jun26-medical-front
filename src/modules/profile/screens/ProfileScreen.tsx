@@ -337,7 +337,7 @@ export default function ProfileScreen() {
         <VStack gap={16}>
           <Text variant="body-sm" tone="secondary">
             {isAdmin
-              ? "You are this pharmacy's Admin, so deleting your account closes the whole workspace. Everyone on your team is signed out and can no longer sign in. Your personal details are erased immediately, and the pharmacy's records are deleted within 30 days, except invoices that GST law requires us to keep."
+              ? "Your name, email and phone number are erased immediately. If you are this pharmacy's only Admin, deleting your account also closes the whole workspace: everyone on your team is signed out and can no longer sign in, and the pharmacy's records are deleted within 30 days, except invoices that GST law requires us to keep."
               : "Your sign-in is removed and your name, email and phone number are erased immediately. Sales and stock entries you made stay with the pharmacy, without your name."}
           </Text>
           {deleteMut.isError && (
@@ -358,11 +358,7 @@ export default function ProfileScreen() {
             textContentType="password"
           />
           <Button
-            label={
-              isAdmin
-                ? "Delete account and close workspace"
-                : "Delete my account"
-            }
+            label="Delete my account"
             variant="destructive"
             icon={<Trash2 size={18} color="#FFFFFF" strokeWidth={2} />}
             disabled={deletePassword.length === 0}
@@ -373,10 +369,12 @@ export default function ProfileScreen() {
       </Card>
       <ConfirmDialog
         visible={confirmDelete}
-        title={
-          isAdmin ? "Close this pharmacy's workspace?" : "Delete your account?"
+        title="Delete your account?"
+        message={
+          isAdmin
+            ? "This cannot be undone. If you are the only Admin, the pharmacy's workspace closes too."
+            : "This cannot be undone."
         }
-        message="This cannot be undone."
         confirmLabel="Delete"
         destructive
         loading={deleteMut.isPending}
