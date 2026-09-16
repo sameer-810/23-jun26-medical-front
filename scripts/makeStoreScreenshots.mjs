@@ -50,6 +50,35 @@ const TARGETS = {
     out: "screenshots-tablet10",
     scale: 1.333,
   },
+  /**
+   * App Store sizes, from real captures at exactly these sizes
+   * (captureStoreScreens.mjs --targets=ios65,ipad13).
+   *
+   * `frame: "card"` — no phone body. Apple's marketing guidelines allow only
+   * Apple's own product bezels, never a drawn device, so the App Store sets
+   * show the screen as a plain rounded card. `cardW` is the card's share of
+   * the canvas width.
+   */
+  ios65: {
+    w: 1284,
+    h: 2778,
+    raw: "raw-screens-ios",
+    out: "app-store/iphone-6.5",
+    scale: 1.19,
+    frame: "card",
+    cardW: 0.78,
+    swap: "APP_STORE_SWAP",
+  },
+  ipad13: {
+    w: 2064,
+    h: 2752,
+    raw: "raw-screens-ipad",
+    out: "app-store/ipad-13",
+    scale: 1.9,
+    frame: "card",
+    cardW: 0.72,
+    swap: "APP_STORE_SWAP",
+  },
 };
 
 /**
@@ -116,6 +145,21 @@ const SHOTS = [
   },
 ];
 
+/**
+ * App Store slots that differ from the Play set. Before a bill is scanned that
+ * screen is mostly an empty panel, which the capture rules forbid; the product
+ * list shows the same catalogue work with real prices, GST rates and Schedule H
+ * flags, so it takes the third slot on the App Store.
+ */
+const APP_STORE_SWAP = {
+  scanbill: {
+    src: "products",
+    title: "Every medicine,\nscheduled right",
+    sub: "Schedule H flags, GST and unit prices",
+    offset: 0,
+  },
+};
+
 const b64 = (f) =>
   "data:image/png;base64," + fs.readFileSync(f).toString("base64");
 
@@ -159,11 +203,22 @@ p{margin-top:${22 * T.scale}px;font-size:${35 * T.scale}px;line-height:1.4;font-
   box-shadow:0 55px 120px rgba(2,18,10,.55),0 8px 24px rgba(0,0,0,.35)}
 .screen{width:100%;height:100%;border-radius:${T.radius - 12}px;overflow:hidden;background:#000}
 .screen img{width:100%;display:block;margin-top:var(--y)}
+/* App Store: the screen as a plain card — no device drawing (see ios65). */
+.card{margin-top:${52 * T.scale}px;width:${T.dw}px;height:${T.dh}px;border-radius:${T.radius}px;
+  overflow:hidden;background:#000;border:${5 * T.scale}px solid rgba(255,255,255,.92);
+  box-shadow:0 55px 120px rgba(2,18,10,.55),0 8px 24px rgba(0,0,0,.35)}
+.card img{width:100%;display:block;margin-top:var(--y)}
 .btn{position:absolute;right:${-4 * T.scale}px;width:${5 * T.scale}px;background:#2C2C2E;border-radius:3px}
 .b1{top:${300 * T.scale}px;height:${60 * T.scale}px}.b2{top:${400 * T.scale}px;height:${110 * T.scale}px}.b3{top:${530 * T.scale}px;height:${110 * T.scale}px}
 `;
 
 const stage = (s, T) => {
+  if (T.frame === "card") {
+    const border = 5 * T.scale;
+    const natural = (T.dw - 2 * border) * (T.srcH / T.srcW);
+    const y = Math.round(-(natural - (T.dh - 2 * border)) * s.offset);
+    return `<div class="card"><img style="--y:${y}px" src="${b64(path.join(T.rawDir, s.src + ".png"))}"></div>`;
+  }
   // Screen height inside the bezel vs the source image's natural height at that
   // width — the difference is how far the screen can slide.
   const screenW = T.dw - 2 * 13 * T.scale;
@@ -186,7 +241,15 @@ const html = (s, T) => `<style>${css(T)}</style>
 
 const browser = await chromium.launch();
 
+/**
+ * --only=ios65,ipad13 renders just those targets, so producing the App Store
+ * set does not rewrite the committed Play screenshots.
+ */
+const onlyArg = process.argv.find((a) => a.startsWith("--only="));
+const ONLY_KEYS = onlyArg ? onlyArg.slice("--only=".length).split(",") : null;
+
 for (const [key, t] of Object.entries(TARGETS)) {
+  if (ONLY_KEYS && !ONLY_KEYS.includes(key)) continue;
   const rawDir = path.join(ROOT, "store-assets", t.raw);
   const outDir = path.join(ROOT, "store-assets", t.out);
   if (!fs.existsSync(rawDir)) {
@@ -209,8 +272,8 @@ for (const [key, t] of Object.entries(TARGETS)) {
     dh: 0,
     radius: Math.round(70 * t.scale),
   };
-  T.dw = Math.round(t.w * 0.73);
-  const pad = 13 * t.scale;
+  T.dw = Math.round(t.w * (t.cardW || 0.73));
+  const pad = (t.frame === "card" ? 5 : 13) * t.scale;
   const screenW = T.dw - 2 * pad;
   const naturalH = screenW * (T.srcH / T.srcW);
   // Phone captures are taller than the frame, so the screen crops and the body
@@ -223,7 +286,10 @@ for (const [key, t] of Object.entries(TARGETS)) {
     deviceScaleFactor: 1,
   });
   let i = 1;
-  for (const s of SHOTS) {
+  const shots = t.swap
+    ? SHOTS.map((s) => APP_STORE_SWAP[s.src] || s)
+    : SHOTS;
+  for (const s of shots) {
     const f = path.join(rawDir, s.src + ".png");
     if (!fs.existsSync(f)) {
       console.log("skip (no source)", key, s.src);

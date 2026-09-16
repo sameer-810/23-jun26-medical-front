@@ -38,7 +38,7 @@ const PASSWORD = DEMO_PASSWORD;
  * Tablet 800x1280 @2x -> 1600x2560   (a real tablet layout, not a blown-up
  *                                     phone — Play rejects those)
  */
-const TARGETS = [
+const ALL_TARGETS = [
   { key: "phone", dir: "raw-screens", w: 390, h: 844, dsf: 3, mobile: true },
   {
     key: "tablet",
@@ -48,7 +48,35 @@ const TARGETS = [
     dsf: 2,
     mobile: false,
   },
+  /**
+   * App Store sizes, captured 1:1 so nothing is resampled. Not captured by
+   * default — pick them with --targets=ios65,ipad13.
+   *   iPhone 6.5-inch  428x926  @3x -> 1284x2778
+   *   iPad 13-inch    1032x1376 @2x -> 2064x2752 (the real iPad layout)
+   */
+  { key: "ios65", dir: "raw-screens-ios", w: 428, h: 926, dsf: 3, mobile: true },
+  {
+    key: "ipad13",
+    dir: "raw-screens-ipad",
+    w: 1032,
+    h: 1376,
+    dsf: 2,
+    mobile: true,
+  },
 ];
+
+/** --targets=phone,tablet (default) | --targets=ios65,ipad13 */
+const targetArg = process.argv.find((a) => a.startsWith("--targets="));
+const TARGET_KEYS = targetArg
+  ? targetArg.slice("--targets=".length).split(",")
+  : ["phone", "tablet"];
+const TARGETS = ALL_TARGETS.filter((t) => TARGET_KEYS.includes(t.key));
+if (TARGETS.length !== TARGET_KEYS.length) {
+  throw new Error(
+    `unknown target in ${TARGET_KEYS.join(",")}. Known: ` +
+      ALL_TARGETS.map((t) => t.key).join(", "),
+  );
+}
 
 /**
  * A medicine the demo pharmacy actually holds stock of AND has a selling price
