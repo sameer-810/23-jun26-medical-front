@@ -26,4 +26,11 @@ export const profileApi = {
     const res = await apiClient.post("/users/me/change-password", payload);
     return res.data;
   },
+  deleteAccount: async (password: string) => {
+    const res = await apiClient.delete<{
+      success: boolean;
+      data: { message: string; workspaceClosed: boolean };
+    }>("/users/me", { data: { password } });
+    return res.data.data;
+  },
 };

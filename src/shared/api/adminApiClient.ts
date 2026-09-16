@@ -15,6 +15,8 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
 export const adminApiClient = axios.create({
   baseURL: `${environment.apiUrl}/admin`,
   headers: { "Content-Type": "application/json" },
+  // Same reason as apiClient: never wait forever on a sleeping API.
+  timeout: 30_000,
 });
 
 adminApiClient.interceptors.request.use((config) => {

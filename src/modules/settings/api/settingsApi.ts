@@ -24,7 +24,7 @@ export const settingsApi = {
     const res = await apiClient.post<{
       success: boolean;
       data: { emailedTo: string; fileName: string; sizeBytes: number };
-    }>("/backup/email");
+    }>("/backup/email", undefined, { timeout: 180_000 });
     return res.data.data;
   },
 };

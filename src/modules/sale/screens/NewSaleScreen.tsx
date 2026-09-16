@@ -1,4 +1,10 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, {
+  useMemo,
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+} from "react";
 import {
   View,
   Pressable,
@@ -64,6 +70,7 @@ import {
   EmptyState,
   ConfirmDialog,
 } from "@shared/ui";
+import { useAiScanConsent } from "@shared/useAiScanConsent";
 
 interface DraftLine {
   productId: string;
@@ -231,6 +238,13 @@ export default function NewSaleScreen() {
   const [scanOpen, setScanOpen] = useState(false);
   /** Camera OCR for packs whose batch number is printed as text, not a barcode. */
   const [packOpen, setPackOpen] = useState(false);
+  /** Pack reading sends the photo to Gemini — ask first, and before the
+      scanner Modal opens (iOS won't stack a dialog on top of it). */
+  const { ensure: ensureAiConsent, dialog: aiConsentDialog } =
+    useAiScanConsent();
+  const openPackScanner = useCallback(async () => {
+    if (await ensureAiConsent()) setPackOpen(true);
+  }, [ensureAiConsent]);
 
   /**
    * Consume the flag in an effect, not in `useState(autoScan)`.
@@ -246,10 +260,10 @@ export default function NewSaleScreen() {
   useEffect(() => {
     if (!autoScan) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot nav param
-    if (autoScan === "pack") setPackOpen(true);
+    if (autoScan === "pack") void openPackScanner();
     else setScanOpen(true);
     navigation.setParams({ autoScan: false });
-  }, [autoScan, navigation]);
+  }, [autoScan, navigation, openPackScanner]);
   const [soundOff, setSoundOff] = useState(isScanSoundMuted());
   /** Refill follow-up offered right after a sale completes. */
   const [followUp, setFollowUp] = useState<{
@@ -1564,7 +1578,7 @@ export default function NewSaleScreen() {
                 strokeWidth={2}
               />
             }
-            onPress={() => setPackOpen(true)}
+            onPress={() => void openPackScanner()}
           />
           <Button
             label="Invoices"
@@ -1672,6 +1686,7 @@ export default function NewSaleScreen() {
           out-of-stock guard and line de-duplication behave identically however
           the lot was identified. Prefers the shelf-label code when the lot has
           one — it's unambiguous even if two products share a batch number. */}
+      {aiConsentDialog}
       {packOpen && (
         <PackTextScanner
           onPicked={(m) => {

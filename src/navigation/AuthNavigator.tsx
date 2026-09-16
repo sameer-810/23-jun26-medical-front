@@ -6,6 +6,7 @@ import SignupScreen from "@modules/auth/screens/SignupScreen";
 import ForgotPasswordScreen from "@modules/auth/screens/ForgotPasswordScreen";
 import ResetPasswordScreen from "@modules/auth/screens/ResetPasswordScreen";
 import PricingScreen from "@modules/pricing/screens/PricingScreen";
+import { SHOW_PRICES } from "@shared/storePolicy";
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -36,7 +37,8 @@ export default function AuthNavigator() {
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-      <Stack.Screen name="Pricing" component={PricingScreen} />
+      {/* Not on iOS — see storePolicy.ts. */}
+      {SHOW_PRICES && <Stack.Screen name="Pricing" component={PricingScreen} />}
     </Stack.Navigator>
   );
 }

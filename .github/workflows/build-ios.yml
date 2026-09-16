@@ -1,0 +1,117 @@
+name: Build iOS (.ipa)
+
+# Run it manually from the GitHub "Actions" tab → "Build iOS (.ipa)" →
+# "Run workflow". Builds with `eas build --local` on a GitHub macOS runner
+# (no EAS build credits used) and publishes the result as a GitHub Release.
+#
+# WHY macOS AND NOT ubuntu: Apple's toolchain (Xcode) only runs on macOS, so
+# unlike build-android.yml this cannot use the free Ubuntu runner. On a PRIVATE
+# repo, GitHub bills macOS minutes at a 10x multiplier against your included
+# quota — budget roughly 4-6 builds/month on the free plan. On a PUBLIC repo,
+# standard macOS runners are free.
+#
+# PREREQUISITE (one time, cannot be done from CI): logged in to Expo as
+# `fdami2`, run
+#   npx eas-cli build --platform ios --profile production
+# once from your Mac and answer the Apple login (5fivempvt@gmail.com) + SMS
+# 2FA prompts. That generates
+# the distribution certificate and provisioning profile and stores them on the
+# EAS servers. This workflow then fetches them non-interactively via EXPO_TOKEN.
+# Without that step, the build here fails with a credentials error.
+#
+# BUILD NUMBER: automatic. eas.json uses remote versioning with autoIncrement, so EAS
+# raises it on every production build; do not add `ios.buildNumber` to app.json.
+#
+# Pick a profile when you run it:
+#   • production → .ipa signed for the App Store. CANNOT be installed directly
+#                  on a phone — it must go through TestFlight.
+#   • preview    → ad-hoc .ipa that installs straight onto iPhones whose UDID
+#                  you registered with `eas device:create`. Much faster to
+#                  iterate than waiting for TestFlight processing.
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile"
+        type: choice
+        options:
+          - production
+          - preview
+        default: production
+      submit:
+        description: "Upload to TestFlight after building (production only)"
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 90
+    # Needed so the workflow can publish the build as a GitHub Release asset.
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version in use
+        run: xcodebuild -version
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache CocoaPods (reuse downloaded pod sources across runs)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cocoapods
+            ios/Pods
+          key: pods-${{ runner.os }}-${{ hashFiles('**/package-lock.json', 'app.json', 'eas.json') }}
+          restore-keys: |
+            pods-${{ runner.os }}-
+
+      - name: Install eas-cli
+        run: npm install -g eas-cli
+
+      - name: Install dependencies
+        run: npm install
+
+      # Credentials are NOT generated here — they are pulled from the EAS
+      # servers using EXPO_TOKEN. See the PREREQUISITE note at the top.
+      - name: Build (local — free, no EAS credits)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          eas build --local \
+            --platform ios \
+            --profile "${{ inputs.profile }}" \
+            --non-interactive \
+            --output "${{ github.workspace }}/app-release.ipa"
+
+      # Publish to a GitHub RELEASE, not an artifact — same reasoning as the
+      # Android workflow: release assets don't count against the 500 MB Actions
+      # artifact quota.
+      - name: Publish build to a GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="ios-${{ inputs.profile }}-${{ github.run_number }}"
+          gh release create "$TAG" \
+            "app-release.ipa" \
+            --title "iOS ${{ inputs.profile }} build #${{ github.run_number }}" \
+            --notes "Automated \`eas build --local\` output. Download the .ipa below." \
+            --prerelease
+
+      # Requires an App Store Connect API key stored on EAS (`eas credentials`
+      # → iOS → App Store Connect API Key). Skipped unless you tick the box.
+      - name: Submit to TestFlight
+        if: ${{ inputs.submit && inputs.profile == 'production' }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          eas submit \
+            --platform ios \
+            --path "${{ github.workspace }}/app-release.ipa" \
+            --non-interactive

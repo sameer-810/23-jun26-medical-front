@@ -56,6 +56,7 @@ export const reportsApi = {
       const res = await apiClient.get(`/reports/${type}/export`, {
         params: { ...params, format },
         responseType: "blob",
+        timeout: 120_000,
       });
       const url = URL.createObjectURL(res.data as Blob);
       const a = document.createElement("a");

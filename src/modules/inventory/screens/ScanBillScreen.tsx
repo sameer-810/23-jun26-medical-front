@@ -43,6 +43,7 @@ import {
   Button,
   StatusChip,
 } from "@shared/ui";
+import { useAiScanConsent } from "@shared/useAiScanConsent";
 
 /** "2028-01" -> "Jan 2028" for a quick human read. */
 const prettyExpiry = (e: string | null) => {
@@ -71,6 +72,8 @@ export default function ScanBillScreen() {
   // smudge, and asking someone to confirm what they can't read is theatre.
   const { width } = useWindowDimensions();
   const previewHeight = width >= 900 ? 440 : 260;
+
+  const ai = useAiScanConsent();
 
   const scan = useMutation({
     mutationFn: ({
@@ -122,6 +125,7 @@ export default function ScanBillScreen() {
   };
 
   const takePhoto = async () => {
+    if (!(await ai.ensure())) return;
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) return;
     const r = await ImagePicker.launchCameraAsync({ quality: 0.9 });
@@ -131,6 +135,7 @@ export default function ScanBillScreen() {
   };
 
   const pickImage = async () => {
+    if (!(await ai.ensure())) return;
     const r = await ImagePicker.launchImageLibraryAsync({ quality: 0.9 });
     if (r.canceled || !r.assets?.[0]) return;
     const a = r.assets[0];
@@ -138,6 +143,7 @@ export default function ScanBillScreen() {
   };
 
   const pickPdf = async () => {
+    if (!(await ai.ensure())) return;
     const r = await DocumentPicker.getDocumentAsync({
       type: ["application/pdf", "image/*"],
       copyToCacheDirectory: true,
@@ -192,6 +198,7 @@ export default function ScanBillScreen() {
       title="Scan a bill"
       subtitle="Photo, gallery or PDF — we read it, you confirm"
     >
+      {ai.dialog}
       {/* Sources */}
       <Card style={{ marginBottom: 16 }}>
         <VStack gap={12}>

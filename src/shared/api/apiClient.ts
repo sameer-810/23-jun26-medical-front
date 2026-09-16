@@ -10,6 +10,11 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
 export const apiClient = axios.create({
   baseURL: environment.apiUrl,
   headers: { "Content-Type": "application/json" },
+  // Without this axios waits forever. The API sleeps on Render's free tier and
+  // takes 30-60s to wake, so a request sent into that window left the screen
+  // spinning with no error (App Review 2.1(a) rejected AshShifa for exactly
+  // this). Slow endpoints — OCR, exports, backup — set their own, longer value.
+  timeout: 30_000,
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -112,8 +117,14 @@ export function apiErrorMessage(
    * inspects the response itself and throws a plain Error; without this its
    * message was thrown away and the user saw only the generic fallback.
    */
-  const plain =
-    !error && err instanceof Error && err.message ? err.message : "";
+  // axios reports a timeout as "timeout of 30000ms exceeded" — true, but not
+  // something to show a pharmacist.
+  const timedOut = (err as { code?: string })?.code === "ECONNABORTED";
+  const plain = timedOut
+    ? "The server took too long to respond. Check your connection and try again."
+    : !error && err instanceof Error && err.message
+      ? err.message
+      : "";
   const message = error?.message || plain || fallback;
 
   /**

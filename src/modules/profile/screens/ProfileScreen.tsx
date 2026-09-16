@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { View } from "react-native";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,11 +9,13 @@ import {
   LogOut,
   Building2,
   Monitor,
+  Trash2,
 } from "lucide-react-native";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import {
   useUpdateProfile,
   useChangePassword,
+  useDeleteAccount,
 } from "@modules/profile/hooks/useProfile";
 import { useSessions, useLogoutAll } from "@modules/profile/hooks/useSessions";
 import {
@@ -33,6 +35,8 @@ import {
   Button,
   StatusChip,
   ErrorState,
+  TextField,
+  ConfirmDialog,
 } from "@shared/ui";
 import { fmtDateTime } from "@shared/format";
 
@@ -51,6 +55,10 @@ export default function ProfileScreen() {
     isFetching: sessionsFetching,
   } = useSessions();
   const logoutAll = useLogoutAll();
+  const deleteMut = useDeleteAccount();
+  const [deletePassword, setDeletePassword] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const isAdmin = user?.role === "admin";
 
   // Two independent forms on one screen — profile details and a password change.
   const detailsForm = useForm({
@@ -314,6 +322,69 @@ export default function ProfileScreen() {
         variant="destructive"
         icon={<LogOut size={18} color="#FFFFFF" strokeWidth={2} />}
         onPress={() => logout()}
+      />
+
+      {/* Delete account — App Store 5.1.1(v) and Google Play both require it
+          in-app for any app that lets people sign up. DELETE /users/me. */}
+      <Text
+        variant="h3"
+        tone="primary"
+        style={{ marginTop: 32, marginBottom: 12 }}
+      >
+        Delete account
+      </Text>
+      <Card style={{ marginBottom: 24 }}>
+        <VStack gap={16}>
+          <Text variant="body-sm" tone="secondary">
+            {isAdmin
+              ? "You are this pharmacy's Admin, so deleting your account closes the whole workspace. Everyone on your team is signed out and can no longer sign in. Your personal details are erased immediately, and the pharmacy's records are deleted within 30 days, except invoices that GST law requires us to keep."
+              : "Your sign-in is removed and your name, email and phone number are erased immediately. Sales and stock entries you made stay with the pharmacy, without your name."}
+          </Text>
+          {deleteMut.isError && (
+            <Text variant="caption" tone="danger">
+              {apiErrorMessage(
+                deleteMut.error,
+                "Could not delete your account",
+              )}
+            </Text>
+          )}
+          <TextField
+            label="Enter your password to confirm"
+            value={deletePassword}
+            onChangeText={setDeletePassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="password"
+          />
+          <Button
+            label={
+              isAdmin
+                ? "Delete account and close workspace"
+                : "Delete my account"
+            }
+            variant="destructive"
+            icon={<Trash2 size={18} color="#FFFFFF" strokeWidth={2} />}
+            disabled={deletePassword.length === 0}
+            loading={deleteMut.isPending}
+            onPress={() => setConfirmDelete(true)}
+          />
+        </VStack>
+      </Card>
+      <ConfirmDialog
+        visible={confirmDelete}
+        title={
+          isAdmin ? "Close this pharmacy's workspace?" : "Delete your account?"
+        }
+        message="This cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        loading={deleteMut.isPending}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          deleteMut.mutate(deletePassword);
+        }}
+        onCancel={() => setConfirmDelete(false)}
       />
     </Screen>
   );

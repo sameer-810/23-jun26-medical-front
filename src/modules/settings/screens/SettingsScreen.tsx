@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Switch, Image, Platform } from "react-native";
+import { SHOW_PRICES } from "@shared/storePolicy";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -675,20 +676,25 @@ export default function SettingsScreen() {
             </Text>
             <SwitchRow control={control} name="alertInApp" />
           </HStack>
-          <PaidAlertRow
-            control={control}
-            name="alertEmail"
-            label="Email alerts"
-            price={data?.alertPricing?.emailMonthly ?? 0}
-            currency={data?.alertPricing?.currency || "INR"}
-          />
-          <PaidAlertRow
-            control={control}
-            name="alertSms"
-            label="SMS alerts"
-            price={data?.alertPricing?.smsMonthly ?? 0}
-            currency={data?.alertPricing?.currency || "INR"}
-          />
+          {/* Paid add-ons: not offered on iOS — see storePolicy.ts. */}
+          {SHOW_PRICES && (
+            <>
+              <PaidAlertRow
+                control={control}
+                name="alertEmail"
+                label="Email alerts"
+                price={data?.alertPricing?.emailMonthly ?? 0}
+                currency={data?.alertPricing?.currency || "INR"}
+              />
+              <PaidAlertRow
+                control={control}
+                name="alertSms"
+                label="SMS alerts"
+                price={data?.alertPricing?.smsMonthly ?? 0}
+                currency={data?.alertPricing?.currency || "INR"}
+              />
+            </>
+          )}
         </VStack>
       </Card>
 

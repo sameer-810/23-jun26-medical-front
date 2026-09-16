@@ -119,6 +119,7 @@ export const inventoryApi = {
     const res = await apiClient.get("/inventory/receipts/export", {
       params,
       responseType: "blob",
+      timeout: 120_000,
     });
     return res.data as Blob;
   },

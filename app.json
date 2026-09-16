@@ -16,7 +16,13 @@
       "backgroundColor": "#FFFFFF"
     },
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.medstock.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Plusveda uses the camera to scan barcodes and read the batch number on medicine packs, and to photograph supplier bills and cheques, for example to add a strip of paracetamol to a sale in one scan.",
+        "NSPhotoLibraryUsageDescription": "Plusveda uses your photo library to import a picture of a supplier bill or cheque you have already taken, so its details can be filled in for you.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "permissions": ["android.permission.INTERNET"],
@@ -40,16 +46,36 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       "expo-localization",
       "expo-font",
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Plusveda to use the camera to scan barcodes on medicine packs."
+          "cameraPermission": "Plusveda uses the camera to scan barcodes and read the batch number on medicine packs, and to photograph supplier bills and cheques, for example to add a strip of paracetamol to a sale in one scan.",
+          "microphonePermission": false,
+          "recordAudioAndroidPermission": false
         }
       ],
-      "expo-audio",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Plusveda uses your photo library to import a picture of a supplier bill or cheque you have already taken, so its details can be filled in for you.",
+          "cameraPermission": "Plusveda uses the camera to scan barcodes and read the batch number on medicine packs, and to photograph supplier bills and cheques, for example to add a strip of paracetamol to a sale in one scan.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false
+        }
+      ],
       "./plugins/withReleaseSigning",
       "./plugins/withAndroidBuildTuning"
     ],

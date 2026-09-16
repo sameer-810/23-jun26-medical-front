@@ -20,6 +20,7 @@ import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
 import { Text, VStack, HStack, Button, ChipsRow } from "@shared/ui";
 import { AuthLayout } from "@modules/auth/components/AuthLayout";
+import { SHOW_PRICES } from "@shared/storePolicy";
 
 type Nav = {
   navigate: (s: string, params?: object) => void;
@@ -101,12 +102,48 @@ export default function SignupScreen({
    * yet, because the next thing this person tries is signing in.
    */
   useEffect(() => {
-    if (!mut.isSuccess) return;
+    // iOS has no Pricing screen (storePolicy.ts), so it stays on the panel below.
+    if (!mut.isSuccess || !SHOW_PRICES) return;
     navigation.replace("Pricing", { plan: requestedPlan, pending: true });
   }, [mut.isSuccess, navigation, requestedPlan]);
 
   /* One frame, at most — but never a blank screen, and never the form again
      with no sign that it worked, if the redirect is somehow blocked. */
+  if (mut.isSuccess && !SHOW_PRICES) {
+    return (
+      <AuthLayout
+        title="Registration received"
+        subtitle="We're reviewing your details"
+      >
+        <VStack gap={16}>
+          <View style={pendingBox}>
+            <HStack gap={10} align="flex-start">
+              <Clock3
+                size={18}
+                color={palette.warning.text}
+                strokeWidth={2}
+                style={{ marginTop: 1 }}
+              />
+              <VStack gap={6} flex={1}>
+                <Text variant="label" tone="primary">
+                  Your workspace is awaiting approval
+                </Text>
+                <Text variant="body-sm" tone="secondary">
+                  Our team will contact you to set it up, usually within one
+                  working day. You can sign in once it is activated.
+                </Text>
+              </VStack>
+            </HStack>
+          </View>
+          <Button
+            label="Back to sign in"
+            onPress={() => navigation.replace("Login")}
+          />
+        </VStack>
+      </AuthLayout>
+    );
+  }
+
   if (mut.isSuccess) {
     return (
       <AuthLayout

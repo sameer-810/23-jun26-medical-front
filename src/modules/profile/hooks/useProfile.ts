@@ -14,6 +14,16 @@ export const useUpdateProfile = () => {
   });
 };
 
+export const useDeleteAccount = () => {
+  const logout = useAuthStore((s) => s.logout);
+  return useMutation({
+    mutationFn: (password: string) => profileApi.deleteAccount(password),
+    // Every session is already gone on the server; clearing local state sends
+    // the navigator back to sign-in.
+    onSuccess: () => logout(),
+  });
+};
+
 export const useChangePassword = () =>
   useMutation({
     mutationFn: (payload: { currentPassword: string; newPassword: string }) =>

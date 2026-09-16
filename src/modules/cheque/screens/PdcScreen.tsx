@@ -60,6 +60,7 @@ import {
   ListGroup,
   ConfirmDialog,
 } from "@shared/ui";
+import { useAiScanConsent } from "@shared/useAiScanConsent";
 
 // To the paisa: this register is read against the cheque in hand, and a
 // rounded ₹65 does not match an instrument written for ₹64.50.
@@ -121,7 +122,10 @@ export default function PdcScreen() {
   const [readResult, setReadResult] = useState<ChequeRead | null>(null);
   const [readError, setReadError] = useState<string | null>(null);
 
+  const ai = useAiScanConsent();
+
   const scanCheque = async () => {
+    if (!(await ai.ensure())) return;
     const img = await capture();
     if (!img) return;
     setPhoto(img);
@@ -217,6 +221,7 @@ export default function PdcScreen() {
       title="Cheques & PDC"
       subtitle="Post-dated cheques you owe and are owed"
     >
+      {ai.dialog}
       {/* Two figures, one panel. Receivable used to be a filled green card next
           to the payable one, which read as "good news" styling on what is just
           the other half of the same pair. Only payable keeps a colour, and only
