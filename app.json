@@ -16,7 +16,7 @@
       "backgroundColor": "#FFFFFF"
     },
     "ios": {
-      "bundleIdentifier": "com.medstock.app",
+      "bundleIdentifier": "com.plusveda.app",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Plusveda uses the camera to scan barcodes and read the batch number on medicine packs, and to photograph supplier bills and cheques, for example to add a strip of paracetamol to a sale in one scan.",

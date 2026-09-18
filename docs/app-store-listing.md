@@ -20,7 +20,7 @@ a prescription register, and it listed only Android and the browser.
 | Subtitle | GST billing, stock & expiry | 27/30 |
 | Primary category | Business | |
 | Secondary category | Productivity | |
-| Bundle ID | com.medstock.app | |
+| Bundle ID | com.plusveda.app | |
 | SKU | plusveda-ios | |
 
 ## Version page
@@ -151,7 +151,7 @@ Work top to bottom. Anything not listed here is left at its default.
 | Platforms | iOS only |
 | Name | Plusveda: Pharmacy Billing |
 | Primary Language | English (India) |
-| Bundle ID | com.medstock.app (appears after the first build) |
+| Bundle ID | com.plusveda.app |
 | SKU | plusveda-ios |
 | User Access | Full Access |
 
