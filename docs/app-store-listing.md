@@ -1,5 +1,7 @@
 # Plusveda — App Store listing
 
+Part 1 is the text to paste. Part 2 is every other field App Store Connect asks for.
+
 Everything App Store Connect asks for, ready to paste. Lengths are checked
 against Apple's limits. Written 16 Sep 2026 for version 1.0.
 
@@ -134,3 +136,137 @@ Account deletion: Profile > Delete account, at the bottom.
 
 Photos of bills, medicine packs and cheques are read by Google Gemini to fill in forms. The app asks for permission before the first photo is sent.
 ```
+
+---
+
+# Part 2 — Every field in App Store Connect
+
+Work top to bottom. Anything not listed here is left at its default.
+`<…>` marks the only values I cannot supply.
+
+## A. My Apps → + → New App
+
+| Field | Answer |
+| --- | --- |
+| Platforms | iOS only |
+| Name | Plusveda: Pharmacy Billing |
+| Primary Language | English (India) |
+| Bundle ID | com.medstock.app (appears after the first build) |
+| SKU | plusveda-ios |
+| User Access | Full Access |
+
+## B. App Information
+
+| Field | Answer |
+| --- | --- |
+| Subtitle | GST billing, stock & expiry |
+| Privacy Policy URL | https://portal.plusveda.online/privacy-policy.html |
+| Category — Primary | **Business** |
+| Category — Secondary | Productivity |
+| Content Rights | Does not contain, show, or access third-party content |
+| Age Rating | see C |
+| License Agreement | Apple's standard EULA |
+| Additional Languages | none; the app ships in English only |
+
+**Do not choose Medical as a category.** It triggers Apple's regulated medical device declaration and a much heavier review. Plusveda is shop software: it bills and counts stock.
+
+## C. Age Rating questionnaire
+
+| Question | Answer |
+| --- | --- |
+| Cartoon or Fantasy Violence / Realistic Violence / Prolonged Violence | None |
+| Sexual Content or Nudity | None |
+| Profanity or Crude Humor | None |
+| Alcohol, Tobacco, or Drug Use or References | **None.** This asks about depicting recreational use; a pharmacy catalogue is not that |
+| Mature or Suggestive Themes | None |
+| Horror or Fear Themes | None |
+| **Medical or Treatment Information** | **Infrequent/Mild.** MedGuide shows uses, side effects, missed-dose and safety advice for medicines |
+| Gambling | None |
+| Contests | None |
+| Unrestricted Web Access | No |
+| Made for Kids | No |
+
+The medical answer will raise the rating above 4+. That is correct for this app and must not be softened: an inaccurate age rating is itself a rejection.
+
+## D. Pricing and Availability
+
+| Field | Answer |
+| --- | --- |
+| Price | Free (₹0) — the subscription is sold on the website, never in the app |
+| Availability | **India only.** GST invoicing, ₹ pricing |
+| Pre-Orders | Off |
+| Distribution on alternative marketplaces (EU) | Off |
+| Custom Product Pages | None |
+| Available on Apple Vision Pro | Off — never tested there |
+
+## E. App Privacy
+
+**Data collection:** Yes.
+For every type: **Linked to the user = Yes**, **Used for tracking = No**, purpose **App Functionality** (plus *Account Management* where noted). No ad, analytics or crash SDK is in the app.
+
+| Category → Type | Purpose | Why it is collected |
+| --- | --- | --- |
+| Contact Info → Name | App Functionality, Account Management | Sign-up, staff, and customers recorded on a sale |
+| Contact Info → Email Address | App Functionality, Account Management | The login |
+| Contact Info → Phone Number | App Functionality | Customer and supplier contact |
+| Health & Fitness → Health | App Functionality | Prescriptions recorded and photographed at the till |
+| Financial Info → Other Financial Info | App Functionality | Cheque and PDC details: bank, account, amount |
+| Identifiers → User ID | App Functionality, Account Management | The account |
+| Identifiers → Device ID | App Functionality | The per-account device limit |
+| User Content → Photos or Videos | App Functionality | Bill, pack, cheque and prescription photos |
+| User Content → Other User Content | App Functionality | GSTIN, drug licence, invoices, stock records |
+| Usage Data → Product Interaction | App Functionality | The staff audit trail |
+
+**Tracking:** **No**.
+**Privacy Choices URL:** leave empty.
+
+Health is declared because prescriptions are recorded and photographed. Do not leave it off to avoid questions; the App Privacy answers must match what the app does.
+
+## F. Version 1.0 page
+
+| Field | Answer |
+| --- | --- |
+| Screenshots — iPhone 6.5-inch | the 8 files in `store-assets/app-store/iphone-6.5/` |
+| Screenshots — iPad 13-inch | the 8 files in `store-assets/app-store/ipad-13/` (required: the app supports iPad) |
+| App Preview (video) | none |
+| Promotional Text / Description / Keywords | see Part 1 |
+| Support URL | https://portal.plusveda.online/privacy-policy.html |
+| Marketing URL | leave empty (plusveda.app did not resolve on 16 Sep 2026) |
+| Version | 1.0 |
+| Copyright | 2026 FiveM Infotech Private Limited |
+| Build | the TestFlight build, once processed |
+| Version Release | **Manually release this version** |
+| Routing App Coverage File | none |
+| Game Center | off |
+| In-App Purchases | **none** — and none must ever be added while the app shows no prices |
+
+### App Review Information
+
+| Field | Answer |
+| --- | --- |
+| Sign-in required | **Yes** |
+| User name | the reviewer email from `scripts/createReviewer.mjs` |
+| Password | the password you pass to that script — type it here only |
+| Contact First Name / Last Name | `<your first name>` / `<your last name>` |
+| Contact Phone Number | `<your mobile, with +91>` |
+| Contact Email | 5fivempvt@gmail.com |
+| Attachment | none |
+| Notes | the block in Part 1 |
+
+## G. If Apple asks about the business model
+
+Expect this on a first submission (2.1(b)), and answer plainly:
+
+- Pharmacies buy Plusveda on our website; our team activates each workspace.
+- The app sells nothing, shows no prices, and links to no purchase page.
+- Users sign in to an account they already hold, which is guideline 3.1.3(f).
+
+## H. Account-level, once per Apple account
+
+| Item | Answer |
+| --- | --- |
+| Free Apps Agreement | must be Active under Business → Agreements |
+| Paid Apps Agreement | not needed |
+| EU Digital Services Act trader status | already submitted for this account with AshShifa |
+| Export compliance | handled by `ITSAppUsesNonExemptEncryption: false`; otherwise answer *None of the algorithms mentioned above* |
+| Advertising Identifier (IDFA) | **No** |
