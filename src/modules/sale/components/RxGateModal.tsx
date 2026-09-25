@@ -45,6 +45,13 @@ interface Props {
   rxItems: string[];
   /** Pre-filled from the sale screen's doctor box, if typed. */
   doctorName?: string;
+  /**
+   * "required" — the legal gate: a scheduled item is in the cart and the sale
+   * cannot complete without this. "optional" — the pharmacist chose to attach
+   * a prescription to an ordinary sale, so the copy must not claim the law
+   * demands it and the button must not promise to finish the bill.
+   */
+  mode?: "required" | "optional";
   onDone: (prescriptionId: string, doctorName: string) => void;
   onCancel: () => void;
 }
@@ -57,9 +64,11 @@ export function RxGateModal({
   customerName,
   rxItems,
   doctorName: initialDoctor,
+  mode = "required",
   onDone,
   onCancel,
 }: Props) {
+  const optional = mode === "optional";
   const [doctor, setDoctor] = useState(initialDoctor || "");
   const [regNo, setRegNo] = useState("");
   const [date, setDate] = useState(today());
@@ -124,13 +133,14 @@ export function RxGateModal({
           >
             <VStack gap={0} flex={1}>
               <Text variant="h3" tone="primary">
-                Prescription required
+                {optional ? "Attach prescription" : "Prescription required"}
               </Text>
               <Text variant="caption" tone="tertiary" numberOfLines={2}>
-                {rxItems.slice(0, 3).join(", ")}
-                {rxItems.length > 3 ? ` +${rxItems.length - 3} more` : ""} —
-                Schedule H/H1/X items need a doctor&apos;s prescription on
-                record.
+                {optional
+                  ? "Photograph the prescription, or pick one already on file. Kept against this bill and the customer's record."
+                  : `${rxItems.slice(0, 3).join(", ")}${
+                      rxItems.length > 3 ? ` +${rxItems.length - 3} more` : ""
+                    } — Schedule H/H1/X items need a doctor's prescription on record.`}
               </Text>
             </VStack>
             <Pressable
@@ -280,15 +290,17 @@ export function RxGateModal({
               {error ? <Banner tone="danger" message={error} /> : null}
 
               <Button
-                label="Verify & continue sale"
+                label={
+                  optional ? "Save prescription" : "Verify & continue sale"
+                }
                 loading={busy}
                 disabled={doctor.trim().length < 2}
                 onPress={() => void recordNew()}
               />
               <Text variant="caption" tone="tertiary">
-                By continuing you confirm the prescription is genuine, current
-                and covers these items. It is recorded in the Schedule H
-                register with this bill.
+                {optional
+                  ? "You confirm the prescription is genuine and current. It is kept with this bill and on the customer's record."
+                  : "By continuing you confirm the prescription is genuine, current and covers these items. It is recorded in the Schedule H register with this bill."}
               </Text>
             </VStack>
           </ScrollView>

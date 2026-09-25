@@ -30,6 +30,7 @@ import {
   Volume2,
   VolumeX,
   ListPlus,
+  Paperclip,
 } from "lucide-react-native";
 import { CameraScanner } from "@shared/CameraScanner";
 import { PackTextScanner } from "@shared/PackTextScanner";
@@ -197,6 +198,12 @@ export default function NewSaleScreen() {
   // The prescription this sale is dispensed against, once the gate has run.
   const [prescriptionId, setPrescriptionId] = useState<string | null>(null);
   const [rxGateOpen, setRxGateOpen] = useState(false);
+  /**
+   * Why the prescription sheet is open. "gate" means a scheduled item stopped
+   * the sale, so finishing it should carry straight on to the bill; "attach"
+   * means the pharmacist opened it themselves and the sale is not ready yet.
+   */
+  const [rxPurpose, setRxPurpose] = useState<"gate" | "attach">("gate");
   useEffect(() => {
     const t = setTimeout(() => setCustomerTerm(customerQuery.trim()), 250);
     return () => clearTimeout(t);
@@ -780,6 +787,7 @@ export default function NewSaleScreen() {
       invoiceProfile?.rx?.enforce !== false &&
       useOfflineStore.getState().online
     ) {
+      setRxPurpose("gate");
       setRxGateOpen(true);
       return;
     }
@@ -1292,6 +1300,59 @@ export default function NewSaleScreen() {
           onChangeText={setDoctorName}
           autoCapitalize="words"
         />
+
+        {/*
+          Attach the paper prescription to ANY sale, not only a scheduled one.
+          The capture sheet already existed but was reachable only when the law
+          forced it open; a pharmacist who simply wants the script on file for a
+          repeat customer had nowhere to put it.
+        */}
+        {prescriptionId ? (
+          <HStack gap={8} align="center">
+            <Paperclip size={16} color={palette.success.text} strokeWidth={2} />
+            <Text variant="body-sm" tone="success" style={{ flex: 1 }}>
+              Prescription attached
+            </Text>
+            <Pressable
+              onPress={() => {
+                setRxPurpose("attach");
+                setRxGateOpen(true);
+              }}
+              hitSlop={6}
+              accessibilityLabel="Replace the attached prescription"
+            >
+              <Text variant="label-sm" tone="link">
+                Replace
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setPrescriptionId(null)}
+              hitSlop={6}
+              accessibilityLabel="Remove the attached prescription"
+            >
+              <Text variant="label-sm" tone="tertiary">
+                Remove
+              </Text>
+            </Pressable>
+          </HStack>
+        ) : (
+          <Button
+            label="Attach prescription photo"
+            variant="secondary"
+            size="sm"
+            icon={
+              <Camera
+                size={16}
+                color={palette.text.primary}
+                strokeWidth={1.9}
+              />
+            }
+            onPress={() => {
+              setRxPurpose("attach");
+              setRxGateOpen(true);
+            }}
+          />
+        )}
         {/* Only once a customer is named — there is nobody to ring back on a
             walk-in sale, so the control would just be noise. */}
         {customerId ? (
@@ -1501,19 +1562,25 @@ export default function NewSaleScreen() {
         customerName={selectedCustomer?.name}
         rxItems={rxItems}
         doctorName={doctorName}
+        mode={rxPurpose === "attach" ? "optional" : "required"}
         onDone={(id, doc) => {
           setPrescriptionId(id);
           if (doc) setDoctorName(doc);
           setRxGateOpen(false);
-          // Continue the sale the pharmacist already asked for.
-          submit(id);
+          // Only the gate was mid-sale. A voluntary attach returns to the cart,
+          // which may not even have items in it yet.
+          if (rxPurpose === "gate") submit(id);
         }}
         onCancel={() => setRxGateOpen(false)}
       />
-      {prescriptionId && rxItems.length > 0 ? (
+      {prescriptionId ? (
         <Banner
           tone="success"
-          message="Prescription attached — this sale goes into the Schedule H register."
+          message={
+            rxItems.length > 0
+              ? "Prescription attached — this sale goes into the Schedule H register."
+              : "Prescription attached to this bill."
+          }
           style={{ marginBottom: 12 }}
         />
       ) : null}
