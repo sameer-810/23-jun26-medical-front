@@ -54,7 +54,14 @@ const ALL_TARGETS = [
    *   iPhone 6.5-inch  428x926  @3x -> 1284x2778
    *   iPad 13-inch    1032x1376 @2x -> 2064x2752 (the real iPad layout)
    */
-  { key: "ios65", dir: "raw-screens-ios", w: 428, h: 926, dsf: 3, mobile: true },
+  {
+    key: "ios65",
+    dir: "raw-screens-ios",
+    w: 428,
+    h: 926,
+    dsf: 3,
+    mobile: true,
+  },
   {
     key: "ipad13",
     dir: "raw-screens-ipad",

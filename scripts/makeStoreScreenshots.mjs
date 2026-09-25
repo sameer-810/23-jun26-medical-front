@@ -286,9 +286,7 @@ for (const [key, t] of Object.entries(TARGETS)) {
     deviceScaleFactor: 1,
   });
   let i = 1;
-  const shots = t.swap
-    ? SHOTS.map((s) => APP_STORE_SWAP[s.src] || s)
-    : SHOTS;
+  const shots = t.swap ? SHOTS.map((s) => APP_STORE_SWAP[s.src] || s) : SHOTS;
   for (const s of shots) {
     const f = path.join(rawDir, s.src + ".png");
     if (!fs.existsSync(f)) {

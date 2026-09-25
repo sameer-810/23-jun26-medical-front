@@ -30,16 +30,26 @@ import {
   EmptyState,
 } from "@shared/ui";
 
+/** The statuses GET /admin/organizations filters on. */
+type Status = "pending" | "active" | "suspended" | undefined;
+
 export default function AdminDashboardScreen() {
   const navigation = useNavigation<any>();
 
   const [search, setSearch] = useState("");
   /**
-   * Set by the "Awaiting approval" tile. Undefined shows everything; tapping
-   * the tile again clears it, so the filter can't strand an operator on an
-   * empty list with no visible way back.
+   * Set by the overview tiles. Undefined shows everything; tapping the applied
+   * tile again clears it, so a filter can't strand an operator on an empty
+   * list with no visible way back.
    */
-  const [status, setStatus] = useState<"pending" | undefined>(undefined);
+  const [status, setStatus] = useState<Status>(undefined);
+
+  /* Filtering from page 3 of an unfiltered list would otherwise land on a page
+     the filtered set does not have, and show nothing. */
+  const applyStatus = (next: Exclude<Status, undefined>) => {
+    setStatus((cur) => (cur === next ? undefined : next));
+    setPage(1);
+  };
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
 
@@ -73,15 +83,21 @@ export default function AdminDashboardScreen() {
     >
       <AdminNav active="pharmacies" />
 
-      {/* Platform overview — one hairline-divided panel. Only "Suspended"
-          earns colour, and only while there is something suspended: the other
-          three are just counts and a count is not a status. */}
+      {/* Platform overview — one hairline-divided panel, and the list's
+          filter control. Every tile but "Total users" narrows the list below to
+          exactly the rows it counts; the applied one is tinted, and tapping it
+          again clears the filter. */}
       <StatRow
         style={{ marginBottom: 16 }}
         stats={[
           {
             label: "Total pharmacies",
             value: String(overview?.totalOrgs ?? "—"),
+            onPress: () => {
+              setStatus(undefined);
+              setPage(1);
+            },
+            selected: status === undefined,
           },
           /**
            * Leads the row when there is a queue.
@@ -96,16 +112,25 @@ export default function AdminDashboardScreen() {
             value: String(overview?.pendingOrgs ?? 0),
             accent:
               (overview?.pendingOrgs ?? 0) > 0 ? accents.amber : undefined,
-            onPress: () =>
-              setStatus((cur) => (cur === "pending" ? undefined : "pending")),
+            onPress: () => applyStatus("pending"),
+            selected: status === "pending",
           },
-          { label: "Active", value: String(overview?.activeOrgs ?? "—") },
+          {
+            label: "Active",
+            value: String(overview?.activeOrgs ?? "—"),
+            onPress: () => applyStatus("active"),
+            selected: status === "active",
+          },
           {
             label: "Suspended",
             value: String(overview?.suspendedOrgs ?? "—"),
             accent:
               (overview?.suspendedOrgs ?? 0) > 0 ? accents.amber : undefined,
+            onPress: () => applyStatus("suspended"),
+            selected: status === "suspended",
           },
+          /* Not pressable: it counts USERS, and there is no platform-wide user
+             list to filter to. Staff are listed per pharmacy. */
           { label: "Total users", value: String(overview?.totalUsers ?? "—") },
         ]}
       />

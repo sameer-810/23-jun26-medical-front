@@ -19,6 +19,12 @@ export interface Stat {
   hint?: string;
   trend?: { pct: number; good: boolean };
   onPress?: () => void;
+  /**
+   * This tile's filter is the one currently applied. A pressable tile that
+   * looks identical whether or not it is switched on leaves an operator unable
+   * to tell a short list from a filtered one.
+   */
+  selected?: boolean;
 }
 
 interface Props {
@@ -130,9 +136,12 @@ export function StatRow({ stats, columns, style }: Props) {
           <Pressable
             key={key}
             onPress={s.onPress}
+            accessibilityRole="button"
+            accessibilityState={{ selected: Boolean(s.selected) }}
             style={({ pressed }) => [
               frame,
               styles.cell,
+              s.selected ? styles.cellSelected : null,
               pressed ? { backgroundColor: palette.surface.sunken } : null,
             ]}
           >
@@ -159,6 +168,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     justifyContent: "center",
     minHeight: 68,
+  },
+  /* The applied filter. A tint plus a brand rule down the inside edge — the
+     hairline grid leaves no room for a border without shifting the cell. */
+  cellSelected: {
+    backgroundColor: palette.teal[50],
+    borderBottomWidth: 2,
+    borderBottomColor: palette.teal[600],
+    paddingBottom: 10,
   },
   divideLeft: {
     borderLeftWidth: 1,
