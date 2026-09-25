@@ -44,6 +44,7 @@ import { AlternativeItem } from "@modules/inventory/types";
 import { useScanGun } from "@shared/useScanGun";
 import { TextField } from "@shared/ui/TextField";
 import { RxGateModal } from "@modules/sale/components/RxGateModal";
+import { NewCustomerDialog } from "@modules/sale/components/NewCustomerDialog";
 import { useOfflineStore } from "@shared/offline/useOfflineStore";
 import {
   useCustomers,
@@ -211,6 +212,12 @@ export default function NewSaleScreen() {
   const priceIncludesTax = invoiceProfile?.tax?.priceIncludesTax ?? false;
 
   const [customerId, setCustomerId] = useState<string | null>(null);
+
+  /* Quick-add customer, opened from the picker's create row. */
+  const [newCustomerOpen, setNewCustomerOpen] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerError, setNewCustomerError] = useState<string | null>(null);
+
   const [taxType, setTaxType] = useState<"intra" | "inter">("intra");
   const [paymentMode, setPaymentMode] = useState("cash");
   /**
@@ -312,6 +319,31 @@ export default function NewSaleScreen() {
     const c = id ? (customers?.data || []).find((x) => x.id === id) : null;
     if (c) setKnownCustomers((cur) => ({ ...cur, [c.id]: c }));
     setCustomerId(id);
+  };
+
+  /**
+   * Save the quick-added customer and select them for this sale.
+   *
+   * The duplicate-mobile 409 is shown in the dialog rather than as a toast: the
+   * number is right there to correct, and the half-typed name would be lost if
+   * the dialog closed.
+   */
+  const createCustomerWithMobile = async (values: {
+    name: string;
+    mobile: string;
+  }) => {
+    setNewCustomerError(null);
+    try {
+      const cst = await createCustomer.mutateAsync({
+        name: values.name,
+        ...(values.mobile ? { mobile: values.mobile } : {}),
+      });
+      setKnownCustomers((cur) => ({ ...cur, [cst.id]: cst }));
+      setCustomerId(cst.id);
+      setNewCustomerOpen(false);
+    } catch (err) {
+      setNewCustomerError(apiErrorMessage(err, "Could not add the customer"));
+    }
   };
 
   const unitOptions = (line: DraftLine) => {
@@ -1242,11 +1274,15 @@ export default function NewSaleScreen() {
           onSearch={setCustomerQuery}
           loading={customersLoading}
           onChange={pickCustomer}
-          onCreate={async (label) => {
-            const cst = await createCustomer.mutateAsync({ name: label });
-            setKnownCustomers((cur) => ({ ...cur, [cst.id]: cst }));
-            return { value: cst.id, label: cst.name };
+          /* Not `onCreate`: that makes a customer from a name alone, and the
+             mobile number is the half that matters at a till — it is where the
+             refill reminder goes and how they are found next visit. */
+          onRequestCreate={(query) => {
+            setNewCustomerName(query);
+            setNewCustomerError(null);
+            setNewCustomerOpen(true);
           }}
+          createNoun="customer"
           allowClear
         />
         <TextField
@@ -1625,6 +1661,15 @@ export default function NewSaleScreen() {
         didn't ask for is noise, and noise is how a reminders list stops being
         read at all.
       */}
+      <NewCustomerDialog
+        visible={newCustomerOpen}
+        initialName={newCustomerName}
+        loading={createCustomer.isPending}
+        error={newCustomerError}
+        onSubmit={createCustomerWithMobile}
+        onCancel={() => setNewCustomerOpen(false)}
+      />
+
       <ConfirmDialog
         visible={Boolean(followUp)}
         title="Set a refill reminder?"
