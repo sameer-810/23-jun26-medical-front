@@ -16,6 +16,7 @@ import {
 import { AdminNav } from "@modules/admin/components/AdminNav";
 import type { AdminOrg } from "@modules/admin/types";
 import { palette, accents, numeric } from "@shared/designSystem";
+import { fmtDate } from "@shared/format";
 import {
   Screen,
   Text,
@@ -31,7 +32,7 @@ import {
 } from "@shared/ui";
 
 /** The statuses GET /admin/organizations filters on. */
-type Status = "pending" | "active" | "suspended" | undefined;
+type Status = "pending" | "trial" | "active" | "suspended" | undefined;
 
 export default function AdminDashboardScreen() {
   const navigation = useNavigation<any>();
@@ -107,6 +108,14 @@ export default function AdminDashboardScreen() {
            * person waiting behind it. It only takes an accent when non-zero,
            * so a cleared queue does not sit there glowing amber.
            */
+          /* Signups now start a free trial instead of waiting for approval;
+             these are the ones to ring before the trial runs out. */
+          {
+            label: "On trial",
+            value: String(overview?.trialOrgs ?? 0),
+            onPress: () => applyStatus("trial"),
+            selected: status === "trial",
+          },
           {
             label: "Awaiting approval",
             value: String(overview?.pendingOrgs ?? 0),
@@ -209,6 +218,8 @@ function PharmacyRow({ org, onPress }: { org: AdminOrg; onPress: () => void }) {
           {/* Approval outranks suspension: a workspace can be active and still pending. */}
           {org.approvalStatus === "pending" ? (
             <StatusChip label="Awaiting approval" tone="warning" />
+          ) : trialChip(org) ? (
+            <StatusChip {...trialChip(org)!} />
           ) : org.approvalStatus === "rejected" ? (
             <StatusChip label="Declined" tone="danger" />
           ) : (
@@ -230,6 +241,23 @@ function PharmacyRow({ org, onPress }: { org: AdminOrg; onPress: () => void }) {
       </VStack>
     </Card>
   );
+}
+
+/** "Trial · ends 27 Oct", or "Trial ended" — null once on a paid plan. */
+function trialChip(org: AdminOrg): {
+  label: string;
+  tone: "info" | "warning" | "danger";
+} | null {
+  const sub = org.subscription;
+  if (!org.selfServiceTrial || sub?.status !== "trial" || !sub.trialEndsAt)
+    return null;
+  const ends = new Date(sub.trialEndsAt).getTime();
+  if (ends < Date.now()) return { label: "Trial ended", tone: "danger" };
+  const daysLeft = Math.ceil((ends - Date.now()) / 86_400_000);
+  return {
+    label: `Trial · ends ${fmtDate(sub.trialEndsAt)}`,
+    tone: daysLeft <= 2 ? "warning" : "info",
+  };
 }
 
 function MiniStat({

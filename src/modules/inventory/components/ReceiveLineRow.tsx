@@ -60,7 +60,7 @@ export function ReceiveLineRow({
   locationOptions,
   onRequestCreateProduct,
 }: Props) {
-  const status = lineStatus(line);
+  const status = lineStatus(line, product);
   const title = lineTitle(line, product);
   const Chevron = open ? ChevronDown : ChevronRight;
   // Three fields across only where they'd still be readable; a phone stacks them.
@@ -153,7 +153,9 @@ export function ReceiveLineRow({
                 placeholder="Unit"
                 value={line.unit}
                 options={unitOptions(product)}
-                onChange={(v) => onChange({ unit: v })}
+                onChange={(v) => onChange({ unit: v, unitNote: undefined })}
+                error={line.unitNote && !line.unit ? line.unitNote : undefined}
+                hint={line.unitNote && line.unit ? line.unitNote : undefined}
               />
             </View>
           </HStack>

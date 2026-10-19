@@ -247,7 +247,7 @@ export default function DashboardScreen() {
       onPress: () => navigation.navigate("Sales", { screen: "NewSale" }),
     },
     {
-      label: "Receive stock",
+      label: "Purchase",
       icon: PackagePlus,
       perm: PERMISSIONS.STOCK_INWARD_MANAGE,
       inTabBar: true,

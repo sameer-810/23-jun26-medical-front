@@ -176,7 +176,9 @@ export function renderBillLines(
           : "",
       ),
     );
-    if (sale.doctorName) line(`Doct : ${sale.doctorName}`);
+    const doct = sale.doctorName ? `Doct : ${sale.doctorName}` : "";
+    const mob = sale.customerMobile ? `Mob : ${sale.customerMobile}` : "";
+    if (doct || mob) line(twoUp(doct, mob));
   } else {
     line(
       twoUp(

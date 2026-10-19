@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { View, Pressable } from "react-native";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,7 +11,6 @@ import {
   EyeOff,
   Phone,
   AtSign,
-  Clock3,
 } from "lucide-react-native";
 import { useSignup } from "@modules/auth/hooks/useAuth";
 import { signupSchema } from "@modules/auth/auth.validation";
@@ -20,17 +19,8 @@ import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
 import { Text, VStack, HStack, Button, ChipsRow } from "@shared/ui";
 import { AuthLayout } from "@modules/auth/components/AuthLayout";
-import { SHOW_PRICES } from "@shared/storePolicy";
 
-type Nav = {
-  navigate: (s: string, params?: object) => void;
-  /**
-   * Replace, not push, on the way to the pricing page: the form is submitted
-   * and the workspace exists, so Back must not return to a filled-in form
-   * whose only button would try to register the same shop twice.
-   */
-  replace: (s: string, params?: object) => void;
-};
+type Nav = { navigate: (s: string, params?: object) => void };
 type Route = { params?: { plan?: string } };
 
 const INDUSTRIES = [
@@ -91,103 +81,14 @@ export default function SignupScreen({
     }),
   );
 
-  /**
-   * Registered — on to the plans.
-   *
-   * The workspace exists and is queued for approval; the client asked for the
-   * full price list to be what a new registration lands on, so the "awaiting
-   * approval" message moved there rather than being said twice. The Pricing
-   * screen still leads with it: it has to be unmistakably a GOOD outcome (the
-   * form worked) while being equally clear that there is nothing to log into
-   * yet, because the next thing this person tries is signing in.
-   */
-  useEffect(() => {
-    // iOS has no Pricing screen (storePolicy.ts), so it stays on the panel below.
-    if (!mut.isSuccess || !SHOW_PRICES) return;
-    navigation.replace("Pricing", { plan: requestedPlan, pending: true });
-  }, [mut.isSuccess, navigation, requestedPlan]);
-
-  /* One frame, at most — but never a blank screen, and never the form again
-     with no sign that it worked, if the redirect is somehow blocked. */
-  if (mut.isSuccess && !SHOW_PRICES) {
-    return (
-      <AuthLayout
-        title="Registration received"
-        subtitle="We're reviewing your details"
-      >
-        <VStack gap={16}>
-          <View style={pendingBox}>
-            <HStack gap={10} align="flex-start">
-              <Clock3
-                size={18}
-                color={palette.warning.text}
-                strokeWidth={2}
-                style={{ marginTop: 1 }}
-              />
-              <VStack gap={6} flex={1}>
-                <Text variant="label" tone="primary">
-                  Your workspace is awaiting approval
-                </Text>
-                <Text variant="body-sm" tone="secondary">
-                  Our team will contact you to set it up, usually within one
-                  working day. You can sign in once it is activated.
-                </Text>
-              </VStack>
-            </HStack>
-          </View>
-          <Button
-            label="Back to sign in"
-            onPress={() => navigation.replace("Login")}
-          />
-        </VStack>
-      </AuthLayout>
-    );
-  }
-
-  if (mut.isSuccess) {
-    return (
-      <AuthLayout
-        title="Registration received"
-        subtitle="We're reviewing your details and preparing your quotation"
-      >
-        <VStack gap={16}>
-          <View style={pendingBox}>
-            <HStack gap={10} align="flex-start">
-              <Clock3
-                size={18}
-                color={palette.warning.text}
-                strokeWidth={2}
-                style={{ marginTop: 1 }}
-              />
-              <VStack gap={6} flex={1}>
-                <Text variant="label" tone="primary">
-                  Your workspace is awaiting approval
-                </Text>
-                <Text variant="body-sm" tone="secondary">
-                  Taking you to the plans…
-                </Text>
-              </VStack>
-            </HStack>
-          </View>
-
-          <Button
-            label="See the plans"
-            onPress={() =>
-              navigation.navigate("Pricing", {
-                plan: requestedPlan,
-                pending: true,
-              })
-            }
-          />
-        </VStack>
-      </AuthLayout>
-    );
-  }
+  /* Success signs the owner in (useSignup applies the session), and the root
+     navigator swaps this whole stack for the app — there is no next screen to
+     navigate to from here. */
 
   return (
     <AuthLayout
-      title="Create your workspace"
-      subtitle="You'll be the Admin — invite your team after sign-up"
+      title="Start your free trial"
+      subtitle="7 days free, no card needed. You'll be the Admin — invite your team after."
     >
       <VStack gap={16}>
         {mut.isError && (
@@ -320,7 +221,7 @@ export default function SignupScreen({
         />
 
         <Button
-          label="Create workspace"
+          label="Start free trial"
           onPress={submit}
           loading={mut.isPending}
           size="lg"
@@ -352,12 +253,4 @@ const errorBox = {
   backgroundColor: palette.danger.bg,
   borderWidth: 1,
   borderColor: palette.danger.border,
-} as const;
-
-const pendingBox = {
-  backgroundColor: palette.warning.bg,
-  borderColor: palette.warning.border,
-  borderWidth: 1,
-  borderRadius: radius.md,
-  padding: 14,
 } as const;

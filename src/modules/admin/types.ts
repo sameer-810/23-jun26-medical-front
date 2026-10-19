@@ -6,6 +6,8 @@ export interface AdminOverview {
   catalogProducts: number;
   /** Registrations waiting on a quotation — somebody is locked out until 0. */
   pendingOrgs?: number;
+  /** Still on the free trial started at signup — sales should call these. */
+  trialOrgs?: number;
 }
 
 export interface AdminOrgOwner {
@@ -73,6 +75,8 @@ export interface AdminOrg {
   gstin?: string;
   drugLicenseNo?: string;
   subscription?: Subscription;
+  /** Started a free trial by signing up; cut off when it ends. */
+  selfServiceTrial?: boolean;
   createdAt: string;
   updatedAt: string;
 }

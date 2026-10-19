@@ -352,7 +352,7 @@ export default function InventoryScreen() {
           emptyMessage={
             filter === "low"
               ? "Everything is above its reorder level."
-              : "Receive stock to see it here."
+              : "Enter a purchase to see it here."
           }
         />
         {list.length > 0 ? (

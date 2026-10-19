@@ -37,28 +37,14 @@ export interface SignupPayload {
    * The plan card they clicked, arriving as `?plan=12m` on the signup URL.
    *
    * Not a purchase — nothing is charged at signup and the workspace still
-   * waits for approval. It rides along so the quotation call opens with the
+   * starts on the free trial. It rides along so the quotation call opens with the
    * right number instead of "which one were you looking at?".
    */
   planCode?: string;
 }
 
-/**
- * What /auth/signup returns now.
- *
- * Deliberately NOT an `AuthResponse`: registration creates a workspace queued
- * for approval and issues no session, so there are no tokens to hand back. A
- * shared type would have let a caller read `data.accessToken`, get `undefined`,
- * and sign in with a blank token.
- */
-export interface SignupResponse {
-  success: boolean;
-  data: {
-    user: User;
-    organization: Organization;
-    pendingApproval: boolean;
-  };
-}
+/** Signup starts the free trial and signs the owner straight in. */
+export type SignupResponse = AuthResponse;
 
 export interface ForgotPasswordPayload {
   email: string;

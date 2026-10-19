@@ -72,7 +72,7 @@ export default function PlansScreen() {
       width: 200,
       render: (p) => (
         <Text variant="body-sm" tone="secondary">
-          Users: {p.maxUsers || "∞"} · Products: {p.maxProducts || "∞"}
+          Users: {p.maxUsers || "∞"}
         </Text>
       ),
     },
@@ -177,7 +177,7 @@ function PlanRow({ plan, onPress }: { plan: Plan; onPress: () => void }) {
             {planPriceLine(plan)}
           </Text>
           <Text variant="body-sm" tone="secondary">
-            Users: {plan.maxUsers || "∞"} · Products: {plan.maxProducts || "∞"}
+            Users: {plan.maxUsers || "∞"}
           </Text>
         </HStack>
         {plan.features?.length ? (

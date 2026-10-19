@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import {
   ChevronRight,
   PackageCheck,
@@ -8,6 +8,7 @@ import {
   Download,
 } from "lucide-react-native";
 import { useReceipts } from "@modules/inventory/hooks/useInventory";
+import { useSuppliers } from "@modules/supplier/hooks/useSuppliers";
 import { ReceiptListItem } from "@modules/inventory/types";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { downloadBlob } from "@shared/download";
@@ -27,6 +28,7 @@ import {
   Skeleton,
   Button,
   DateField,
+  Select,
   Banner,
   ErrorState,
 } from "@shared/ui";
@@ -42,6 +44,20 @@ export default function ReceiptsScreen() {
    * pharmacist wants on opening it — the filter is for answering a question
    * ("what came in during the first fortnight of August?"), not a gate.
    */
+  /** Invoice history per supplier — the question pharmacists actually ask. */
+  const route = useRoute<{
+    key: string;
+    name: string;
+    params?: { supplierId?: string };
+  }>();
+  const [supplierId, setSupplierId] = useState<string | null>(
+    route.params?.supplierId ?? null,
+  );
+  const { data: suppliers } = useSuppliers();
+  const supplierOptions = (suppliers?.data || []).map((s) => ({
+    value: s.id,
+    label: s.name,
+  }));
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,6 +66,7 @@ export default function ReceiptsScreen() {
     useReceipts({
       page,
       limit,
+      supplierId: supplierId || undefined,
       from: from || undefined,
       to: to || undefined,
     });
@@ -59,6 +76,7 @@ export default function ReceiptsScreen() {
     setNote(null);
     try {
       const blob = await inventoryApi.exportReceipts({
+        supplierId: supplierId || undefined,
         from: from || undefined,
         to: to || undefined,
         format,
@@ -88,25 +106,32 @@ export default function ReceiptsScreen() {
 
   const columns: Column<ReceiptListItem>[] = [
     {
-      key: "receiptNo",
-      header: "Receipt",
-      width: 150,
+      key: "referenceNo",
+      header: "Invoice",
+      width: 170,
       sortable: true,
-      sortValue: (r) => r.receiptNo,
-      // A voided GRN keeps its row but contributes nothing, so it has to be
-      // distinguishable from a live one at a glance.
+      sortValue: (r) => r.referenceNo || r.receiptNo,
+      // The supplier's own bill number leads: it is what is printed on the
+      // paper in the pharmacist's hand. Our GRN number sits underneath. A
+      // voided entry keeps its row but counts for nothing, so it is marked.
       render: (r) => (
-        <HStack gap={6} align="center">
-          <Text
-            variant="label"
-            tone={r.status === "void" ? "tertiary" : "primary"}
-          >
+        <VStack gap={1}>
+          <HStack gap={6} align="center">
+            <Text
+              variant="label"
+              tone={r.status === "void" ? "tertiary" : "primary"}
+              numberOfLines={1}
+            >
+              {r.referenceNo || "No invoice no."}
+            </Text>
+            {r.status === "void" ? (
+              <StatusChip label="Void" tone="danger" />
+            ) : null}
+          </HStack>
+          <Text variant="caption" tone="tertiary">
             {r.receiptNo}
           </Text>
-          {r.status === "void" ? (
-            <StatusChip label="Void" tone="danger" />
-          ) : null}
-        </HStack>
+        </VStack>
       ),
     },
     {
@@ -176,13 +201,13 @@ export default function ReceiptsScreen() {
 
   return (
     <Screen
-      back="Back to receive"
+      back="Back to purchase"
       overline="Stock Inward"
-      title="Receipt history"
+      title="Purchase history"
       subtitle={
         isError
           ? undefined
-          : `${total.toLocaleString("en-IN")} goods-received notes`
+          : `${total.toLocaleString("en-IN")} supplier invoice${total === 1 ? "" : "s"}`
       }
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
@@ -191,6 +216,20 @@ export default function ReceiptsScreen() {
           matches the list on screen, so the two can never disagree. */}
       <Card style={{ marginBottom: 12 }}>
         <HStack gap={10} align="flex-end" wrap>
+          <View style={{ minWidth: 220, flexGrow: 1, maxWidth: 320 }}>
+            <Select
+              label="Supplier"
+              placeholder="All suppliers"
+              value={supplierId}
+              options={supplierOptions}
+              onChange={(v) => {
+                setSupplierId(v);
+                setPage(1);
+              }}
+              allowClear
+              searchable
+            />
+          </View>
           <DateField
             label="From"
             value={from}
@@ -265,7 +304,12 @@ export default function ReceiptsScreen() {
       ) : (
         <>
           <DataTable<ReceiptListItem>
-            columns={columns}
+            // Filtered to one supplier, its name on every row says nothing.
+            columns={
+              supplierId
+                ? columns.filter((c) => c.key !== "supplierName")
+                : columns
+            }
             rows={receipts}
             keyExtractor={(r) => r.id}
             onRowPress={open}
@@ -274,7 +318,7 @@ export default function ReceiptsScreen() {
             )}
             emptyIcon={ScrollText}
             emptyTitle="No receipts yet"
-            emptyMessage="Received stock will be listed here as GRNs."
+            emptyMessage="Purchases you enter will be listed here."
           />
           {receipts.length > 0 ? (
             <View style={{ marginTop: 16 }}>
@@ -331,7 +375,7 @@ function ReceiptRow({
               variant="label-lg"
               tone={receipt.status === "void" ? "tertiary" : "primary"}
             >
-              {receipt.receiptNo}
+              {receipt.referenceNo || receipt.receiptNo}
             </Text>
             {receipt.status === "void" ? (
               <StatusChip label="Void" tone="danger" />
@@ -340,6 +384,7 @@ function ReceiptRow({
           <Text variant="body-sm" tone="tertiary" numberOfLines={1}>
             {[
               receipt.supplierName || "No supplier",
+              receipt.referenceNo ? receipt.receiptNo : "",
               fmtDate(receipt.receivedAt),
               receipt.receivedByName,
             ]

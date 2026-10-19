@@ -93,7 +93,7 @@ function billOfSupplyHtml(sale: Sale, profile?: InvoiceProfile): string {
     <div class="c title">BILL OF SUPPLY</div>
     <div class="grid"><span>Date : ${ddmmyyyy(sale.saleDate)}</span><span>Scheduled Bill No.: ${esc(sale.invoiceNo)}</span></div>
     <div class="grid"><span>Name : ${esc((sale.customerName || "Walk-in").toUpperCase())}</span><span>${sale.customerAddress ? "Addr : " + esc(sale.customerAddress.toUpperCase()) : ""}</span></div>
-    ${sale.doctorName ? `<div>Doct : ${esc(sale.doctorName)}</div>` : ""}
+    ${sale.doctorName || sale.customerMobile ? `<div class="grid"><span>${sale.doctorName ? "Doct : " + esc(sale.doctorName) : ""}</span><span>${sale.customerMobile ? "Mob : " + esc(sale.customerMobile) : ""}</span></div>` : ""}
     <table>
       <thead><tr><th>Qty</th><th>Description</th><th>Com</th><th>Batch</th><th>Exp</th><th class="r">Amount</th></tr></thead>
       <tbody>${rows}</tbody>

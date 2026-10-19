@@ -56,7 +56,7 @@ const TABS: TabDef[] = [
   },
   {
     route: "Receive",
-    label: "Receive",
+    label: "Purchase",
     icon: PackagePlus,
     permission: PERMISSIONS.STOCK_INWARD_MANAGE,
     matches: ["ReceiveStock", "Receipts", "ScanBill"],

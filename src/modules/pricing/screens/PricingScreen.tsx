@@ -11,7 +11,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Check } from "lucide-react-native";
 import { palette, radius, space, layout } from "@shared/designSystem";
 import { Text, VStack, HStack, Button, Banner } from "@shared/ui";
-import { fmtMoney } from "@shared/format";
+import { fmtMoney, fmtDate } from "@shared/format";
+import { useAuthStore } from "@shared/store/useAuthStore";
 import { usePublicPlans } from "@modules/pricing/hooks/usePublicPlans";
 import { PublicPlan } from "@modules/pricing/types";
 
@@ -19,7 +20,7 @@ import { PublicPlan } from "@modules/pricing/types";
 const RIBBON_HEIGHT = 26;
 
 type Nav = { navigate: (s: string) => void };
-type Route = { params?: { plan?: string; pending?: boolean } };
+type Route = { params?: { plan?: string; trialEnded?: boolean } };
 
 /**
  * The full price list, with the breakdown the public landing page leaves out.
@@ -33,14 +34,13 @@ type Route = { params?: { plan?: string; pending?: boolean } };
  * lead with one number and for the arithmetic to appear once someone has
  * actually put their name in.
  *
+ * WHERE IT IS REACHED FROM. Inside the app, from the free-trial strip; and
+ * from the sign-in screen once a trial has ended and sign-in is refused.
+ *
  * WHY THERE IS NO PAY BUTTON. There is no payment gateway in this product yet
- * — that is coming later — and, more fundamentally, there is nobody to charge
- * at this point: signing up creates a workspace that WAITS for the platform
- * team to activate it, so there is no session and no customer record to bill.
- * A "Pay now" button here would be a button that cannot work. What the page
- * does instead is let the visitor mark which plan they want and tell them
- * plainly what happens next. When the gateway lands, `onChoose` below is the
- * one place that has to change.
+ * — that is coming later. The page lets the reader mark which plan they want
+ * and says what happens next; the platform team activates it. When the
+ * gateway lands, `onChoose` below is the one place that has to change.
  *
  * The figures are NOT computed here. They arrive derived from /plans, from the
  * same arithmetic the landing site uses, because a chemist reads the public
@@ -58,7 +58,9 @@ export default function PricingScreen({
 
   /** Which card they clicked on the way in, if they came from the price list. */
   const requested = route?.params?.plan;
-  const justSignedUp = Boolean(route?.params?.pending);
+  const trialEnded = Boolean(route?.params?.trialEnded);
+  const signedIn = useAuthStore((s) => Boolean(s.token));
+  const trialEndsAt = useAuthStore((s) => s.organization?.trialEndsAt);
 
   const plans = useMemo(() => data ?? [], [data]);
   const [chosen, setChosen] = useState<string | undefined>(requested);
@@ -96,7 +98,9 @@ export default function PricingScreen({
               accessibilityIgnoresInvertColors
             />
             <Text variant="h2" tone="primary" style={{ textAlign: "center" }}>
-              {justSignedUp ? "Choose your plan" : "Plusveda pricing"}
+              {trialEnded || trialEndsAt
+                ? "Choose your plan"
+                : "Plusveda pricing"}
             </Text>
             <Text
               variant="body"
@@ -109,17 +113,18 @@ export default function PricingScreen({
             </Text>
           </VStack>
 
-          {/*
-            Shown only when arriving straight from the signup form. It is the
-            first thing that must be said: the registration worked, and there
-            is nothing to log into yet. Leaving this out earns a support call
-            the moment they try to sign in.
-          */}
-          {justSignedUp && (
+          {trialEnded && (
             <Banner
               tone="warning"
-              title="Registration received — your workspace is awaiting approval"
-              message="You won't be able to sign in until our team activates it, usually within one working day. Pick the plan you want below and we'll set it up on the call."
+              title="Your free trial has ended"
+              message="Your data is kept. Pick the plan you want below and contact us — once we activate it you can sign in and carry on."
+            />
+          )}
+          {!trialEnded && trialEndsAt && (
+            <Banner
+              tone="info"
+              title={`You're on the free trial until ${fmtDate(trialEndsAt)}`}
+              message="Pick the plan you want below and we'll activate it before the trial ends, so nothing stops."
             />
           )}
 
@@ -143,7 +148,7 @@ export default function PricingScreen({
             <Banner
               tone="info"
               title="Pricing is being finalised"
-              message="We'll send you a quotation when we activate your workspace."
+              message="Contact us and we'll send you a quotation."
             />
           )}
 
@@ -181,16 +186,17 @@ export default function PricingScreen({
                 {[
                   `You've chosen the ${selected.name} — ${fmtMoney(selected.total)}`,
                   ` for ${selected.termMonths} month${selected.termMonths === 1 ? "" : "s"}.`,
-                  " Nothing is charged now and no card is stored; we'll confirm",
-                  " it when we activate your workspace, and you can change your",
-                  " mind until then.",
+                  " Nothing is charged now and no card is stored; our team will",
+                  " confirm it with you when they activate the plan.",
                 ].join("")}
               </Text>
               <View>
                 <Button
-                  label="Back to sign in"
+                  label={signedIn ? "Back to Plusveda" : "Back to sign in"}
                   variant="secondary"
-                  onPress={() => navigation.navigate("Login")}
+                  onPress={() =>
+                    navigation.navigate(signedIn ? "Dashboard" : "Login")
+                  }
                 />
               </View>
             </VStack>

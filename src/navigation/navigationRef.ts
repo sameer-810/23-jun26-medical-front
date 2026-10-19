@@ -16,3 +16,11 @@ export function openOfflineSync() {
     params: { screen: "OfflineSync" },
   });
 }
+
+/** Opens the price list from the trial strip above the drawer. */
+export function openPlans() {
+  if (!navigationRef.isReady()) return;
+  (navigationRef.navigate as (name: string, params?: object) => void)("App", {
+    screen: "Plans",
+  });
+}

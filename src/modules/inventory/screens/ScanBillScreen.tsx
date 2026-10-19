@@ -406,8 +406,7 @@ export default function ScanBillScreen() {
             align="center"
             style={{ marginTop: 8 }}
           >
-            Nothing is saved yet — you&apos;ll confirm on the Receive Stock
-            form.
+            Nothing is saved yet — you&apos;ll confirm on the Purchase form.
           </Text>
         </>
       )}

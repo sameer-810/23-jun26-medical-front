@@ -107,10 +107,10 @@ export function CommandPalette() {
         perm: PERMISSIONS.STOCK_INWARD_MANAGE,
         cmd: {
           id: "a-receive",
-          label: "Receive stock",
+          label: "Purchase entry",
           hint: "Purchasing",
           icon: PackagePlus,
-          keywords: "grn goods inward purchase",
+          keywords: "receive stock grn goods inward purchase bill",
           kind: "action",
           run: toSection("Receive", "ReceiveStock"),
         },

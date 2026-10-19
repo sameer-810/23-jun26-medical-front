@@ -93,6 +93,7 @@ export const inventoryApi = {
   },
   receipts: async (params?: {
     search?: string;
+    supplierId?: string;
     page?: number;
     limit?: number;
     from?: string;
@@ -112,6 +113,7 @@ export const inventoryApi = {
    */
   exportReceipts: async (params: {
     search?: string;
+    supplierId?: string;
     from?: string;
     to?: string;
     format?: "pdf" | "excel";

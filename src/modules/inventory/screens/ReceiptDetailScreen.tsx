@@ -74,7 +74,11 @@ export default function ReceiptDetailScreen() {
 
   if (isError) {
     return (
-      <Screen back="Back to history" overline="Stock Inward" title="Receipt">
+      <Screen
+        back="Back to purchase history"
+        overline="Stock Inward"
+        title="Receipt"
+      >
         <ErrorState
           error={error}
           title="This receipt isn't available"
@@ -90,7 +94,7 @@ export default function ReceiptDetailScreen() {
 
   return (
     <Screen
-      back="Back to history"
+      back="Back to purchase history"
       overline="Stock Inward"
       title={r?.receiptNo || "Receipt"}
       subtitle={r ? fmtDateTime(r.receivedAt) : ""}

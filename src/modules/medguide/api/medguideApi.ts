@@ -22,11 +22,14 @@ export const medguideApi = {
   },
 
   /** Copy a catalogue medicine into this pharmacy's own product list. */
-  addToStore: async (catalogProductId: string) => {
+  addToStore: async (
+    catalogProductId: string,
+    opts: { returnExisting?: boolean } = {},
+  ) => {
     const res = await apiClient.post<{
       success: boolean;
       data: { id: string; name: string };
-    }>("/products/from-catalog", { catalogProductId });
+    }>("/products/from-catalog", { catalogProductId, ...opts });
     return res.data.data;
   },
 };

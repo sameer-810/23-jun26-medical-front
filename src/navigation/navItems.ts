@@ -152,7 +152,7 @@ export const NAV_ITEMS: NavItem[] = [
   // ---- Purchasing ----
   {
     name: "Receive",
-    label: "Receive Stock",
+    label: "Purchase",
     icon: PackagePlus,
     section: "Purchasing",
     permission: PERMISSIONS.STOCK_INWARD_MANAGE,

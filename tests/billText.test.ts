@@ -181,7 +181,7 @@ test("the Bill of Supply carries the sample's fields", () => {
   assert.match(text, /Date : 15-07-2026 {2,}Scheduled Bill No\.: SM-T1-0272/);
   assert.match(text, /Name : MEHBOOB BEE/);
   assert.match(text, /Addr : CHEMBUR/);
-  assert.match(text, /Doct : uday nayak/);
+  assert.match(text, /Doct : uday nayak {2,}Mob : 9000000000/);
   // Header carries no phone/GSTIN on the client's bill; they sit in the footer.
   assert.doesNotMatch(text.split("BILL OF SUPPLY")[0], /Ph:|GSTIN/);
   assert.match(

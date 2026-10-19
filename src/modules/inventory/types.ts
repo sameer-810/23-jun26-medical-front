@@ -142,6 +142,10 @@ export interface DraftLine {
   flagged?: boolean;
   /** What the bill said, for identifying and creating an unmatched product. */
   fromBill?: BillHint;
+  /** Why the unit is what it is, or why it still needs choosing. */
+  unitNote?: string;
+  /** Unmatched bill line the scanner found in the medicine catalogue. */
+  catalogMatch?: CatalogueHit;
 }
 
 export interface ReceivePayload {
@@ -353,8 +357,14 @@ export interface ShortbookItem {
   baseUnit: string;
   reorderLevel: number;
   onHand: number;
-  /** Gap back to the reorder level (min-fill quantity). */
+  /** Gap back to the reorder level, after what is already on order. */
   need: number;
+  /** Base units on placed purchase orders not yet received. */
+  onOrder?: number;
+  /** Order numbers those units are on, e.g. ["PO-0007"]. */
+  onOrderRefs?: string[];
+  /** Open orders already bring it back to the reorder level. */
+  covered?: boolean;
   /** Net units sold in the last 30 days. */
   sold30: number;
   /** Average units sold per day over that window. */
@@ -507,12 +517,21 @@ export interface ScannedLine {
   };
   /** Catalogue link — null when we couldn't match confidently. */
   match: OcrProductRef | null;
+  /** Not in this store's products, but confidently in the medicine catalogue. */
+  catalogMatch?: CatalogueHit | null;
   matchScore: number;
   suggestions: OcrProductRef[];
   needsReview: boolean;
   criticalIssues: string[];
   lowFields: string[];
   missing: string[];
+}
+
+export interface CatalogueHit {
+  id: string;
+  name: string;
+  packLabel?: string;
+  score?: number;
 }
 
 export interface ScannedBill {

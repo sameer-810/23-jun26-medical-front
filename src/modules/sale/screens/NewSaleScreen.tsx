@@ -11,6 +11,7 @@ import {
   StyleSheet,
   TextInput,
   Platform,
+  Modal,
   useWindowDimensions,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -31,6 +32,7 @@ import {
   VolumeX,
   ListPlus,
   Paperclip,
+  ChevronDown,
 } from "lucide-react-native";
 import { CameraScanner } from "@shared/CameraScanner";
 import { PackTextScanner } from "@shared/PackTextScanner";
@@ -521,7 +523,7 @@ export default function NewSaleScreen() {
           quantity: "1",
           unitPrice: String(p.sellingPrice),
           discount: "",
-          discountMode: "amount",
+          discountMode: "pct",
           taxRate: String(p.taxRatePct),
         },
       ];
@@ -587,7 +589,7 @@ export default function NewSaleScreen() {
               quantity: "1",
               unitPrice: String(b.mrp || sp.sellingPrice),
               discount: "",
-              discountMode: "amount",
+              discountMode: "pct",
               taxRate: String(sp.taxRatePct),
             },
           ];
@@ -696,6 +698,21 @@ export default function NewSaleScreen() {
   const grand = Math.round(exactTotal);
   const roundOff = Math.round((grand - exactTotal) * 100) / 100;
   const itemCount = lines.length;
+  /** The percent every line shares, or null when they differ. */
+  const billDiscount = (() => {
+    const pcts = lines.map((l) =>
+      l.discountMode === "pct" ? Number(l.discount) || 0 : -1,
+    );
+    return pcts.length && pcts.every((p) => p === pcts[0]) ? pcts[0] : null;
+  })();
+  const applyBillDiscount = (pct: number) =>
+    setLines((cur) =>
+      cur.map((l) => ({
+        ...l,
+        discountMode: "pct",
+        discount: pct ? String(pct) : "",
+      })),
+    );
   const qtyCount = lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
 
   // Sent values are clamped again here: the boxes bound what can be typed, this
@@ -1420,6 +1437,36 @@ export default function NewSaleScreen() {
           label={`Subtotal · ${itemCount} item${itemCount === 1 ? "" : "s"}`}
           value={fmtMoneyExact(totals.subtotal)}
         />
+        {itemCount > 0 ? (
+          <VStack gap={4}>
+            <Text variant="caption" tone="tertiary">
+              Discount on all items
+            </Text>
+            <HStack gap={6} align="center" wrap>
+              {[0, ...DISCOUNT_PRESETS].map((pct) => {
+                const on = billDiscount === pct;
+                return (
+                  <Pressable
+                    key={pct}
+                    onPress={() => applyBillDiscount(pct)}
+                    style={[styles.discChip, on && styles.discOptionOn]}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      pct ? `${pct} percent off every item` : "No discount"
+                    }
+                  >
+                    <Text
+                      variant="label-sm"
+                      style={{ color: on ? "#FFFFFF" : palette.text.secondary }}
+                    >
+                      {pct ? `${pct}%` : "None"}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </HStack>
+          </VStack>
+        ) : null}
         {totals.discount > 0 && (
           <Row label="Discount" value={`- ${fmtMoneyExact(totals.discount)}`} />
         )}
@@ -2000,75 +2047,103 @@ function Cell({
   );
 }
 
+/** The quick picks behind every discount box, and the bill-wide row. */
+const DISCOUNT_PRESETS = [10, 15, 20];
+
+/**
+ * Discount, in percent only. The ₹ option confused counter staff — a patient
+ * asks for "10 percent", nobody asks for "₹14.30" — so the box takes a percent
+ * and the ▾ beside it offers the usual 10 / 15 / 20.
+ *
+ * A line restored from an older draft may still be in rupees; it keeps its
+ * value, and picking a preset or typing moves it to percent.
+ */
 function DiscCell({
   w,
   line,
-  gross,
   onValue,
   onMode,
   onNote,
 }: {
   w: number;
   line: DraftLine;
-  /** The line's gross — the ceiling for a discount entered in rupees. */
-  gross: number;
+  /** The line's gross — kept for callers; percent needs no ceiling but 100. */
+  gross?: number;
   onValue: (v: string) => void;
   onMode: (m: "amount" | "pct") => void;
   /** Reports a rewritten value so the screen can say what it changed. */
   onNote: (note: string | null) => void;
 }) {
-  const ceiling = (mode: "amount" | "pct") => (mode === "pct" ? 100 : gross);
-  const label = () => (line.discountMode === "pct" ? "Discount %" : "Discount");
+  const [open, setOpen] = useState(false);
+  const pick = (pct: number) => {
+    onValue(pct ? String(pct) : "");
+    onMode("pct");
+    onNote(null);
+    setOpen(false);
+  };
   return (
     <View style={[styles.discWrap, { width: w }]}>
       <TextInput
         value={line.discount}
         onChangeText={(v) => {
-          const r = clampWithNote(v, ceiling(line.discountMode), label());
+          const r = clampWithNote(v, 100, "Discount %");
           onValue(r.value);
           onNote(r.note);
+          if (line.discountMode !== "pct") onMode("pct");
         }}
         keyboardType="decimal-pad"
         placeholder="0"
         placeholderTextColor={palette.text.tertiary}
         selectTextOnFocus
+        accessibilityLabel="Discount percent"
         // @ts-expect-error web-only outline reset
         style={[styles.discInput, { outlineStyle: "none" }]}
       />
-      <View style={styles.discToggle}>
-        {(["amount", "pct"] as const).map((m) => {
-          const active = line.discountMode === m;
-          return (
-            <Pressable
-              key={m}
-              onPress={() => {
-                // A value that was legal in the old mode can exceed the new
-                // mode's ceiling — 150 is fine in rupees, not as a percent.
-                const r = clampWithNote(
-                  line.discount,
-                  ceiling(m),
-                  m === "pct" ? "Discount %" : "Discount",
-                );
-                onValue(r.value);
-                onNote(r.note);
-                onMode(m);
-              }}
-              style={[styles.discToggleBtn, active && styles.discToggleBtnOn]}
-              accessibilityRole="button"
-              accessibilityLabel={
-                m === "amount" ? "Discount in rupees" : "Discount in percent"
-              }
-            >
-              <Text
-                variant="label-sm"
-                style={{ color: active ? "#FFFFFF" : palette.text.tertiary }}
-              >
-                {m === "amount" ? "₹" : "%"}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <Pressable
+        onPress={() => setOpen(true)}
+        style={styles.discPick}
+        accessibilityRole="button"
+        accessibilityLabel="Choose a discount"
+      >
+        <Text variant="label-sm" tone="tertiary">
+          {line.discountMode === "amount" ? "₹" : "%"}
+        </Text>
+        <ChevronDown size={12} color={palette.text.tertiary} strokeWidth={2} />
+      </Pressable>
+      <Modal
+        transparent
+        visible={open}
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
+        <Pressable style={styles.discBackdrop} onPress={() => setOpen(false)}>
+          <View style={styles.discMenu}>
+            <Text variant="label" tone="primary" style={{ marginBottom: 6 }}>
+              Discount
+            </Text>
+            {[0, ...DISCOUNT_PRESETS].map((pct) => {
+              const on =
+                line.discountMode === "pct" &&
+                (Number(line.discount) || 0) === pct;
+              return (
+                <Pressable
+                  key={pct}
+                  onPress={() => pick(pct)}
+                  style={[styles.discOption, on && styles.discOptionOn]}
+                  accessibilityRole="button"
+                >
+                  <Text
+                    variant="body"
+                    style={{ color: on ? "#FFFFFF" : palette.text.primary }}
+                  >
+                    {pct ? `${pct}%` : "No discount"}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -2190,18 +2265,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: palette.text.primary,
   },
-  discToggle: {
+  discChip: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: palette.border.default,
+  },
+  discPick: {
     flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    height: 38,
+    paddingHorizontal: 6,
     borderLeftWidth: 1,
     borderLeftColor: palette.border.default,
   },
-  discToggleBtn: {
-    width: 26,
-    height: 38,
+  discBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.35)",
     alignItems: "center",
     justifyContent: "center",
   },
-  discToggleBtnOn: { backgroundColor: palette.teal[700] },
+  discMenu: {
+    width: 220,
+    padding: 12,
+    gap: 6,
+    borderRadius: radius.md,
+    backgroundColor: palette.surface.primary,
+  },
+  discOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.border.default,
+  },
+  discOptionOn: {
+    backgroundColor: palette.teal[700],
+    borderColor: palette.teal[700],
+  },
   lotBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,

@@ -138,10 +138,17 @@ export default function ShortBookScreen() {
         all.push(...(res.data ?? []));
         if (p >= (res.meta?.pages ?? 1)) break;
       }
+      // Already fully on order — re-adding it is the double order this list
+      // exists to prevent.
+      const toOrder = all.filter((it) => !it.covered);
+      if (!toOrder.length) {
+        setNote("Everything on the ShortBook is already on a placed order.");
+        return;
+      }
       navigation.navigate("Orders", {
         screen: "OrderForm",
         params: {
-          seedLines: all.map((it) => ({
+          seedLines: toOrder.map((it) => ({
             productId: it.productId,
             productName: it.name,
             sku: it.sku,
@@ -227,12 +234,7 @@ export default function ShortBookScreen() {
       key: "status",
       header: "Status",
       width: 90,
-      render: (it) => (
-        <StatusChip
-          label={it.onHand === 0 ? "Out" : "Low"}
-          tone={it.onHand === 0 ? "danger" : "warning"}
-        />
-      ),
+      render: (it) => <StatusChip {...statusChip(it)} />,
     },
     {
       key: "suggested",
@@ -249,6 +251,11 @@ export default function ShortBookScreen() {
           {it.suggested != null && it.suggested !== it.need ? (
             <Text variant="caption" tone="tertiary">
               min {it.need}
+            </Text>
+          ) : null}
+          {it.onOrder ? (
+            <Text variant="caption" tone="tertiary">
+              {it.onOrder} on order
             </Text>
           ) : null}
         </VStack>
@@ -516,10 +523,7 @@ function ShortBookRow({
         </HStack>
 
         <HStack gap={12} align="center">
-          <StatusChip
-            label={item.onHand === 0 ? "Out" : "Low"}
-            tone={item.onHand === 0 ? "danger" : "warning"}
-          />
+          <StatusChip {...statusChip(item)} />
           <VStack gap={1} flex={1}>
             <Text variant="caption" tone="tertiary">
               Stock / Min
@@ -545,6 +549,11 @@ function ShortBookRow({
                 min {item.need}
               </Text>
             ) : null}
+            {item.onOrder ? (
+              <Text variant="caption" tone="tertiary">
+                {item.onOrder} on order
+              </Text>
+            ) : null}
           </VStack>
         </HStack>
 
@@ -554,6 +563,21 @@ function ShortBookRow({
       </VStack>
     </Card>
   );
+}
+
+/** Out / Low, or "Ordered" once open purchase orders cover the gap. */
+function statusChip(it: ShortbookItem): {
+  label: string;
+  tone: "danger" | "warning" | "info";
+} {
+  if (it.covered)
+    return {
+      label: `Ordered${it.onOrderRefs?.[0] ? ` · ${it.onOrderRefs[0]}` : ""}`,
+      tone: "info",
+    };
+  return it.onHand === 0
+    ? { label: "Out", tone: "danger" }
+    : { label: "Low", tone: "warning" };
 }
 
 function ListSkeleton() {

@@ -43,6 +43,7 @@ export const useInventorySearch = (
 /** Paged goods-received notes — history grows with every delivery. */
 export const useReceipts = (params?: {
   search?: string;
+  supplierId?: string;
   page?: number;
   limit?: number;
   from?: string;

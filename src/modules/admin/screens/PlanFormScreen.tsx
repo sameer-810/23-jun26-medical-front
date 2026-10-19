@@ -255,12 +255,6 @@ export default function PlanFormScreen() {
           />
           <ControlledTextField
             control={control}
-            name="maxProducts"
-            label="Max products (0 = unlimited)"
-            keyboardType="number-pad"
-          />
-          <ControlledTextField
-            control={control}
             name="priceYearly"
             label="Price / year (₹) — legacy, nothing reads it"
             keyboardType="numeric"

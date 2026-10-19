@@ -10,7 +10,8 @@ import type { ScannedBill } from "@modules/inventory/types";
 export type ReceivingStackParamList = {
   // `scanned` arrives from the bill scanner and pre-fills the form.
   ReceiveStock: { scanned?: ScannedBill } | undefined;
-  Receipts: undefined;
+  /** Opened from a supplier's page, pre-filtered to that supplier. */
+  Receipts: { supplierId?: string } | undefined;
   ReceiptDetail: { id: string };
   ScanBill: undefined;
   PurchaseReturn: { id: string };

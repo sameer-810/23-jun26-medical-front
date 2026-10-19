@@ -218,6 +218,11 @@ export default function SaleDetailScreen() {
                 GSTIN {sale.customerGstin}
               </Text>
             ) : null}
+            {sale.doctorName ? (
+              <Text variant="body-sm" tone="secondary">
+                Doctor: {sale.doctorName}
+              </Text>
+            ) : null}
           </VStack>
           <VStack gap={6} align="flex-end">
             <StatusChip

@@ -15,6 +15,7 @@ import { ControlledSelect } from "@shared/form/ControlledSelect";
 import { getBillPrinter, setBillPrinter } from "@shared/print";
 import {
   useSettings,
+  useSetupStatus,
   useUpdateSettings,
   useEmailBackup,
 } from "@modules/settings/hooks/useSettings";
@@ -91,6 +92,7 @@ function SwitchRow({ control, name }: { control: any; name: string }) {
 
 export default function SettingsScreen() {
   const { data, isLoading, refetch, isRefetching } = useSettings();
+  const { data: setup } = useSetupStatus();
   const mut = useUpdateSettings();
   const backupMut = useEmailBackup();
   const org = useAuthStore((s) => s.organization);
@@ -287,6 +289,14 @@ export default function SettingsScreen() {
         />
       }
     >
+      {setup && !setup.complete && (
+        <Banner
+          tone="warning"
+          title="Finish your shop details to start using Plusveda"
+          message={`These print on every bill and are needed before anything else opens. Still needed: ${setup.missing.join(", ")}.`}
+          style={{ marginBottom: 16 }}
+        />
+      )}
       {invalidFields.length > 0 && (
         <Banner
           tone="danger"

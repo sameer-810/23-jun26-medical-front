@@ -1,4 +1,5 @@
 import {
+  CatalogueHit,
   DraftLine,
   ProductLite,
   ReceiptLineInput,
@@ -79,6 +80,126 @@ export function unitFactor(
 ): number {
   if (!product || !line.unit || line.unit === product.baseUnit) return 1;
   return (product.packs || []).find((p) => p.unit === line.unit)?.factor || 1;
+}
+
+/**
+ * Pack size printed on a distributor bill: "1X10" -> 10, "10ML" -> 10,
+ * "20 GM" -> 20, "15TABS" -> 15. For "AxB" the second number is the content.
+ *
+ * Mirrors parsePackSize in the server's ocr.units.js, which resolves the unit
+ * for lines the scan matched on its own. Keep the two in step: a line matched
+ * by hand must come out exactly as one the scan matched.
+ */
+export function parsePackSize(pack?: string | null): number | null {
+  if (!pack) return null;
+  const s = String(pack).toUpperCase().replace(/\s+/g, "");
+  const multi = /(\d+(?:\.\d+)?)[X*](\d+(?:\.\d+)?)/.exec(s);
+  const raw = multi ? multi[2] : /(\d+(?:\.\d+)?)/.exec(s)?.[1];
+  const n = Number(raw);
+  return raw && Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * Which unit the bill's QTY is counted in, for a product picked onto a line.
+ *
+ * A bill's QTY counts PACKS. Taking the product's base unit instead booked a
+ * "1 x 1X10" line as 1 tablet rather than 10 — stock understated tenfold, and
+ * the per-strip rate charged against every single tablet.
+ *
+ * Only an exact match against the product's own pack factors is trusted. When
+ * the bill and the product disagree, `unit` is null: the pharmacist chooses,
+ * and the line cannot be saved until they do.
+ */
+export function unitForBillPack(
+  product: ProductLite,
+  pack?: string | null,
+): { unit: string | null; note: string | null } {
+  const packs = product.packs || [];
+  // A hand-added row has no bill pack: the base unit is the sensible default.
+  if (!pack) return { unit: product.baseUnit, note: null };
+
+  const size = parsePackSize(pack);
+  // No packs defined: the base unit is the only unit there is.
+  if (!packs.length) {
+    return {
+      unit: product.baseUnit,
+      note:
+        size && size > 1
+          ? `Bill sells packs of ${size}, but this product has no pack unit — quantity is taken as ${product.baseUnit}.`
+          : null,
+    };
+  }
+  if (size === 1) return { unit: product.baseUnit, note: null };
+
+  const exact =
+    size === null ? null : packs.find((p) => Number(p.factor) === size);
+  if (exact) return { unit: exact.unit, note: null };
+
+  return {
+    unit: null,
+    note: `Bill pack "${pack}" doesn't match this product's units — choose the unit.`,
+  };
+}
+
+/** "ALDIGESIC-TH TAB" and "Aldigesic-TH  tab." are the same bill line. */
+function billKey(line: DraftLine): string {
+  return (line.fromBill?.productName || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Put a product on a line, and on every other unmatched line the bill printed
+ * under the same name.
+ *
+ * Distributors print one row per batch, so one medicine bought in two batches
+ * is two rows with identical names. Matching the first and leaving the second
+ * "Set product..." made the pharmacist match the same medicine twice.
+ *
+ * Each line gets the unit for ITS OWN pack. `row` is the line that asked; null
+ * means the top search bar, which fills the first blank line or appends one.
+ */
+export function applyProductToLines(
+  lines: DraftLine[],
+  row: number | null,
+  product: ProductLite,
+  newLineLocation: string | null = null,
+): DraftLine[] {
+  const fill = (l: DraftLine): DraftLine => {
+    const { unit, note } = unitForBillPack(product, l.fromBill?.pack);
+    return {
+      ...l,
+      productId: product.id,
+      unit,
+      unitNote: note || undefined,
+      flagged: l.flagged || unit === null,
+    };
+  };
+
+  if (row === null) {
+    const blank = lines.findIndex((l) => !l.productId);
+    if (blank >= 0) return lines.map((l, k) => (k === blank ? fill(l) : l));
+    return [...lines, fill({ ...emptyLine(), locationId: newLineLocation })];
+  }
+
+  const key = row < lines.length ? billKey(lines[row]) : "";
+  return lines.map((l, k) => {
+    if (k === row) return fill(l);
+    if (key && !l.productId && billKey(l) === key) return fill(l);
+    return l;
+  });
+}
+
+/**
+ * A line whose product has pack units but no unit chosen. Saving it would book
+ * the quantity as base units, which is the exact mistake unitForBillPack exists
+ * to prevent — so it blocks the save rather than defaulting.
+ */
+export function needsUnit(line: DraftLine, product?: ProductLite | null) {
+  return Boolean(
+    line.productId && product && (product.packs || []).length && !line.unit,
+  );
 }
 
 /**
@@ -213,8 +334,12 @@ export function totalBaseUnits(
  * everything the server requires — otherwise the row names the gap, so 25 lines
  * can be triaged without opening 25 forms.
  */
-export function lineStatus(line: DraftLine): { label: string; tone: LineTone } {
+export function lineStatus(
+  line: DraftLine,
+  product?: ProductLite | null,
+): { label: string; tone: LineTone } {
   if (!line.productId) return { label: "Product?", tone: "todo" };
+  if (needsUnit(line, product)) return { label: "Unit?", tone: "todo" };
   if (!line.batchNumber.trim()) return { label: "Batch?", tone: "todo" };
   if (!(Number(line.quantity) > 0)) return { label: "Qty?", tone: "todo" };
   if (!line.locationId) return { label: "Location?", tone: "todo" };
@@ -303,6 +428,11 @@ export function linesFromScan(bill: ScannedBill): DraftLine[] {
       gstPct: l.gstPct != null ? String(l.gstPct) : "",
       locationId: null,
       flagged: l.needsReview || !l.match || !rateOk || !mrpOk,
+      unitNote:
+        (l.unitResolution?.resolved
+          ? l.unitResolution?.note
+          : l.unitResolution?.reason) || undefined,
+      catalogMatch: l.match ? undefined : l.catalogMatch || undefined,
       // Kept regardless of whether we matched: it names the row for a human,
       // and it's what fills the form if this product has to be created.
       fromBill: {
@@ -343,6 +473,15 @@ export function scanSummary(bill: ScannedBill): string {
     : `${bill.stats.total} lines from ${from} read cleanly. Pick a storage location for each line.`;
 }
 
+/** Unmatched rows the scanner found in the medicine catalogue, still unfilled. */
+export function catalogueRows(
+  lines: DraftLine[],
+): { row: number; hit: CatalogueHit }[] {
+  return lines.flatMap((l, row) =>
+    !l.productId && l.catalogMatch ? [{ row, hit: l.catalogMatch }] : [],
+  );
+}
+
 /** Re-receiving an invoice doubles the stock — this is the sentence that warns. */
 export function duplicateWarning(bill: ScannedBill): string | null {
   if (!bill.duplicate) return null;
@@ -379,6 +518,8 @@ export function incompleteLines(
     if (!isStarted(l)) return;
     const missing: string[] = [];
     if (!l.productId) missing.push("product");
+    if (needsUnit(l, l.productId ? byId[l.productId] : null))
+      missing.push("unit");
     if (!l.batchNumber.trim()) missing.push("batch");
     if (!(Number(l.quantity) > 0)) missing.push("quantity");
     if (!l.locationId) missing.push("location");

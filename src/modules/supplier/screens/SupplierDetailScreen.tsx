@@ -56,6 +56,10 @@ export default function SupplierDetailScreen() {
   const canManage = useAuthStore((s) => s.hasPermission)(
     PERMISSIONS.SUPPLIERS_MANAGE,
   );
+  // Purchase history lives under Purchase, which needs stock-inward access.
+  const canOpenPurchases = useAuthStore((s) => s.hasPermission)(
+    PERMISSIONS.STOCK_INWARD_MANAGE,
+  );
 
   const queryClient = useQueryClient();
   // Not a PATCH: deactivation soft-deletes, which hides the record from update.
@@ -237,7 +241,25 @@ export default function SupplierDetailScreen() {
         />
       ) : null}
 
-      <SectionHeader title="Purchase history" />
+      <SectionHeader
+        title="Invoice history"
+        action={
+          (purchases || []).length && canOpenPurchases ? (
+            <Button
+              label="View all"
+              variant="ghost"
+              size="sm"
+              fullWidth={false}
+              onPress={() =>
+                navigation.navigate("Receive", {
+                  screen: "Receipts",
+                  params: { supplierId: id },
+                })
+              }
+            />
+          ) : undefined
+        }
+      />
       {(purchases || []).length === 0 ? (
         <EmptyState
           icon={PackageCheck}
@@ -250,9 +272,18 @@ export default function SupplierDetailScreen() {
           {(purchases || []).map((p) => (
             <ListRow
               key={p.id}
-              title={p.receiptNo}
-              subtitle={`${fmtDate(p.receivedAt)} · ${p.lineCount} line${p.lineCount === 1 ? "" : "s"} · ${p.totalQuantity} units`}
+              title={p.referenceNo ? `Invoice ${p.referenceNo}` : p.receiptNo}
+              subtitle={`${fmtDate(p.receivedAt)}${p.referenceNo ? ` · ${p.receiptNo}` : ""} · ${p.lineCount} line${p.lineCount === 1 ? "" : "s"}`}
               value={money(p.totalValue)}
+              onPress={
+                canOpenPurchases
+                  ? () =>
+                      navigation.navigate("Receive", {
+                        screen: "ReceiptDetail",
+                        params: { id: p.id },
+                      })
+                  : undefined
+              }
             />
           ))}
         </ListGroup>

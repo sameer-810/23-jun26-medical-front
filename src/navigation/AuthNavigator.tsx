@@ -16,13 +16,10 @@ export type AuthStackParamList = {
   ResetPassword: { email?: string } | undefined;
   /**
    * The full price list, with the breakdown the public cards leave out.
-   *
-   * It lives in the AUTH stack, not the app stack, because the visitor who
-   * needs it has no session: signing up creates a workspace that waits for the
-   * platform team to activate it, and `pending` is what tells this screen to
-   * say so.
+   * In the AUTH stack for the visitor whose trial has ended and who can no
+   * longer sign in; the app registers its own copy ("Plans") for trial users.
    */
-  Pricing: { plan?: string; pending?: boolean } | undefined;
+  Pricing: { plan?: string; trialEnded?: boolean } | undefined;
 };
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();

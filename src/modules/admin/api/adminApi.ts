@@ -23,7 +23,7 @@ export interface ListOrgsParams {
   limit?: number;
   search?: string;
   /** Mirrors the server filter, which also accepts the approval queue. */
-  status?: "active" | "suspended" | "pending" | "rejected";
+  status?: "active" | "suspended" | "pending" | "rejected" | "trial";
 }
 
 export interface ListParams {

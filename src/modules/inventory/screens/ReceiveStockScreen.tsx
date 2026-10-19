@@ -71,6 +71,8 @@ import {
   lineAmount,
   billTotals,
   totalBaseUnits,
+  applyProductToLines,
+  catalogueRows,
 } from "@modules/inventory/receiveDraft";
 import { apiErrorMessage } from "@api/apiClient";
 import { fmtMoneyExact, fmtAmountExact } from "@shared/format";
@@ -358,23 +360,24 @@ export default function ReceiveStockScreen() {
    * Put a product on a line. `row` is the line that asked for it; null means
    * the top bar, which fills the first blank line or appends one.
    */
-  const addLineForProduct = (id: string, row: number | null = null) => {
-    const p = productsById[id];
-    if (p) setKnownProducts((cur) => ({ ...cur, [p.id]: p }));
-    const patch = { productId: id, unit: p?.baseUnit || null };
-    if (row !== null) {
-      setLines((cur) =>
-        cur.map((l, k) => (k === row ? { ...l, ...patch } : l)),
-      );
-      return;
-    }
-    setLines((cur) => {
-      const blank = cur.findIndex((l) => !l.productId);
-      if (blank >= 0) {
-        return cur.map((l, k) => (k === blank ? { ...l, ...patch } : l));
+  const addLineForProduct = async (id: string, row: number | null = null) => {
+    // The pack units are needed to read the bill's PACK, so a product that has
+    // dropped out of the search results between render and click is fetched
+    // rather than applied blind.
+    let p = productsById[id];
+    if (!p) {
+      try {
+        p = toProductLite(await productApi.get(id));
+      } catch (e) {
+        setScanNote(apiErrorMessage(e));
+        return;
       }
-      return [...cur, { ...emptyLine(), locationId: lastLocationId, ...patch }];
-    });
+    }
+    const product = p;
+    setKnownProducts((cur) => ({ ...cur, [product.id]: product }));
+    // The unit comes from the bill's PACK, not the base unit, and identical
+    // bill lines are filled too — see applyProductToLines.
+    setLines((cur) => applyProductToLines(cur, row, product, lastLocationId));
   };
 
   /**
@@ -382,39 +385,68 @@ export default function ReceiveStockScreen() {
    * Everything the catalogue knows (salt, brand, pack unit + factor, MRP, GST,
    * HSN, Rx flag) is copied server-side, so nothing has to be typed.
    */
+  const importFromCatalog = async (
+    catalogId: string,
+    returnExisting = false,
+  ): Promise<ProductLite> => {
+    const created = await medguideApi.addToStore(catalogId, { returnExisting });
+    const full = await productApi.get(created.id);
+    const lite: ProductLite = {
+      id: full.id,
+      name: full.name,
+      sku: full.sku,
+      baseUnit: full.baseUnit,
+      packs: full.packs || [],
+    };
+    setKnownProducts((cur) => ({ ...cur, [lite.id]: lite }));
+    return lite;
+  };
+
   const addLineFromCatalog = async (
     catalogId: string,
     row: number | null = null,
   ) => {
     try {
-      const created = await medguideApi.addToStore(catalogId);
-      const full = await productApi.get(created.id);
-      const lite: ProductLite = {
-        id: full.id,
-        name: full.name,
-        sku: full.sku,
-        baseUnit: full.baseUnit,
-        packs: full.packs || [],
-      };
-      setKnownProducts((cur) => ({ ...cur, [lite.id]: lite }));
-      const patch = { productId: lite.id, unit: lite.baseUnit };
-      setLines((cur) => {
-        if (row !== null)
-          return cur.map((l, k) => (k === row ? { ...l, ...patch } : l));
-        const blank = cur.findIndex((l) => !l.productId);
-        if (blank >= 0)
-          return cur.map((l, k) => (k === blank ? { ...l, ...patch } : l));
-        return [
-          ...cur,
-          { ...emptyLine(), locationId: lastLocationId, ...patch },
-        ];
-      });
+      const lite = await importFromCatalog(catalogId);
+      setLines((cur) => applyProductToLines(cur, row, lite, lastLocationId));
       scanFeedback("ok");
       setScanNote(`Added ${lite.name} from the global catalogue.`);
     } catch (e) {
       scanFeedback("error");
       setScanNote(apiErrorMessage(e));
     }
+  };
+
+  /**
+   * Adds every unmatched bill line the scanner found in the medicine catalogue,
+   * one tap instead of a search per line. Sequential, so two bill lines naming
+   * the same medicine import it once (the second gets the existing product).
+   */
+  const pendingCatalogue = catalogueRows(lines);
+  const [addingCatalogue, setAddingCatalogue] = useState(false);
+  const addCatalogueMatches = async () => {
+    setAddingCatalogue(true);
+    let added = 0;
+    let failed = 0;
+    for (const { row, hit } of pendingCatalogue) {
+      try {
+        const lite = await importFromCatalog(hit.id, true);
+        setLines((cur) =>
+          cur[row]?.productId
+            ? cur
+            : applyProductToLines(cur, row, lite, lastLocationId),
+        );
+        added++;
+      } catch {
+        failed++;
+      }
+    }
+    setAddingCatalogue(false);
+    setScanNote(
+      failed
+        ? `Added ${added} from the catalogue; ${failed} could not be added — pick those by hand.`
+        : `Added ${added} line${added === 1 ? "" : "s"} from the medicine catalogue. Check the unit on each.`,
+    );
   };
 
   const setLine = (i: number, patch: Partial<DraftLine>) =>
@@ -528,7 +560,7 @@ export default function ReceiveStockScreen() {
       onSuccess: (created) => {
         const lite = toProductLite(created);
         setKnownProducts((cur) => ({ ...cur, [lite.id]: lite }));
-        setLine(index, { productId: lite.id, unit: lite.baseUnit });
+        setLines((cur) => applyProductToLines(cur, index, lite));
         setCreatingFor(null);
       },
     });
@@ -676,8 +708,8 @@ export default function ReceiveStockScreen() {
   return (
     <Screen
       overline="Stock Inward"
-      title="Receive stock"
-      subtitle="Goods received note — batch, expiry, location & cost"
+      title="Purchase"
+      subtitle="Enter a supplier bill — batch, expiry, location & cost"
       right={
         <HStack gap={8}>
           <Button
@@ -696,7 +728,7 @@ export default function ReceiveStockScreen() {
             onPress={() => setScanOpen(true)}
           />
           <Button
-            label="History"
+            label="Purchase history"
             variant="secondary"
             fullWidth={false}
             icon={
@@ -717,6 +749,33 @@ export default function ReceiveStockScreen() {
       {scanNote ? (
         <Banner tone="info" message={scanNote} style={{ marginBottom: 16 }} />
       ) : null}
+      {/* Offered, never automatic: adding creates products in this store. */}
+      {pendingCatalogue.length && canManageProducts ? (
+        <Banner
+          tone="info"
+          title={`${pendingCatalogue.length} unmatched line${pendingCatalogue.length === 1 ? " is" : "s are"} in the medicine catalogue`}
+          message={
+            pendingCatalogue
+              .slice(0, 3)
+              .map((p) => p.hit.name)
+              .join(", ") +
+            (pendingCatalogue.length > 3
+              ? ` and ${pendingCatalogue.length - 3} more`
+              : "")
+          }
+          style={{ marginBottom: 16 }}
+        >
+          <HStack gap={10} wrap style={{ marginTop: 10 }}>
+            <Button
+              label="Add them to my products"
+              size="sm"
+              fullWidth={false}
+              loading={addingCatalogue}
+              onPress={() => void addCatalogueMatches()}
+            />
+          </HStack>
+        </Banner>
+      ) : null}
       {done ? (
         <Banner tone="success" style={{ marginBottom: 16 }}>
           <HStack gap={10} align="center" justify="space-between" wrap>
@@ -727,7 +786,7 @@ export default function ReceiveStockScreen() {
                 strokeWidth={2}
               />
               <Text variant="body-sm" tone="success">
-                Stock received — {done.receiptNo} posted to inventory.
+                Purchase saved — {done.receiptNo} added to stock.
               </Text>
             </HStack>
             {done.lines.some((l) => l.labelCode) && (
@@ -948,7 +1007,7 @@ export default function ReceiveStockScreen() {
             if (id.startsWith(CATALOG_PREFIX)) {
               void addLineFromCatalog(id.slice(CATALOG_PREFIX.length));
             } else {
-              addLineForProduct(id);
+              void addLineForProduct(id);
             }
             setAddQuery("");
           }}
@@ -1064,8 +1123,20 @@ export default function ReceiveStockScreen() {
                     <Select
                       value={line.unit}
                       options={units}
-                      onChange={(v) => setLine(i, { unit: v })}
+                      onChange={(v) =>
+                        setLine(i, { unit: v, unitNote: undefined })
+                      }
                     />
+                    {line.unitNote ? (
+                      <Text
+                        variant="caption"
+                        tone={line.unit ? "tertiary" : "danger"}
+                        numberOfLines={2}
+                        style={{ marginTop: 2 }}
+                      >
+                        {line.unitNote}
+                      </Text>
+                    ) : null}
                     {line.fromBill?.pack ? (
                       <Text
                         variant="caption"
@@ -1210,7 +1281,7 @@ export default function ReceiveStockScreen() {
           } else if (id.startsWith(CATALOG_PREFIX)) {
             void addLineFromCatalog(id.slice(CATALOG_PREFIX.length), row);
           } else {
-            addLineForProduct(id, row);
+            void addLineForProduct(id, row);
           }
           setPickingFor(null);
           setRowQuery("");
@@ -1425,7 +1496,7 @@ export default function ReceiveStockScreen() {
         }}
       >
         <Button
-          label="Receive stock"
+          label="Save purchase"
           size="lg"
           fullWidth={!wide}
           loading={mut.isPending}

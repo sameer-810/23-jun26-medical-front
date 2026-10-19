@@ -250,7 +250,7 @@ export default function OrderDetailScreen() {
       <ConfirmDialog
         visible={receivedOpen}
         title="Mark this order as received?"
-        message="This closes the order for good — it cannot be reopened or edited afterwards. It does not add anything to stock: enter the goods through Receive stock so batches, expiry and cost are recorded."
+        message="This closes the order for good — it cannot be reopened or edited afterwards. It does not add anything to stock: enter the goods through Purchase so batches, expiry and cost are recorded."
         confirmLabel="Mark received"
         loading={statusMut.isPending}
         onConfirm={() =>

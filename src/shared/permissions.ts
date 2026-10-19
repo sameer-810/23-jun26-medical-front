@@ -54,7 +54,7 @@ export const PERMISSION_META: Record<
   "stock_inward.manage": {
     label: "Stock Inward",
     group: "Inventory",
-    description: "Receive goods into stock",
+    description: "Purchase entry — receive goods into stock",
   },
   "inventory.view": {
     label: "Inventory View",

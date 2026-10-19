@@ -8,6 +8,14 @@ export const settingsApi = {
     );
     return res.data.data;
   },
+  /** Whether the required shop details are filled in. Any member may ask. */
+  setupStatus: async () => {
+    const res = await apiClient.get<{
+      success: boolean;
+      data: { complete: boolean; missing: string[] };
+    }>("/settings/setup-status");
+    return res.data.data;
+  },
   update: async (patch: SettingsPatch) => {
     const res = await apiClient.patch<{ success: boolean; data: Settings }>(
       "/settings",

@@ -16,6 +16,8 @@ export interface Organization {
   id: string;
   name: string;
   industry: string;
+  /** Set while on the free trial started at signup; null on a paid plan. */
+  trialEndsAt?: string | null;
 }
 
 export interface User {
@@ -53,6 +55,13 @@ interface AuthState {
   logout: () => Promise<void>;
   initializeAuth: () => Promise<void>;
   refreshSession: () => Promise<string | null>;
+  /**
+   * Why the server ended the session, when it said — e.g. TRIAL_EXPIRED. Read
+   * by the sign-in screen so a pharmacist thrown out mid-shift sees the reason,
+   * not a blank login form. Not persisted.
+   */
+  signOutCode: string | null;
+  clearSignOutCode: () => void;
   hasPermission: (permission: string) => boolean;
   isAdmin: () => boolean;
 }
@@ -103,9 +112,18 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isHydrated: false,
       isAuthChecked: false,
+      signOutCode: null,
+      clearSignOutCode: () => set({ signOutCode: null }),
 
       setAuth: (user, organization, token, refreshToken) =>
-        set({ user, organization, token, refreshToken, isAuthenticated: true }),
+        set({
+          user,
+          organization,
+          token,
+          refreshToken,
+          isAuthenticated: true,
+          signOutCode: null,
+        }),
 
       updateUser: (patch) =>
         set((state) => ({
@@ -178,10 +196,20 @@ export const useAuthStore = create<AuthState>()(
             // Only a 401/403 clears the session. A network error or a cold
             // start means the token was never judged, so it is kept for the
             // next attempt — each re-login also consumes a device slot.
-            const status = (err as { response?: { status?: number } })?.response
-              ?.status;
+            const res = (
+              err as {
+                response?: {
+                  status?: number;
+                  data?: { error?: { code?: string } };
+                };
+              }
+            )?.response;
+            const status = res?.status;
             const rejected = status === 401 || status === 403;
-            if (rejected) await get().logout();
+            if (rejected) {
+              await get().logout();
+              set({ signOutCode: res?.data?.error?.code ?? null });
+            }
             return null;
           } finally {
             refreshPromise = null;
