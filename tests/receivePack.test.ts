@@ -190,8 +190,8 @@ test("a hand-added line defaults to the pack, because bills count packs", () => 
   const [line] = applyProductToLines([], null, tablet, "loc");
   assert.equal(line.unit, "strip");
   assert.equal(line.locationId, "loc");
-  // Still the pharmacist's to change.
-  assert.equal(packChoiceNeeded(line, tablet), true);
+  // Read, not chosen.
+  assert.equal(packChoiceNeeded(line, tablet), false);
 });
 
 test("the default pack is the smallest real one; no pack means the base unit", () => {

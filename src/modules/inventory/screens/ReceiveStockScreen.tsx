@@ -1214,10 +1214,9 @@ export default function ReceiveStockScreen() {
                       </Text>
                     </Pressable>
                   </View>
-                  {/* PACK. The select is what the maths runs on (it carries the
-                      pack factor); the caption under it is the bill's own PACK
-                      string, so the two can be read against each other without
-                      going back to the paper. */}
+                  {/* PACK reads exactly as the bill prints it. The select only
+                      appears when the bill's pack fits none of the product's
+                      units, with the bill's wording under it to choose against. */}
                   <View style={{ width: COL.pack }}>
                     {packChoiceNeeded(line, p) ? (
                       <Select
@@ -1252,7 +1251,7 @@ export default function ReceiveStockScreen() {
                         {line.unitNote}
                       </Text>
                     ) : null}
-                    {line.fromBill?.pack ? (
+                    {line.fromBill?.pack && packChoiceNeeded(line, p) ? (
                       <Text
                         variant="caption"
                         tone="tertiary"

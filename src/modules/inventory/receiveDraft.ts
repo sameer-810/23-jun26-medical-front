@@ -130,7 +130,7 @@ export function unitForBillPack(
 ): { unit: string | null; note: string | null } {
   const packs = product.packs || [];
   // A hand-added row has no bill pack, but the paper in hand still counts packs:
-  // qty 20 at rate 30 is 20 strips, not 20 tablets. The dropdown stays open.
+  // qty 20 at rate 30 is 20 strips, not 20 tablets.
   if (!pack) return { unit: defaultPack(product), note: null };
 
   const size = parsePackSize(pack);
@@ -211,20 +211,21 @@ export function applyProductToLines(
 }
 
 /**
- * Does the pharmacist have a pack to choose? Not when the bill already settled
- * it: the line reads as printed, and a dropdown there only invites a change
- * that makes the stock and rate wrong. A product with one unit has no choice.
+ * PACK is read, not chosen: a dropdown there only invites a change that makes
+ * the stock and rate wrong. The one exception is a bill pack that fits none of
+ * the product's units, where nobody but the pharmacist knows and the line can't
+ * be saved until they say.
  */
 export function packChoiceNeeded(
   line: DraftLine,
   product?: ProductLite | null,
 ) {
-  if (!product || !(product.packs || []).length) return false;
-  return !line.fromBill?.pack || !line.unit;
+  return Boolean(product && (product.packs || []).length && !line.unit);
 }
 
-/** The line's unit as the bill would write it: "10 tablet", "tube". */
+/** The PACK cell, as the bill prints it: "20 GM", "1X10". Else "10 tablet". */
 export function packLabel(line: DraftLine, product?: ProductLite | null) {
+  if (line.fromBill?.pack) return line.fromBill.pack;
   const pack = (product?.packs || []).find((p) => p.unit === line.unit);
   if (pack) return `${pack.factor} ${product?.baseUnit}`;
   return line.unit || product?.baseUnit || "";
@@ -236,6 +237,8 @@ export function packLabel(line: DraftLine, product?: ProductLite | null) {
  */
 export function unitCaption(line: DraftLine, product?: ProductLite | null) {
   if (!product || !line.unit || !(product.packs || []).length) return null;
+  // The bill's own pack needs no explaining; the cell already reads like it.
+  if (line.fromBill?.pack) return null;
   const pack = product.packs!.find((p) => p.unit === line.unit);
   return pack
     ? `Qty and rate per ${pack.unit} (${pack.factor} ${product.baseUnit})`

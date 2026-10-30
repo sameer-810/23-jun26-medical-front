@@ -75,20 +75,22 @@ test("no pack choice once the bill has settled the line", () => {
     unit: "strip",
   };
   assert.equal(packChoiceNeeded(line, strip), false);
-  assert.equal(packLabel(line, strip), "10 tablet");
+  assert.equal(packLabel(line, strip), "1X10");
 });
 
 test("a product with one unit never asks", () => {
   const line = { ...billLine("MYFAIR CREAM", "20 GM", 196.87), unit: "tube" };
   assert.equal(packChoiceNeeded(line, tube), false);
-  assert.equal(packLabel(line, tube), "tube");
+  assert.equal(packLabel(line, tube), "20 GM");
 });
 
-test("the choice stays when the bill can't settle it, and on hand-added rows", () => {
+test("the only choice left is a bill pack that fits no unit", () => {
   const clash = { ...billLine("X TAB", "1X15", 90), unit: null };
   assert.equal(packChoiceNeeded(clash, strip), true);
-  assert.equal(
-    packChoiceNeeded({ ...emptyLine(), unit: "tablet" }, strip),
-    true,
-  );
+});
+
+test("a hand-added row reads its pack too, in the product's words", () => {
+  const line = { ...emptyLine(), unit: "strip" };
+  assert.equal(packChoiceNeeded(line, strip), false);
+  assert.equal(packLabel(line, strip), "10 tablet");
 });
