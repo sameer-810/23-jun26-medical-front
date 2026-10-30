@@ -9,6 +9,9 @@ import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
  * the page here and the server is told not to guess.
  */
 
+/** The longest side of a bill photo sent for reading. */
+const MAX_EDGE_PX = 3000;
+
 /** Quarter turns only — the four ways a page can sit in front of a camera. */
 export type Rotation = 0 | 90 | 180 | 270;
 
@@ -49,7 +52,17 @@ export async function renderUpright(
 ): Promise<string> {
   const context = ImageManipulator.manipulate(originalUri);
   if (rotation !== 0) context.rotate(rotation);
-  const rendered = await context.renderAsync();
+  let rendered = await context.renderAsync();
+  // A 12 MP phone photo is several MB over a shop's connection for no gain: an
+  // A4 page at this size still prints batch numbers about 25 pixels tall.
+  if (Math.max(rendered.width, rendered.height) > MAX_EDGE_PX) {
+    context.resize(
+      rendered.width >= rendered.height
+        ? { width: MAX_EDGE_PX }
+        : { height: MAX_EDGE_PX },
+    );
+    rendered = await context.renderAsync();
+  }
   const saved = await rendered.saveAsync({
     format: SaveFormat.JPEG,
     // High on purpose: batch numbers are the smallest print on the page and the
