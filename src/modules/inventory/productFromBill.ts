@@ -1,3 +1,4 @@
+import { isMeasurePack } from "@modules/inventory/receiveDraft";
 import { DraftLine, ProductLite } from "@modules/inventory/types";
 
 /**
@@ -56,10 +57,23 @@ const UNIT_WORDS: Record<string, { base: string; pack: string }> = {
 };
 
 /**
+ * What a tube or bottle is called. "20 GM" and "10ML" are sizes: the piece is
+ * what the shop buys and sells, so it is the base unit and there is no pack.
+ * Stocking grams made a tube read as 20, billed ₹197 per gram, and put a pack
+ * choice on a line that has none.
+ */
+function pieceWord(pack: string, name: string): string {
+  if (/\d\s*(ML|L|LTR)\b/i.test(pack)) return "bottle";
+  return /\bPOW(DER)?\b|\bSACHET/i.test(name) ? "packet" : "tube";
+}
+
+/**
  * Reads a distributor's pack string into a count and a unit word.
  *
  * "1X30ML" means one box holding 30ml — the 30 is what matters, not the 1, so
- * an "A x B" form always takes B. Mirrors the server's `parsePackSize`.
+ * an "A x B" form always takes B. "1X10" prints no word at all; the word then
+ * comes from the product name ("ALDIGESIC-TH TAB"). Mirrors the server's
+ * `parsePackSize`.
  */
 export function parsePack(
   pack: string | null,
@@ -67,7 +81,7 @@ export function parsePack(
   if (!pack) return null;
   const s = pack.toUpperCase().trim();
 
-  const multi = s.match(/(\d+)\s*[X*]\s*(\d+)\s*([A-Z]+)/);
+  const multi = s.match(/(\d+)\s*[X*]\s*(\d+)\s*([A-Z]*)/);
   if (multi) return { count: Number(multi[2]), word: multi[3] };
 
   const simple = s.match(/(\d+)\s*([A-Z]+)/);
@@ -88,14 +102,25 @@ export function draftFromLine(
   fallbackName = "",
 ): NewProductDraft {
   const bill = line.fromBill;
+  const name = bill?.productName?.trim() || fallbackName.trim();
+  const measured = isMeasurePack(bill?.pack);
   const parsed = parsePack(bill?.pack || null);
-  const words = parsed ? UNIT_WORDS[parsed.word] : null;
+  const nameWord = name
+    .toUpperCase()
+    .split(/[^A-Z]+/)
+    .find((w) => UNIT_WORDS[w]);
+  const words = parsed
+    ? UNIT_WORDS[parsed.word] || UNIT_WORDS[nameWord || ""]
+    : null;
+  const inPacks = !measured && parsed != null && parsed.count > 1;
 
   return {
-    name: bill?.productName?.trim() || fallbackName.trim(),
-    baseUnit: words?.base || "pcs",
-    packUnit: parsed && parsed.count > 1 ? words?.pack || "pack" : "",
-    packFactor: parsed && parsed.count > 1 ? String(parsed.count) : "",
+    name,
+    baseUnit: measured
+      ? pieceWord(bill?.pack || "", name)
+      : words?.base || "pcs",
+    packUnit: inPacks ? words?.pack || "pack" : "",
+    packFactor: inPacks ? String(parsed.count) : "",
     mrp: bill?.mrp != null ? String(bill.mrp) : "",
     gstPct: bill?.gstPct != null ? String(bill.gstPct) : "",
     // A bill names neither — the pharmacist classifies it in the popup.
@@ -122,16 +147,21 @@ export function toCreatePayload(d: NewProductDraft) {
       : undefined;
 
   const num = (v: string) => (v.trim() === "" ? undefined : Number(v));
+  // The form's MRP is the bill's, for the whole pack. Products price ONE base
+  // unit and the till multiplies by the pack, so a ₹155 strip of 10 is ₹15.5.
+  const mrp = num(d.mrp);
+  const unitMrp =
+    mrp != null && packs ? Math.round((mrp / factor) * 10000) / 10000 : mrp;
 
   return {
     name: d.name.trim(),
     baseUnit: d.baseUnit.trim(),
     packs,
-    mrp: num(d.mrp),
+    mrp: unitMrp,
     // A product created mid-GRN used to reach the till at ₹0, because nothing
     // seeds a selling price and nothing blocks a ₹0 sale line. MRP is the legal
     // ceiling and the default counter price — the pharmacist can discount it.
-    sellingPrice: num(d.mrp),
+    sellingPrice: unitMrp,
     taxRatePct: num(d.gstPct),
     hsnCode: d.hsnCode.trim() || undefined,
     categoryId: d.categoryId || undefined,

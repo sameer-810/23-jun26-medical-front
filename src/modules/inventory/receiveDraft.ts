@@ -202,6 +202,26 @@ export function applyProductToLines(
 }
 
 /**
+ * Does the pharmacist have a pack to choose? Not when the bill already settled
+ * it: the line reads as printed, and a dropdown there only invites a change
+ * that makes the stock and rate wrong. A product with one unit has no choice.
+ */
+export function packChoiceNeeded(
+  line: DraftLine,
+  product?: ProductLite | null,
+) {
+  if (!product || !(product.packs || []).length) return false;
+  return !line.fromBill?.pack || !line.unit;
+}
+
+/** The line's unit as the bill would write it: "10 tablet", "tube". */
+export function packLabel(line: DraftLine, product?: ProductLite | null) {
+  const pack = (product?.packs || []).find((p) => p.unit === line.unit);
+  if (pack) return `${pack.factor} ${product?.baseUnit}`;
+  return line.unit || product?.baseUnit || "";
+}
+
+/**
  * A line whose product has pack units but no unit chosen. Saving it would book
  * the quantity as base units, which is the exact mistake unitForBillPack exists
  * to prevent — so it blocks the save rather than defaulting.
@@ -495,6 +515,14 @@ export function catalogueRows(
 }
 
 /** Re-receiving an invoice doubles the stock — this is the sentence that warns. */
+/** The GST% on the lines don't rebuild the GST printed on the bill. */
+export function gstWarning(bill: ScannedBill): string | null {
+  const m = bill.gstMismatch;
+  if (!m) return null;
+  const printed = m.billTax != null ? `₹${m.billTax}` : "a different amount";
+  return `The lines come to ₹${m.lineTax} GST but the bill prints ${printed}. Check the GST% on each line against the bill.`;
+}
+
 export function duplicateWarning(bill: ScannedBill): string | null {
   if (!bill.duplicate) return null;
   const when = fmtDate(bill.duplicate.receivedAt);

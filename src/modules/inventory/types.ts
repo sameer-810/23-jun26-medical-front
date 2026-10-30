@@ -541,6 +541,8 @@ export interface CatalogueHit {
 }
 
 export interface ScannedBill {
+  /** Set when the lines' GST% can't rebuild the GST the bill prints. */
+  gstMismatch?: { lineTax: number; billTax: number | null } | null;
   supplierName: string | null;
   /** Existing supplier this bill confidently came from, if any. */
   supplierMatch: { id: string; name: string; score: number } | null;

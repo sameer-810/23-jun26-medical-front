@@ -66,6 +66,9 @@ import {
   productsFromScan,
   scanSummary,
   duplicateWarning,
+  gstWarning,
+  packChoiceNeeded,
+  packLabel,
   toReceiptLines,
   incompleteLines,
   lineAmount,
@@ -225,6 +228,7 @@ export default function ReceiveStockScreen() {
     null,
   );
   const [dupWarning, setDupWarning] = useState<string | null>(null);
+  const [gstNotice, setGstNotice] = useState<string | null>(null);
   const [knownProducts, setKnownProducts] = useState<
     Record<string, ProductLite>
   >({});
@@ -255,6 +259,7 @@ export default function ReceiveStockScreen() {
       setUnmatchedSupplier(scanned.supplierName.trim());
     setScanNote(scanSummary(scanned));
     setDupWarning(duplicateWarning(scanned));
+    setGstNotice(gstWarning(scanned));
     setAutoImport(true);
     navigation.setParams({ scanned: undefined });
   }, [scanned, navigation]);
@@ -743,6 +748,7 @@ export default function ReceiveStockScreen() {
           setReference("");
           setScanNote(null);
           setDupWarning(null);
+          setGstNotice(null);
           setPaymentMode("cash");
           setAmountPaid("");
           setConfirmShort(false);
@@ -787,6 +793,14 @@ export default function ReceiveStockScreen() {
         </HStack>
       }
     >
+      {gstNotice ? (
+        <Banner
+          tone="warning"
+          title="GST doesn't match the bill"
+          message={gstNotice}
+          style={{ marginBottom: 16 }}
+        />
+      ) : null}
       {dupWarning ? (
         <Banner
           tone="warning"
@@ -1169,13 +1183,19 @@ export default function ReceiveStockScreen() {
                       string, so the two can be read against each other without
                       going back to the paper. */}
                   <View style={{ width: COL.pack }}>
-                    <Select
-                      value={line.unit}
-                      options={units}
-                      onChange={(v) =>
-                        setLine(i, { unit: v, unitNote: undefined })
-                      }
-                    />
+                    {packChoiceNeeded(line, p) ? (
+                      <Select
+                        value={line.unit}
+                        options={units}
+                        onChange={(v) =>
+                          setLine(i, { unit: v, unitNote: undefined })
+                        }
+                      />
+                    ) : (
+                      <Text variant="body-sm" numberOfLines={1}>
+                        {packLabel(line, p)}
+                      </Text>
+                    )}
                     {line.unitNote ? (
                       <Text
                         variant="caption"
