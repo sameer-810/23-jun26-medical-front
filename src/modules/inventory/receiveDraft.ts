@@ -29,6 +29,7 @@ export const emptyLine = (): DraftLine => ({
   purchasePrice: "",
   mrp: "",
   discountPct: "",
+  schemeAmount: "",
   gstPct: "",
   locationId: null,
 });
@@ -110,6 +111,11 @@ export function parsePackSize(pack?: string | null): number | null {
  * the bill and the product disagree, `unit` is null: the pharmacist chooses,
  * and the line cannot be saved until they do.
  */
+/** "20 GM", "10ML", "1X30ML" — a size, not a count. Twin of ocr.units.js. */
+export function isMeasurePack(pack?: string | null): boolean {
+  return /\d\s*(ML|GM|GMS|G|KG|L|LTR)\b/.test(String(pack || "").toUpperCase());
+}
+
 export function unitForBillPack(
   product: ProductLite,
   pack?: string | null,
@@ -119,12 +125,14 @@ export function unitForBillPack(
   if (!pack) return { unit: product.baseUnit, note: null };
 
   const size = parsePackSize(pack);
-  // No packs defined: the base unit is the only unit there is.
+  // No packs defined: the base unit is the only unit there is. A measure pack
+  // ("20 GM") on a tube/bottle product is just its size — 3 on the bill is
+  // 3 pieces, nothing to check.
   if (!packs.length) {
     return {
       unit: product.baseUnit,
       note:
-        size && size > 1
+        size && size > 1 && !isMeasurePack(pack)
           ? `Bill sells packs of ${size}, but this product has no pack unit — quantity is taken as ${product.baseUnit}.`
           : null,
     };
@@ -173,6 +181,8 @@ export function applyProductToLines(
       productId: product.id,
       unit,
       unitNote: note || undefined,
+      // A blank row picked up by hand gets the usual rack too.
+      locationId: l.locationId ?? newLineLocation,
       flagged: l.flagged || unit === null,
     };
   };
@@ -258,7 +268,9 @@ export interface LineTotals {
 export function lineTotals(line: DraftLine): LineTotals {
   const gross = lineAmount(line);
   const discPct = Math.min(Math.max(Number(line.discountPct) || 0, 0), 100);
-  const discount = paise((gross * discPct) / 100);
+  // Scheme in rupees (SCH AMT) comes off with the percent — same as the server.
+  const scheme = Math.max(Number(line.schemeAmount) || 0, 0);
+  const discount = paise(Math.min((gross * discPct) / 100 + scheme, gross));
   const taxable = paise(gross - discount);
   const gst = paise((taxable * (Number(line.gstPct) || 0)) / 100);
   return { gross, discount, taxable, gst, total: paise(taxable + gst) };
@@ -577,6 +589,10 @@ export function toReceiptLines(
         // Percentages, not money — they describe the line whatever unit it was
         // received in, so unlike rate and MRP they need no pack conversion.
         discountPct: l.discountPct === "" ? undefined : Number(l.discountPct),
+        schemeAmount:
+          !l.schemeAmount || Number(l.schemeAmount) <= 0
+            ? undefined
+            : Number(l.schemeAmount),
         gstPct: l.gstPct === "" ? undefined : Number(l.gstPct),
         locationId: l.locationId!,
       };

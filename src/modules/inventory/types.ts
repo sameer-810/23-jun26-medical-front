@@ -49,6 +49,8 @@ export interface ProductBatchStock {
   mfgDate: string | null;
   expiryDate: string | null;
   purchasePrice: number;
+  /** The lot's MRP per base unit; 0 when the receipt didn't record one. */
+  mrp?: number;
   expired: boolean;
   onHand: number;
   locations: BatchLocation[];
@@ -93,6 +95,8 @@ export interface ReceiptLineInput {
    * — without them the GRN total can never match the bill's TOTAL AMT.
    */
   discountPct?: number;
+  /** Scheme as rupees off the line — the bill's SCH AMT. */
+  schemeAmount?: number;
   gstPct?: number;
 }
 
@@ -135,6 +139,8 @@ export interface DraftLine {
   mrp: string;
   /** DIS% / TD% / CD% — every distributor invoice prints one of these. */
   discountPct: string;
+  /** Scheme in rupees off this line (SCH AMT). Optional on older drafts. */
+  schemeAmount?: string;
   /** GST% for the line. Split into CGST+SGST or charged as IGST at the foot. */
   gstPct: string;
   locationId: string | null;

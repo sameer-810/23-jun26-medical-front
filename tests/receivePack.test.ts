@@ -20,6 +20,7 @@ import {
   emptyLine,
   baseQty,
   catalogueRows,
+  isMeasurePack,
 } from "../src/modules/inventory/receiveDraft";
 import type { DraftLine, ProductLite } from "../src/modules/inventory/types";
 
@@ -130,14 +131,41 @@ test("a 10ML bottle line is received in bottles", () => {
   assert.equal(baseQty(line, drops), 50);
 });
 
-test("a product with no pack units takes its base unit, with a note when the bill sells packs", () => {
+test("3 x '100 GM' is three pieces — the bill's quantity, as printed", () => {
   const [line] = applyProductToLines(
     [billRow("GLUCOSE-D", "100 GM", "3")],
     0,
     noPacks,
   );
   assert.equal(line.unit, "box");
-  assert.match(line.unitNote || "", /packs of 100/);
+  assert.equal(line.unitNote, undefined);
+  assert.equal(baseQty(line, noPacks), 3);
+});
+
+test("a counted pack on a product with no pack units still gets a note", () => {
+  const [line] = applyProductToLines([billRow("LOOSE TAB", "1X10", "3")], 0, {
+    ...noPacks,
+    baseUnit: "tablet",
+  });
+  assert.match(line.unitNote || "", /packs of 10/);
+});
+
+test("the client and server agree on which packs are measures", async () => {
+  const { isMeasurePack: server } = await import(
+    "../../23-jun26-medical-back/src/modules/ocr/ocr.units.js" as string
+  );
+  for (const pack of [
+    "20 GM",
+    "10ML",
+    "1X30ML",
+    "100GM",
+    "1X10",
+    "15TABS",
+    "1 S",
+    "",
+    null,
+  ])
+    assert.equal(isMeasurePack(pack), server(pack), `pack "${pack}"`);
 });
 
 test("a pack the product doesn't define is left for a human, and blocks the save", () => {
@@ -215,4 +243,28 @@ test("catalogue matches are offered only for rows still unfilled", () => {
   const filled = applyProductToLines(lines, 0, tablet);
   assert.deepEqual(catalogueRows(filled), []);
   assert.equal(baseQty(filled[0], tablet) + baseQty(filled[1], tablet), 70);
+});
+
+test("a scheme can be a percent, rupees off, or free goods — all three on one line", async () => {
+  const { lineTotals, toReceiptLines } =
+    await import("../src/modules/inventory/receiveDraft");
+  // GLUCOSE-D on SP/4579: 3 at 42.84, 3 free, 3% off — plus ₹5 scheme off.
+  const line: DraftLine = {
+    ...billRow("GLUCOSE-D (TUSHAR) 100 GM", "100 GM", "3"),
+    productId: "glucose",
+    unit: "box",
+    purchasePrice: "42.84",
+    freeQuantity: "3",
+    discountPct: "3",
+    schemeAmount: "5",
+    gstPct: "5",
+  };
+  const t = lineTotals(line);
+  assert.equal(t.gross, 128.52);
+  assert.equal(t.discount, 8.86); // 3.86 + 5.00
+  assert.equal(baseQty(line, noPacks), 6); // three bought, three free
+  const [sent] = toReceiptLines([line], { glucose: noPacks });
+  assert.equal(sent.schemeAmount, 5);
+  assert.equal(sent.discountPct, 3);
+  assert.equal(sent.freeQuantity, 3);
 });

@@ -90,6 +90,12 @@ interface DraftLine {
   unit: string | null;
   quantity: string;
   unitPrice: string;
+  /**
+   * MRP per base unit of the lot FEFO will sell first. The bill's default
+   * price — a lot carries the MRP printed on it, which the catalogue figure
+   * on the product does not know.
+   */
+  lotMrp?: number | null;
   discount: string;
   discountMode: "amount" | "pct";
   taxRate: string;
@@ -372,15 +378,23 @@ export default function NewSaleScreen() {
       cur.map((l, idx) => (idx === i ? { ...l, ...patch } : l)),
     );
 
-  /** Price for a product in a given unit = base price × that unit's pack factor. */
-  const priceForUnit = (productId: string, unit: string | null) => {
+  /**
+   * Price for a product in a given unit = base price × that unit's pack factor.
+   * The base price is the selling lot's MRP when known, else the product's.
+   */
+  const priceForUnit = (
+    productId: string,
+    unit: string | null,
+    lotMrp?: number | null,
+  ) => {
     const p = productsById[productId];
     if (!p) return "";
     const factor =
       !unit || unit === p.baseUnit
         ? 1
         : (p.packs || []).find((x) => x.unit === unit)?.factor || 1;
-    return String(Math.round((p.sellingPrice || 0) * factor * 100) / 100);
+    const base = lotMrp && lotMrp > 0 ? lotMrp : p.sellingPrice || 0;
+    return String(Math.round(base * factor * 100) / 100);
   };
   const removeLine = (i: number) =>
     setLines((cur) => cur.filter((_, idx) => idx !== i));
@@ -483,12 +497,29 @@ export default function NewSaleScreen() {
   const loadAvailabilityForProduct = async (productId: string) => {
     try {
       const inv = await inventoryApi.productInventory(productId);
+      // The lot FEFO sells first: nearest expiry, unexpired, in stock.
+      const first = inv.batches.find((b) => !b.expired && b.onHand > 0);
+      const lotMrp = first?.mrp && first.mrp > 0 ? first.mrp : null;
       setLines((cur) =>
-        cur.map((l) =>
-          l.productId === productId && !l.batchId
-            ? { ...l, available: inv.summary.available }
-            : l,
-        ),
+        cur.map((l) => {
+          if (l.productId !== productId || l.batchId) return l;
+          // Re-price only a line still on the default price — never over a
+          // price the cashier typed.
+          const untouched =
+            Math.abs(
+              Number(l.unitPrice) -
+                Number(priceForUnit(productId, l.unit, l.lotMrp)),
+            ) < 0.01;
+          return {
+            ...l,
+            available: inv.summary.available,
+            lotMrp,
+            unitPrice:
+              untouched && lotMrp
+                ? priceForUnit(productId, l.unit, lotMrp)
+                : l.unitPrice,
+          };
+        }),
       );
     } catch {
       // Non-fatal: checkout still refuses to oversell, server-side.
@@ -1063,7 +1094,11 @@ export default function NewSaleScreen() {
                           onChange={(v) =>
                             setLine(i, {
                               unit: v,
-                              unitPrice: priceForUnit(line.productId, v),
+                              unitPrice: priceForUnit(
+                                line.productId,
+                                v,
+                                line.lotMrp,
+                              ),
                             })
                           }
                         />
@@ -1222,7 +1257,11 @@ export default function NewSaleScreen() {
                           onChange={(v) =>
                             setLine(i, {
                               unit: v,
-                              unitPrice: priceForUnit(line.productId, v),
+                              unitPrice: priceForUnit(
+                                line.productId,
+                                v,
+                                line.lotMrp,
+                              ),
                             })
                           }
                         />

@@ -172,6 +172,7 @@ export function localProductInventory(productId: string) {
         mfgDate: l.batch.mfgDate ?? null,
         expiryDate: l.batch.expiryDate ?? null,
         purchasePrice: l.batch.purchasePrice ?? 0,
+        mrp: l.batch.mrp ?? 0,
         expired: isExpired(l.batch),
         onHand: l.onHand,
         locations: [],

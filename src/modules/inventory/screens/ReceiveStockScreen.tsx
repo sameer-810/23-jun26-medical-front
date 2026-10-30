@@ -235,6 +235,8 @@ export default function ReceiveStockScreen() {
     fromBill: boolean;
   } | null>(null);
 
+  /** Set by a fresh scan: link its MedGuide matches without waiting for a tap. */
+  const [autoImport, setAutoImport] = useState(false);
   // A scanned bill arrives as a route param — consume it once, then clear it so
   // a re-render can't wipe the pharmacist's edits.
   const scanned: ScannedBill | undefined = route.params?.scanned;
@@ -253,6 +255,7 @@ export default function ReceiveStockScreen() {
       setUnmatchedSupplier(scanned.supplierName.trim());
     setScanNote(scanSummary(scanned));
     setDupWarning(duplicateWarning(scanned));
+    setAutoImport(true);
     navigation.setParams({ scanned: undefined });
   }, [scanned, navigation]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -265,6 +268,28 @@ export default function ReceiveStockScreen() {
     value: l.id,
     label: `${l.code} — ${l.name}`,
   }));
+  /**
+   * Where new lines go: the rack used last time, or the shop's only location.
+   * The location is asked for once — after that a scanned bill arrives with
+   * every line already placed.
+   */
+  const defaultLocationId =
+    lastLocationId ?? (locations?.length === 1 ? locations[0].id : null);
+  /* eslint-disable react-hooks/set-state-in-effect -- fills rows once the
+     remembered location has loaded from storage. */
+  useEffect(() => {
+    if (!defaultLocationId) return;
+    setLines((cur) =>
+      cur.some((l) => l.fromBill && !l.locationId)
+        ? cur.map((l) =>
+            l.fromBill && !l.locationId
+              ? { ...l, locationId: defaultLocationId }
+              : l,
+          )
+        : cur,
+    );
+  }, [defaultLocationId, lines.length]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const searchResults = useMemo<ProductLite[]>(
     () =>
@@ -377,7 +402,9 @@ export default function ReceiveStockScreen() {
     setKnownProducts((cur) => ({ ...cur, [product.id]: product }));
     // The unit comes from the bill's PACK, not the base unit, and identical
     // bill lines are filled too — see applyProductToLines.
-    setLines((cur) => applyProductToLines(cur, row, product, lastLocationId));
+    setLines((cur) =>
+      applyProductToLines(cur, row, product, defaultLocationId),
+    );
   };
 
   /**
@@ -408,7 +435,7 @@ export default function ReceiveStockScreen() {
   ) => {
     try {
       const lite = await importFromCatalog(catalogId);
-      setLines((cur) => applyProductToLines(cur, row, lite, lastLocationId));
+      setLines((cur) => applyProductToLines(cur, row, lite, defaultLocationId));
       scanFeedback("ok");
       setScanNote(`Added ${lite.name} from the global catalogue.`);
     } catch (e) {
@@ -418,15 +445,17 @@ export default function ReceiveStockScreen() {
   };
 
   /**
-   * Adds every unmatched bill line the scanner found in the medicine catalogue,
-   * one tap instead of a search per line. Sequential, so two bill lines naming
-   * the same medicine import it once (the second gets the existing product).
+   * Links every unmatched bill line the scanner found in MedGuide, adding the
+   * medicine to this store. Runs by itself straight after a scan (the client:
+   * "photo kheenchunga, automatically fetch ho jaane chahiye"); the banner's
+   * button is the retry. Sequential, so two bill lines naming the same
+   * medicine import it once — the second gets the existing product.
    */
   const pendingCatalogue = catalogueRows(lines);
   const [addingCatalogue, setAddingCatalogue] = useState(false);
   const addCatalogueMatches = async () => {
     setAddingCatalogue(true);
-    let added = 0;
+    const names: string[] = [];
     let failed = 0;
     for (const { row, hit } of pendingCatalogue) {
       try {
@@ -434,25 +463,43 @@ export default function ReceiveStockScreen() {
         setLines((cur) =>
           cur[row]?.productId
             ? cur
-            : applyProductToLines(cur, row, lite, lastLocationId),
+            : applyProductToLines(cur, row, lite, defaultLocationId),
         );
-        added++;
+        if (!names.includes(lite.name)) names.push(lite.name);
       } catch {
         failed++;
       }
     }
     setAddingCatalogue(false);
     setScanNote(
-      failed
-        ? `Added ${added} from the catalogue; ${failed} could not be added — pick those by hand.`
-        : `Added ${added} line${added === 1 ? "" : "s"} from the medicine catalogue. Check the unit on each.`,
+      `Matched from MedGuide: ${names.join(", ") || "none"}.` +
+        (failed
+          ? ` ${failed} line${failed === 1 ? "" : "s"} could not be added — pick those by hand.`
+          : " Check the names against the bill."),
     );
   };
+  /* eslint-disable react-hooks/set-state-in-effect -- one shot per scan. */
+  useEffect(() => {
+    if (!autoImport) return;
+    setAutoImport(false);
+    if (canManageProducts && pendingCatalogue.length)
+      void addCatalogueMatches();
+    // Runs on the render that carries the scanned lines; nothing else re-arms it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoImport]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  const setLine = (i: number, patch: Partial<DraftLine>) =>
+  const setLine = (i: number, patch: Partial<DraftLine>) => {
+    // The first rack chosen on a scanned bill goes to every line still without
+    // one, and is remembered for the next bill.
+    if (patch.locationId) rememberLocation(patch.locationId);
     setLines((cur) =>
       cur.map((l, idx) => {
-        if (idx !== i) return l;
+        if (idx !== i) {
+          return patch.locationId && !l.locationId && l.fromBill
+            ? { ...l, locationId: patch.locationId }
+            : l;
+        }
         // Editing a scanned value clears the row's review flag: typing over the
         // figure is the review.
         const touchesReadValue =
@@ -467,6 +514,7 @@ export default function ReceiveStockScreen() {
         };
       }),
     );
+  };
 
   /**
    * Any scan — USB gun, camera, or a code typed into the scan box — resolves
@@ -985,7 +1033,7 @@ export default function ReceiveStockScreen() {
       <QuickEntryPanel
         entry={quick}
         locationOptions={locationOptions}
-        defaultLocationId={lastLocationId}
+        defaultLocationId={defaultLocationId}
         onCommit={commitQuick}
         onCancel={() => {
           setQuick(null);
@@ -1047,6 +1095,7 @@ export default function ReceiveStockScreen() {
                   figure that appears nowhere on the paper. Same for MRP. */}
               <GrnHead w={COL.rate} label="RATE" right />
               <GrnHead w={COL.disc} label="DIS%" right />
+              <GrnHead w={COL.sch} label="SCH ₹" right />
               <GrnHead w={COL.gst} label="GST%" right />
               <GrnHead w={COL.loc} label="LOCATION" />
               <GrnHead w={COL.amount} label="AMOUNT" right />
@@ -1206,6 +1255,14 @@ export default function ReceiveStockScreen() {
                     w={COL.disc}
                     value={line.discountPct}
                     onChangeText={(v) => setLine(i, { discountPct: v })}
+                    numeric
+                    align="right"
+                    placeholder="0"
+                  />
+                  <GrnCell
+                    w={COL.sch}
+                    value={line.schemeAmount ?? ""}
+                    onChangeText={(v) => setLine(i, { schemeAmount: v })}
                     numeric
                     align="right"
                     placeholder="0"
@@ -1582,18 +1639,20 @@ const styles = StyleSheet.create({
  */
 const COL = {
   idx: 22,
-  product: 166,
-  pack: 84,
-  batch: 84,
-  expiry: 94,
+  product: 150,
+  pack: 78,
+  batch: 80,
+  expiry: 90,
   qty: 44,
   free: 40,
   // Money columns hold paise now ("1,759.63"), so they need the room.
-  mrp: 74,
-  rate: 74,
+  mrp: 70,
+  rate: 70,
   disc: 48,
+  // Scheme in rupees — the third way a bill gives a scheme, after DIS% and FREE.
+  sch: 52,
   gst: 46,
-  loc: 104,
+  loc: 96,
   amount: 88,
   rm: 26,
 };
