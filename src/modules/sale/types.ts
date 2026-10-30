@@ -194,6 +194,8 @@ export interface InvoiceProfile {
     defaultRatePct: number;
     invoicePrefix: string;
     priceIncludesTax?: boolean;
+    /** Settings → Tax Enabled; off charges no GST on any line. */
+    enabled?: boolean;
   };
   print?: PrintSettings;
   rx?: { enforce: boolean; validityMonths: number };

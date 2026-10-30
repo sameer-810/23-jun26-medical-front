@@ -54,7 +54,9 @@ export interface RxRegisterRow {
   quantity: number;
   unit: string;
   baseQuantity: number;
+  /** One lot, or "E1:2, E2:2" when the line was split across lots. */
   batchNumber: string;
+  batches: { batchNumber: string; quantity: number }[];
   soldBy: string;
 }
 

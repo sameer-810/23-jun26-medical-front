@@ -17,7 +17,7 @@ import {
   Skeleton,
   useBreakpoint,
 } from "@shared/ui";
-import { fmtDate } from "@shared/format";
+import { fmtDate, fmtMoneyExact } from "@shared/format";
 
 export default function ProductLedgerScreen() {
   const route = useRoute<any>();
@@ -89,7 +89,7 @@ export default function ProductLedgerScreen() {
                 label: "Min qty",
                 value: String(product.reorderLevel ?? 0),
               },
-              { label: "MRP", value: `₹${product.mrp ?? 0}` },
+              { label: "MRP", value: fmtMoneyExact(product.mrp) },
               { label: "GST", value: `${product.taxRatePct ?? 0}%` },
               { label: "HSN", value: product.hsnCode || "—" },
             ]}

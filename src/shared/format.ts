@@ -4,15 +4,52 @@
  */
 const inr = (n: number) => Math.round(n).toLocaleString("en-IN");
 
+const exact = (n: number) =>
+  n.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+/**
+ * The sign goes in front of everything, as the true minus the bills print:
+ * −₹320.25, never ₹-320.25. Decided after rounding, so a −0.001 float residue
+ * reads as zero rather than as a negative nothing.
+ */
+const signed = (n: number, body: (abs: number) => string) => {
+  const text = body(Math.abs(n));
+  return n < 0 && /[1-9]/.test(text) ? `−${text}` : text;
+};
+
 /** Integer count with thousands separators: 31544 → "31,544". */
 export const fmtInt = (n: number | null | undefined) => inr(Number(n) || 0);
 
 /** Rounded quantity with separators: 5164.97 → "5,165". */
 export const fmtQty = (n: number | null | undefined) => inr(Number(n) || 0);
 
+/**
+ * A figure kept to at most `maxDp` places: 4999605.917 → "49,99,605.92". For
+ * base-unit quantities, stored to 3dp, where `fmtQty` would hide real fractions
+ * of a pack and the raw number reads as debug output.
+ */
+export const fmtNumber = (n: number | null | undefined, maxDp = 2) =>
+  signed(Number(n) || 0, (abs) =>
+    abs.toLocaleString("en-IN", { maximumFractionDigits: maxDp }),
+  );
+
+/** "1 sale", "2 sales", "31,544 sales". Irregular plurals pass `many`. */
+export const fmtCount = (
+  n: number | null | undefined,
+  one: string,
+  many = `${one}s`,
+) => `${fmtInt(n)} ${Number(n) === 1 ? one : many}`;
+
+/** "products" → "product", "entries" → "entry". For a noun passed in plural. */
+export const singularNoun = (plural: string) =>
+  plural.replace(/ies$/, "y").replace(/s$/, "");
+
 /** Rupee amount, rounded: 81696.92 → "₹81,697". Headline figures only. */
 export const fmtMoney = (n: number | null | undefined) =>
-  `₹${inr(Number(n) || 0)}`;
+  signed(Number(n) || 0, (abs) => `₹${inr(abs)}`);
 
 /**
  * Rupee amount to the paisa: 128.92 → "₹128.92", 5055.8 → "₹5,055.80".
@@ -25,17 +62,11 @@ export const fmtMoney = (n: number | null | undefined) =>
  * is a defect.
  */
 export const fmtMoneyExact = (n: number | null | undefined) =>
-  `₹${(Number(n) || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  signed(Number(n) || 0, (abs) => `₹${exact(abs)}`);
 
 /** Same, without the ₹ — for cells in a money column that already says so. */
 export const fmtAmountExact = (n: number | null | undefined) =>
-  (Number(n) || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  signed(Number(n) || 0, exact);
 
 /**
  * Dates. One format everywhere: DD-MM-YYYY, IST, whatever locale the machine
@@ -113,6 +144,17 @@ export const businessYmd = (v: DateInput): string | null => {
 
 /** Today, in the business zone. */
 export const todayYmd = () => businessYmd(new Date()) as string;
+
+/**
+ * Is this "YYYY-MM-DD" range back to front? Such a query can only come back
+ * empty, which reads as "nothing happened in that period" — a false statement
+ * about the books. An open end is not inverted.
+ */
+export const isInvertedRange = (from?: string | null, to?: string | null) => {
+  const start = (from ?? "").trim();
+  const end = (to ?? "").trim();
+  return Boolean(start && end && start > end);
+};
 
 /**
  * Is this lot past its expiry date?

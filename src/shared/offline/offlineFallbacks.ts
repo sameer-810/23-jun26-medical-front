@@ -125,7 +125,9 @@ export function localScan(code: string) {
     };
   }
 
-  const product = localCatalog.productByBarcode(code);
+  // Same order as the server's resolveScan: SKU last.
+  const product =
+    localCatalog.productByBarcode(code) ?? localCatalog.productBySku(code);
   if (product) {
     return {
       kind: "product" as const,

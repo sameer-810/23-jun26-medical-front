@@ -9,7 +9,7 @@ import { useAuthStore } from "@shared/store/useAuthStore";
 import { palette } from "@shared/designSystem";
 import AuthNavigator from "@navigation/AuthNavigator";
 import AppNavigator from "@navigation/AppNavigator";
-import AdminNavigator from "@navigation/AdminNavigator";
+import { AdminNavigator } from "@navigation/lazyScreens";
 
 const Stack = createNativeStackNavigator();
 

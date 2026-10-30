@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Pressable } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react-native";
@@ -12,6 +13,7 @@ import { Text, VStack, HStack, Button } from "@shared/ui";
 import { AuthLayout } from "@modules/auth/components/AuthLayout";
 import { SHOW_PRICES } from "@shared/storePolicy";
 import { useAuthStore } from "@shared/store/useAuthStore";
+import { isDraftKey } from "@modules/sale/saleDraft";
 
 type Nav = { navigate: (s: string, params?: object) => void };
 
@@ -29,6 +31,14 @@ export default function LoginScreen({ navigation }: { navigation: Nav }) {
     errCode === "TRIAL_EXPIRED" ||
     (!mut.isError && signOutCode === "TRIAL_EXPIRED");
   const needsUs = isPending || isRejected;
+  // The session died mid-work. Say so, and whether the bill survived.
+  const [draftKept, setDraftKept] = useState(false);
+  useEffect(() => {
+    void AsyncStorage.getAllKeys()
+      .then((keys) => setDraftKept(keys.some(isDraftKey)))
+      .catch(() => {});
+  }, []);
+  const sessionEnded = !mut.isError && Boolean(signOutCode) && !trialEnded;
   /**
    * The device cap is the one refusal the user can clear themselves, but only
    * from here — the profile it used to point at is behind this very login.
@@ -60,6 +70,15 @@ export default function LoginScreen({ navigation }: { navigation: Nav }) {
       subtitle="Sign in to your Plusveda workspace"
     >
       <VStack gap={16}>
+        {sessionEnded ? (
+          <View style={pendingBox}>
+            <Text variant="body-sm" tone="secondary">
+              {draftKept
+                ? "You were signed out. Your unfinished bill is saved and comes back on New sale after you sign in."
+                : "You were signed out. Sign in again to carry on."}
+            </Text>
+          </View>
+        ) : null}
         {/* Workspace-state errors get the amber notice, not the red error panel. */}
         {mut.isError && atDeviceLimit ? (
           <View style={pendingBox}>

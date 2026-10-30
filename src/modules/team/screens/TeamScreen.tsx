@@ -11,6 +11,7 @@ import { TeamUser } from "@modules/team/types";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { apiErrorMessage } from "@api/apiClient";
 import { palette } from "@shared/designSystem";
+import { fmtCount } from "@shared/format";
 import {
   Screen,
   Text,
@@ -106,7 +107,7 @@ export default function TeamScreen() {
       subtitle={
         isError
           ? "Permission-based access"
-          : `${data?.meta?.total ?? 0} members · permission-based access`
+          : `${fmtCount(data?.meta?.total, "member")} · permission-based access`
       }
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}

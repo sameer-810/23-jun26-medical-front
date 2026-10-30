@@ -15,7 +15,7 @@ import {
   EmptyState,
   Skeleton,
 } from "@shared/ui";
-import { fmtDate } from "@shared/format";
+import { fmtDate, fmtMoney, fmtMoneyExact } from "@shared/format";
 
 type Sort = "expiry" | "price" | "margin";
 const TABS: { key: Sort; label: string }[] = [
@@ -120,7 +120,7 @@ export default function AlternativesScreen() {
                 </VStack>
                 <VStack gap={3} align="flex-end">
                   <Text variant="label-lg" weight="700" tone="primary">
-                    ₹{it.mrp}
+                    {fmtMoneyExact(it.mrp)}
                   </Text>
                   <StatusChip
                     label={`Stock ${it.available}`}
@@ -128,7 +128,7 @@ export default function AlternativesScreen() {
                   />
                   {sort === "margin" ? (
                     <Text variant="caption" tone="tertiary">
-                      Margin ₹{Math.round(it.margin)}
+                      Margin {fmtMoney(it.margin)}
                     </Text>
                   ) : null}
                 </VStack>

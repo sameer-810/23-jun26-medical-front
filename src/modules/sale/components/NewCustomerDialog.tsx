@@ -10,8 +10,8 @@
  * Mobile stays optional — a walk-in who will not give a number must not block
  * the bill — but it is asked for, in front of the person who can supply it.
  */
-import React, { useState } from "react";
-import { Modal, View, Pressable, StyleSheet } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Modal, View, Pressable, StyleSheet, Platform } from "react-native";
 import { Phone, User } from "lucide-react-native";
 import { palette, radius, shadows } from "@shared/designSystem";
 import { Text, HStack, Button, TextField } from "@shared/ui";
@@ -60,6 +60,20 @@ export function NewCustomerDialog({
     }
   }
 
+  // RN Web's Modal takes focus just after it mounts, past the autoFocus below,
+  // and the picker this opens from is still fading out and can take it back. So
+  // try until an input has it, without stealing it from one being typed in.
+  useEffect(() => {
+    if (!visible || Platform.OS !== "web") return;
+    const tries = [60, 180, 360].map((ms) =>
+      setTimeout(() => {
+        if (document.activeElement?.tagName !== "INPUT")
+          document.getElementById("new-customer-name")?.focus();
+      }, ms),
+    );
+    return () => tries.forEach(clearTimeout);
+  }, [visible]);
+
   const submit = () => {
     const cleanName = name.trim();
     const cleanMobile = mobile.replace(/[\s-]/g, "").trim();
@@ -107,6 +121,7 @@ export function NewCustomerDialog({
               placeholder="Customer name"
               autoCapitalize="words"
               autoFocus
+              nativeID="new-customer-name"
               leading={
                 <User
                   size={18}

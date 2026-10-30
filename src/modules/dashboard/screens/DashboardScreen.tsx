@@ -37,6 +37,7 @@ import {
   ErrorState,
   ListRow,
   ListGroup,
+  Skeleton,
 } from "@shared/ui";
 import type { Stat } from "@shared/ui";
 
@@ -111,12 +112,15 @@ export default function DashboardScreen() {
 
   // Zero is a real figure on these tiles, so a query that didn't load renders "—".
   const finMissing = finError || (!fin && !finLoading);
-  const fmtFin = (value: number | undefined, format: (n: number) => string) =>
-    finMissing ? "—" : format(value ?? 0);
-
   const sumMissing = sumError || (!data && !isLoading);
+  // `Blank` also covers the first load, which is not a failure (so no error
+  // state) but has no figures yet — ₹0 there would be a false statement.
+  const finBlank = finMissing || !fin;
+  const sumBlank = sumMissing || !data;
+  const fmtFin = (value: number | undefined, format: (n: number) => string) =>
+    finBlank ? "—" : format(value ?? 0);
   const fmtSum = (value: number | undefined, format: (n: number) => string) =>
-    sumMissing ? "—" : format(value ?? 0);
+    sumBlank ? "—" : format(value ?? 0);
 
   const todayTrend = data?.sales.todayTrendPct;
   const lowStock = data?.inventory.lowStock ?? 0;
@@ -142,19 +146,19 @@ export default function DashboardScreen() {
     },
     {
       label: "Products",
-      value: sumMissing ? "—" : fmtInt(data?.products.total),
+      value: fmtSum(data?.products.total, fmtInt),
       onPress: () => go("Products"),
     },
     {
       label: "Low stock",
-      value: sumMissing ? "—" : fmtInt(lowStock),
-      accent: !sumMissing && lowStock > 0 ? accents.amber : undefined,
+      value: fmtSum(lowStock, fmtInt),
+      accent: !sumBlank && lowStock > 0 ? accents.amber : undefined,
       onPress: () => go("Inventory"),
     },
     {
       label: "Expiring soon",
-      value: sumMissing ? "—" : fmtInt(expiringSoon),
-      accent: !sumMissing && expiringSoon > 0 ? accents.red : undefined,
+      value: fmtSum(expiringSoon, fmtInt),
+      accent: !sumBlank && expiringSoon > 0 ? accents.red : undefined,
       onPress: () => go("Expiry"),
     },
   ];
@@ -356,6 +360,13 @@ export default function DashboardScreen() {
           onRetry={refreshAll}
           retrying={isRefetching || finRefetching}
         />
+      ) : attn.length === 0 && (sumBlank || finBlank) ? (
+        <Card>
+          <VStack gap={8}>
+            <Skeleton width="30%" height={13} />
+            <Skeleton width="60%" height={12} />
+          </VStack>
+        </Card>
       ) : attn.length === 0 ? (
         <Card>
           <HStack gap={10} align="center">
@@ -433,7 +444,9 @@ export default function DashboardScreen() {
           {
             label: "Upcoming PDC (out)",
             value: fmtFin(fin?.upcomingPDC.payable.total, money),
-            hint: `${pdcCount} cheque${pdcCount === 1 ? "" : "s"}`,
+            hint: finBlank
+              ? undefined
+              : `${pdcCount} cheque${pdcCount === 1 ? "" : "s"}`,
             onPress: () => go("PDC"),
           },
           {
@@ -459,7 +472,7 @@ export default function DashboardScreen() {
           title="Sales"
           subtitle="Last 7 days / 30 days"
           value={
-            finMissing
+            finBlank
               ? "—"
               : `${money(fin?.sales.last7 ?? 0)} / ${money(fin?.sales.last30 ?? 0)}`
           }
@@ -489,7 +502,7 @@ export default function DashboardScreen() {
           title="Gross margin"
           subtitle="Last 30 days"
           value={
-            finMissing
+            finBlank
               ? "—"
               : `${money(fin?.margin.grossMargin ?? 0)} · ${fin?.margin.marginPct ?? 0}%`
           }
@@ -540,7 +553,7 @@ export default function DashboardScreen() {
         <ListRow
           icon={Users}
           title={
-            sumMissing
+            sumBlank
               ? "—"
               : `${data?.team.active ?? 0} active · ${data?.team.total ?? 0} total`
           }

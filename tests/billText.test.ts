@@ -172,8 +172,17 @@ test("every line fits the LX-310's 80 columns, on both document types", () => {
   }
 });
 
+/** No GST on the bill, which is the only way a shop with a GSTIN gets one. */
+const untaxed: Sale = {
+  ...sale,
+  totalTax: 0,
+  totalCgst: 0,
+  totalSgst: 0,
+  totalIgst: 0,
+};
+
 test("the Bill of Supply carries the sample's fields", () => {
-  const text = renderBillLines(sale, profile)
+  const text = renderBillLines(untaxed, profile)
     .map((l) => l.text)
     .join("\n");
   assert.match(text, /ASHOK MEDICAL/);
@@ -189,7 +198,7 @@ test("the Bill of Supply carries the sample's fields", () => {
     /1x70 G\s+OMNIDENT GEL 70GM\s+GRO\s+OM25118\s+10-27\s+156\.00/,
   );
   // Second lot of a split line prints under the first, in the Batch column.
-  const rows = renderBillLines(sale, profile).map((l) => l.text);
+  const rows = renderBillLines(untaxed, profile).map((l) => l.text);
   const first = rows.find((r) => r.includes("AB12345678"))!;
   const second = rows.find((r) => r.includes("CD999"))!;
   assert.equal(
@@ -211,6 +220,16 @@ test("the Bill of Supply carries the sample's fields", () => {
   assert.match(text, /MOBILE NO\.-8652586786\s+R\. Khan, Pharmacist/);
   // A Bill of Supply must not show tax — the whole reason it exists.
   assert.doesNotMatch(text, /CGST|SGST|IGST|Taxable/);
+});
+
+test("the Bill of Supply states its round-off, and fits the page", () => {
+  const rounded = renderBillLines({ ...untaxed, roundOff: 0.5 }, profile).map(
+    (l) => l.text,
+  );
+  assert.ok(rounded.some((l) => /^Round off: 0\.50$/.test(l)));
+  assert.ok(rounded.every((l) => l.length <= COLS));
+  const exact = renderBillLines({ ...untaxed, roundOff: 0 }, profile);
+  assert.ok(!exact.some((l) => /Round off/.test(l.text)));
 });
 
 test("the Tax Invoice shows the GST split and no composition line", () => {

@@ -17,7 +17,12 @@ import { apiClient, apiErrorMessage } from "@api/apiClient";
 import { getDeviceId, getDeviceName } from "@api/deviceId";
 import { useAuthStore } from "../store/useAuthStore";
 import { useOfflineStore } from "./useOfflineStore";
-import { localCatalog, TABLES, TableName } from "./localCatalog";
+import {
+  localCatalog,
+  MirrorWriteError,
+  TABLES,
+  TableName,
+} from "./localCatalog";
 
 const PROBE_MS = 20_000;
 const DRAIN_MS = 30_000;
@@ -99,6 +104,8 @@ const PULL_TABLES: TableName[] = TABLES;
 let pulling = false;
 let lastPullAt = 0;
 const PULL_EVERY_MS = 60_000;
+// A long first sync keeps some progress without rewriting the mirror per page.
+const SAVE_EVERY_PAGES = 10;
 
 /**
  * Delta-pulls the tenant working set into the local catalog. Cursor per
@@ -128,13 +135,26 @@ export async function pullCatalog(force = false) {
       // Guard: a table never pages forever in one pass.
       let page = 0;
       for (; page < 50; page++) {
-        const rs = await apiClient.get<{ data: SyncPage }>("/sync/pull", {
-          params: {
-            collection: table,
-            ...(since ? { since } : {}),
-            ...(sinceId ? { sinceId } : {}),
-          },
-        });
+        const rs = await apiClient
+          .get<{ data: SyncPage }>("/sync/pull", {
+            params: {
+              collection: table,
+              ...(since ? { since } : {}),
+              ...(sinceId ? { sinceId } : {}),
+            },
+          })
+          .catch((err: unknown) => {
+            // Collections are gated per permission. One this login doesn't
+            // hold is a settled answer, not a failed round: skip it, or every
+            // table after it never syncs.
+            if (axios.isAxiosError(err) && err.response?.status === 403)
+              return null;
+            throw err;
+          });
+        if (!rs) {
+          drained = true;
+          break;
+        }
         // Landed in its own annotated const on purpose: destructuring straight
         // off `rs` makes the cursors' types infer through the response that
         // they themselves parameterise, and TypeScript gives up (TS7022).
@@ -145,8 +165,9 @@ export async function pullCatalog(force = false) {
           // minutes wrong (printed bill times), not network jitter.
           skewSample = Date.now() - new Date(serverTime).getTime();
         }
-        await localCatalog.applyPage(table, docs);
-        await localCatalog.setCursor(table, nextSince);
+        await localCatalog.applyPage(table, docs, nextSince, {
+          persist: !more || page % SAVE_EVERY_PAGES === SAVE_EVERY_PAGES - 1,
+        });
         since = nextSince;
         sinceId = nextId ?? null;
         if (!more) {
@@ -169,9 +190,17 @@ export async function pullCatalog(force = false) {
       lastSyncAt: new Date().toISOString(),
       ...(skewSample != null ? { clockSkewMs: skewSample } : {}),
       incompleteTables: incomplete,
+      mirrorError: null,
     });
-  } catch {
-    // Offline or a 4xx mid-pull — cursors already hold real progress.
+  } catch (err) {
+    // Offline or a failed pull — cursors already hold real progress. A failed
+    // write is different: only a person can free the disk, so say so.
+    if ((err as MirrorWriteError)?.isMirrorWrite) {
+      useOfflineStore.getState().setSyncMeta({
+        mirrorError:
+          "Could not save the offline copy on this computer. Offline billing may miss medicines until there is free disk space.",
+      });
+    }
   } finally {
     pulling = false;
   }

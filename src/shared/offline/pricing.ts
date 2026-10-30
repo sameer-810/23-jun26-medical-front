@@ -11,6 +11,44 @@ export const round = (n: number) =>
 const round3 = (n: number) =>
   Math.round((Number(n) + Number.EPSILON) * 1000) / 1000;
 
+/** A line may land one paisa over: both sides are rounded to the paisa. */
+export const MRP_TOLERANCE = 0.01;
+
+/** The rates the till's GST box may switch a line to. */
+export const GST_SLABS = [0, 5, 12, 18, 28];
+
+/**
+ * Port of the server's sale/mrpCeiling.js. MRP is GST-inclusive and legally the
+ * most a customer can pay; lot MRPs are per BASE unit. Highest price per SALE
+ * unit it allows, four decimals, floored: ₹22 for 15 tablets is ₹1.4667 each.
+ */
+export function maxUnitPrice(
+  mrpPerBase: number,
+  factor: number,
+  taxRate: number,
+  priceIncludesTax: boolean,
+) {
+  const ceiling = mrpPerBase * factor;
+  const beforeTax = priceIncludesTax ? ceiling : ceiling / (1 + taxRate / 100);
+  return Math.floor(beforeTax * 10000 + 1e-6) / 10000;
+}
+
+/** True when the rate, tax-inclusive and before discount, is above the MRP. */
+export function aboveMrp(l: {
+  unitPrice: number;
+  quantity: number;
+  baseQuantity: number;
+  mrpPerBase: number;
+  taxRate: number;
+  priceIncludesTax: boolean;
+}) {
+  const gross = round(l.unitPrice * l.quantity);
+  const charged = l.priceIncludesTax
+    ? gross
+    : round(gross + round((gross * l.taxRate) / 100));
+  return round(charged - round(l.mrpPerBase * l.baseQuantity)) > MRP_TOLERANCE;
+}
+
 export interface OfflinePriceLineInput {
   productName: string;
   sku?: string;
@@ -65,9 +103,14 @@ export interface OfflinePricedSale {
 
 export function priceSaleLocally(
   lines: OfflinePriceLineInput[],
-  opts: { priceIncludesTax: boolean; taxType: "intra" | "inter" },
+  opts: {
+    priceIncludesTax: boolean;
+    taxType: "intra" | "inter";
+    /** Settings → Tax Enabled; off charges no GST on any line. */
+    taxEnabled?: boolean;
+  },
 ): OfflinePricedSale {
-  const { priceIncludesTax, taxType } = opts;
+  const { priceIncludesTax, taxType, taxEnabled = true } = opts;
   const out: OfflinePricedSale = {
     lines: [],
     subtotal: 0,
@@ -89,7 +132,7 @@ export function priceSaleLocally(
       discount = round((gross * line.discountPct) / 100);
     discount = Math.min(Math.max(discount, 0), gross);
 
-    const taxRate = line.taxRatePct || 0;
+    const taxRate = taxEnabled ? line.taxRatePct || 0 : 0;
     const net = round(gross - discount);
 
     let taxable: number;

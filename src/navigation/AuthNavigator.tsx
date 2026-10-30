@@ -2,11 +2,13 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import LoginScreen from "@modules/auth/screens/LoginScreen";
-import SignupScreen from "@modules/auth/screens/SignupScreen";
-import ForgotPasswordScreen from "@modules/auth/screens/ForgotPasswordScreen";
-import ResetPasswordScreen from "@modules/auth/screens/ResetPasswordScreen";
-import PricingScreen from "@modules/pricing/screens/PricingScreen";
 import { SHOW_PRICES } from "@shared/storePolicy";
+import {
+  ForgotPasswordScreen,
+  PricingScreen,
+  ResetPasswordScreen,
+  SignupScreen,
+} from "./lazyScreens";
 
 export type AuthStackParamList = {
   Login: undefined;

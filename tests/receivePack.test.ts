@@ -15,6 +15,9 @@ import {
   parsePackSize,
   unitForBillPack,
   applyProductToLines,
+  defaultPack,
+  packChoiceNeeded,
+  unitCaption,
   needsUnit,
   incompleteLines,
   emptyLine,
@@ -183,10 +186,37 @@ test("a pack the product doesn't define is left for a human, and blocks the save
   assert.deepEqual(pending[0]?.missing, ["unit"]);
 });
 
-test("a hand-added line with no bill pack defaults to the base unit", () => {
+test("a hand-added line defaults to the pack, because bills count packs", () => {
   const [line] = applyProductToLines([], null, tablet, "loc");
-  assert.equal(line.unit, "tablet");
+  assert.equal(line.unit, "strip");
   assert.equal(line.locationId, "loc");
+  // Still the pharmacist's to change.
+  assert.equal(packChoiceNeeded(line, tablet), true);
+});
+
+test("the default pack is the smallest real one; no pack means the base unit", () => {
+  const boxed: ProductLite = {
+    ...tablet,
+    packs: [
+      { unit: "box", factor: 100 },
+      { unit: "strip", factor: 10 },
+      { unit: "single", factor: 1 },
+    ],
+  };
+  assert.equal(defaultPack(boxed), "strip");
+  assert.equal(defaultPack(noPacks), "box");
+  const [line] = applyProductToLines([], null, noPacks, "loc");
+  assert.equal(line.unit, "box");
+});
+
+test("the row says what its qty and rate count", () => {
+  const line = { ...emptyLine(), unit: "strip" };
+  assert.equal(unitCaption(line, tablet), "Qty and rate per strip (10 tablet)");
+  assert.equal(
+    unitCaption({ ...line, unit: "tablet" }, tablet),
+    "Qty and rate per single tablet",
+  );
+  assert.equal(unitCaption({ ...line, unit: "box" }, noPacks), null);
 });
 
 /* ---- the same medicine printed twice ------------------------------------- */

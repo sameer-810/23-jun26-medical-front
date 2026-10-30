@@ -10,6 +10,7 @@ import { apiErrorMessage } from "@api/apiClient";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { palette, radius } from "@shared/designSystem";
+import { fmtMoneyExact } from "@shared/format";
 import {
   Screen,
   Text,
@@ -161,7 +162,7 @@ export default function MedGuideScreen() {
                 </VStack>
                 <VStack gap={4} align="flex-end">
                   <Text variant="label" weight="600" tone="secondary">
-                    ₹{m.mrp}
+                    {fmtMoneyExact(m.mrp)}
                   </Text>
                   {m.prescriptionRequired ? (
                     <StatusChip label="Rx" tone="warning" />

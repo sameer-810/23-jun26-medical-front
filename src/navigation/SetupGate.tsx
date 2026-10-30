@@ -11,12 +11,12 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Settings2 } from "lucide-react-native";
-import SettingsScreen from "@modules/settings/screens/SettingsScreen";
 import { useSetupStatus } from "@modules/settings/hooks/useSettings";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { palette } from "@shared/designSystem";
 import { Text, VStack, HStack, Button, Card } from "@shared/ui";
+import { SettingsScreen } from "./lazyScreens";
 
 const Stack = createNativeStackNavigator();
 

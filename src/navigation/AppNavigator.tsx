@@ -11,7 +11,7 @@
  * shareable. `linking` in App.tsx maps each route to its path — both halves are
  * required, and either alone does nothing.
  */
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Pressable,
@@ -32,34 +32,38 @@ import { Sidebar } from "./Sidebar";
 import { CommandPalette } from "./CommandPalette";
 import { PhoneTabBar, useHasPhoneTabs } from "./PhoneTabBar";
 import { OfflineBanner } from "@shared/offline/OfflineBanner";
+import { UpdateBanner } from "@shared/UpdateBanner";
 import { TrialBanner } from "@modules/auth/components/TrialBanner";
 import { SetupGate } from "./SetupGate";
-import PricingScreen from "@modules/pricing/screens/PricingScreen";
 import { SHOW_PRICES } from "@shared/storePolicy";
 import { NAV_ITEMS, useVisibleNavItems } from "./navItems";
+import { preloadScreens } from "./lazyScreen";
+import {
+  AuditLogScreen,
+  CustomersNavigator,
+  DamagedScreen,
+  ExpiryScreen,
+  InventoryNavigator,
+  MedGuideNavigator,
+  PdcScreen,
+  PricingScreen,
+  ProductsNavigator,
+  ProfileScreen,
+  PurchaseOrdersNavigator,
+  ReceivingNavigator,
+  RemindersScreen,
+  ReportsScreen,
+  SearchScreen,
+  SettingsScreen,
+  ShortBookScreen,
+  SuppliersNavigator,
+  TeamNavigator,
+  TransfersScreen,
+  WarehouseScreen,
+} from "./lazyScreens";
 
 import DashboardScreen from "@modules/dashboard/screens/DashboardScreen";
-import ProductsNavigator from "@modules/product/ProductsNavigator";
-import WarehouseScreen from "@modules/warehouse/screens/WarehouseScreen";
-import InventoryNavigator from "@modules/inventory/InventoryNavigator";
-import ReceivingNavigator from "@modules/inventory/ReceivingNavigator";
-import SearchScreen from "@modules/inventory/screens/SearchScreen";
-import ShortBookScreen from "@modules/inventory/screens/ShortBookScreen";
-import PurchaseOrdersNavigator from "@modules/purchaseOrder/PurchaseOrdersNavigator";
-import MedGuideNavigator from "@modules/medguide/MedGuideNavigator";
 import SalesNavigator from "@modules/sale/SalesNavigator";
-import CustomersNavigator from "@modules/customer/CustomersNavigator";
-import SuppliersNavigator from "@modules/supplier/SuppliersNavigator";
-import PdcScreen from "@modules/cheque/screens/PdcScreen";
-import ExpiryScreen from "@modules/expiry/screens/ExpiryScreen";
-import DamagedScreen from "@modules/stockops/screens/DamagedScreen";
-import TransfersScreen from "@modules/stockops/screens/TransfersScreen";
-import ReportsScreen from "@modules/reports/screens/ReportsScreen";
-import TeamNavigator from "@modules/team/TeamNavigator";
-import AuditLogScreen from "@modules/team/screens/AuditLogScreen";
-import SettingsScreen from "@modules/settings/screens/SettingsScreen";
-import ProfileScreen from "@modules/profile/screens/ProfileScreen";
-import RemindersScreen from "@modules/reminder/screens/RemindersScreen";
 
 /**
  * Jumps to another top-level section by name.
@@ -121,6 +125,11 @@ export default function AppNavigator() {
   const items = useVisibleNavItems();
   const hasTabs = useHasPhoneTabs();
 
+  // This mounts only once signed in: fill the offline cache from here.
+  useEffect(() => {
+    preloadScreens();
+  }, []);
+
   const drawerContent = (props: DrawerContentComponentProps) => {
     drawerNav.current = props.navigation;
     return (
@@ -135,11 +144,14 @@ export default function AppNavigator() {
 
   return (
     <View style={{ flex: 1 }}>
+      <UpdateBanner />
       <OfflineBanner />
       <TrialBanner />
       <SetupGate>
         <Drawer.Navigator
-          initialRouteName="Dashboard"
+          // Dashboard is only registered for those who may see it; naming it
+          // for anyone else is a blank app, not a redirect.
+          initialRouteName={items[0]?.name}
           drawerContent={drawerContent}
           /**
            * Track which section is showing so the phone tab bar can highlight it.

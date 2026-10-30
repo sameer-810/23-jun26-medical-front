@@ -7,6 +7,7 @@ import {
   ChevronsRight,
 } from "lucide-react-native";
 import { palette, radius, outline } from "../designSystem";
+import { singularNoun } from "../format";
 import { Text } from "./Text";
 
 interface Props {
@@ -62,7 +63,8 @@ export function Pagination({
       <Text variant="body-sm" tone="tertiary">
         Showing <Text variant="label">{n(start)}</Text>–
         <Text variant="label">{n(end)}</Text> of{" "}
-        <Text variant="label">{n(total)}</Text> {label}
+        <Text variant="label">{n(total)}</Text>{" "}
+        {total === 1 ? singularNoun(label) : label}
       </Text>
 
       {/* Rows per page */}

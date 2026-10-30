@@ -98,7 +98,7 @@ function billOfSupplyHtml(sale: Sale, profile?: InvoiceProfile): string {
       <thead><tr><th>Qty</th><th>Description</th><th>Com</th><th>Batch</th><th>Exp</th><th class="r">Amount</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="totals"><span>MRP Val : ${money(mrpVal)}</span><span>Less : ${money(less)}</span><span>Net Amount: ${money(sale.grandTotal)}</span></div>
+    <div class="totals"><span>MRP Val : ${money(mrpVal)}</span><span>Less : ${money(less)}</span>${sale.roundOff ? `<span>Round off : ${money(sale.roundOff)}</span>` : ""}<span>Net Amount: ${money(sale.grandTotal)}</span></div>
     <div class="foot">
       <div>
         <div>E &amp; O.E. ${c?.jurisdiction ? "Subject to " + esc(c.jurisdiction.toUpperCase()) + " jurisdiction" : ""}</div>

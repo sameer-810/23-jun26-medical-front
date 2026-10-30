@@ -2,12 +2,20 @@ import { apiClient } from "@api/apiClient";
 
 export interface ReconciliationTask {
   id: string;
-  type: "oversell";
+  type:
+    | "oversell"
+    | "above_mrp"
+    | "credit_no_customer"
+    | "rx_review"
+    | "tax_review"
+    | "quantity_review";
   status: "open" | "resolved";
   productName: string;
   sku: string;
   batchNumber: string;
   qtyShort: number;
+  /** What to check, for the types that aren't a shelf recount. */
+  detail: string;
   invoiceNo: string;
   deviceId: string;
   note: string;

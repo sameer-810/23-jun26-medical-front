@@ -5,15 +5,20 @@
  * kept on-device so the till can search, price and allocate a sale with no
  * server. Reads are answered from in-memory Maps (a pharmacy's working set is
  * a few thousand rows — linear scans are sub-millisecond); durability comes
- * from AsyncStorage, sharded into 16 hash buckets per table because Android
- * caps a single AsyncStorage value at ~2 MB and one JSON blob per table would
- * hit it at catalogue scale.
+ * from kvStore (IndexedDB on web, AsyncStorage on native), sharded into 16 hash
+ * buckets per table because Android caps a single AsyncStorage value at ~2 MB
+ * and one JSON blob per table would hit it at catalogue scale.
  *
  * The server is the only truth: rows arrive exclusively via /sync/pull deltas
  * (cursor = server updatedAt), tombstones (`isDeleted`) delete locally, and
  * nothing here is ever pushed back.
  */
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { kvStore } from "./kvStore";
+
+/** A page reached memory but not the device. The cursor stays where it was. */
+export class MirrorWriteError extends Error {
+  readonly isMirrorWrite = true;
+}
 
 export type TableName =
   | "products"
@@ -101,7 +106,12 @@ const BUCKETS = 16;
  * MIRROR: on mismatch the org's slice is wiped and cursors reset, and the
  * next pull rebuilds it from the server. Cheap, and cannot lose anything.
  */
-const CAT_SCHEMA_VERSION = 1;
+// v2: batches no longer carry purchasePrice for a till-only login. Rows only
+// change when the server sends them again, so a stored cost would otherwise sit
+// on a cashier's device indefinitely.
+// v3: web moved to IndexedDB. A cursor from localStorage days can sit past rows
+// that were never stored, so every device re-pulls once from the start.
+const CAT_SCHEMA_VERSION = 3;
 const keyOf = (orgId: string, table: TableName, bucket: number) =>
   `medstock-cat:${orgId}:${table}:${bucket}`;
 const cursorKey = (orgId: string, table: TableName) =>
@@ -110,10 +120,12 @@ const schemaKey = (orgId: string) => `medstock-cat:${orgId}:schema`;
 // Last hex char spreads Mongo ObjectIds evenly (it's counter-driven).
 const bucketOf = (id: string) => parseInt(id.slice(-1), 16) % BUCKETS;
 
-class LocalCatalog {
+export class LocalCatalog {
   private orgId: string | null = null;
   private tables = new Map<TableName, Map<string, BaseRow>>();
   private cursors = new Map<TableName, string | null>();
+  /** Buckets changed in memory but not yet saved. */
+  private dirty = new Map<TableName, Set<number>>();
   private hydrating: Promise<void> | null = null;
 
   /** True once hydrate() finished for the signed-in org. */
@@ -133,28 +145,28 @@ class LocalCatalog {
     // org's cursors or rows.
     this.cursors = new Map();
     this.tables = new Map();
+    this.dirty = new Map();
     this.hydrating = (async () => {
-      const storedVersion = await AsyncStorage.getItem(schemaKey(orgId)).catch(
-        () => null,
-      );
-      if (Number(storedVersion) !== CAT_SCHEMA_VERSION) {
-        const stale = TABLES.flatMap((t) => [
-          ...Array.from({ length: BUCKETS }, (_, b) => keyOf(orgId, t, b)),
-          cursorKey(orgId, t),
-        ]);
-        await AsyncStorage.multiRemove(stale).catch(() => {});
-        await AsyncStorage.setItem(
-          schemaKey(orgId),
-          String(CAT_SCHEMA_VERSION),
-        ).catch(() => {});
-      }
-
       const rowKeys = TABLES.flatMap((t) =>
         Array.from({ length: BUCKETS }, (_, b) => keyOf(orgId, t, b)),
       );
       const curKeys = TABLES.map((t) => cursorKey(orgId, t));
-      const pairs = await AsyncStorage.multiGet([...rowKeys, ...curKeys]);
-      const byKey = new Map(pairs);
+      let byKey: Map<string, string | null>;
+      try {
+        const [[, storedVersion]] = await kvStore.getMany([schemaKey(orgId)]);
+        if (Number(storedVersion) !== CAT_SCHEMA_VERSION) {
+          await kvStore.removeMany([...rowKeys, ...curKeys]);
+          await kvStore.setMany([
+            [schemaKey(orgId), String(CAT_SCHEMA_VERSION)],
+          ]);
+        }
+        byKey = new Map(await kvStore.getMany([...rowKeys, ...curKeys]));
+      } catch (e) {
+        // Start empty with no cursors: a pull rebuilds the mirror in memory,
+        // and its first failed write reaches the Offline & Sync screen.
+        console.warn("[catalog] offline storage unreadable", e);
+        byKey = new Map();
+      }
 
       for (const t of TABLES) {
         const map = new Map<string, BaseRow>();
@@ -188,40 +200,60 @@ class LocalCatalog {
     return this.cursors.get(table) ?? null;
   }
 
-  async setCursor(table: TableName, iso: string): Promise<void> {
-    if (!this.orgId) return;
-    this.cursors.set(table, iso);
-    await AsyncStorage.setItem(cursorKey(this.orgId, table), iso).catch(
-      () => {},
-    );
-  }
-
   /**
    * Applies one /sync/pull page: upserts live rows, deletes tombstones, and
    * persists only the buckets the page touched.
+   *
+   * The cursor is written with the rows, and only moves once they are stored.
+   * Advancing past a failed write loses those rows for good: every later delta
+   * starts after them, and nothing would ever send them again.
+   *
+   * `persist: false` keeps a page in memory for a later save. Each save
+   * rewrites whole buckets, so saving after every page of a first sync redoes
+   * all the rows so far, each time, while the till is trying to bill. A pull
+   * cut short simply repeats from the last saved cursor.
    */
-  async applyPage(table: TableName, docs: BaseRow[]): Promise<void> {
-    if (!this.orgId || docs.length === 0) return;
+  async applyPage(
+    table: TableName,
+    docs: BaseRow[],
+    cursor?: string,
+    { persist = true }: { persist?: boolean } = {},
+  ): Promise<void> {
+    if (!this.orgId) return;
     const map = this.tables.get(table) ?? new Map<string, BaseRow>();
     this.tables.set(table, map);
 
-    const dirty = new Set<number>();
+    const dirty = this.dirty.get(table) ?? new Set<number>();
+    this.dirty.set(table, dirty);
     for (const doc of docs) {
       const id = String(doc._id);
       if (doc.isDeleted) map.delete(id);
       else map.set(id, { ...doc, _id: id });
       dirty.add(bucketOf(id));
     }
+    if (!persist) return;
 
-    const writes: [string, string][] = [];
-    for (const b of dirty) {
-      const rows: Record<string, BaseRow> = {};
-      for (const [id, row] of map) {
-        if (bucketOf(id) === b) rows[id] = row;
-      }
-      writes.push([keyOf(this.orgId, table, b), JSON.stringify(rows)]);
+    const saving = [...dirty];
+    const rows = new Map(saving.map((b) => [b, {} as Record<string, BaseRow>]));
+    for (const [id, row] of map) {
+      const bucket = rows.get(bucketOf(id));
+      if (bucket) bucket[id] = row;
     }
-    await AsyncStorage.multiSet(writes).catch(() => {});
+    const writes: [string, string][] = [];
+    for (const [b, bucket] of rows) {
+      writes.push([keyOf(this.orgId, table, b), JSON.stringify(bucket)]);
+      // Between buckets, so a keystroke at the till never waits for all of them.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    if (cursor) writes.push([cursorKey(this.orgId, table), cursor]);
+    if (writes.length === 0) return;
+    try {
+      await kvStore.setMany(writes);
+    } catch (e) {
+      throw new MirrorWriteError(String(e));
+    }
+    saving.forEach((b) => dirty.delete(b));
+    if (cursor) this.cursors.set(table, cursor);
   }
 
   // ---- Queries the till needs ------------------------------------------
@@ -302,6 +334,16 @@ class LocalCatalog {
     if (!needle) return undefined;
     for (const p of this.all<LocalProduct>("products")) {
       if (p.barcode === needle && p.isActive) return p;
+    }
+    return undefined;
+  }
+
+  /** Case-insensitive, like the server's SKU lookup. */
+  productBySku(code: string): LocalProduct | undefined {
+    const needle = code.trim().toLowerCase();
+    if (!needle) return undefined;
+    for (const p of this.all<LocalProduct>("products")) {
+      if ((p.sku || "").toLowerCase() === needle && p.isActive) return p;
     }
     return undefined;
   }

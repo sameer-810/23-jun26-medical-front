@@ -18,6 +18,7 @@ import { saleApi } from "@modules/sale/api/saleApi";
 import { ScanReturnMatch } from "@modules/sale/types";
 import { useScanGun } from "@shared/useScanGun";
 import { apiErrorMessage } from "@api/apiClient";
+import { saleStatusLabel } from "@modules/sale/saleStatus";
 import { fmtMoney, fmtDate } from "@shared/format";
 import { palette, radius, shadows } from "@shared/designSystem";
 import {
@@ -173,7 +174,7 @@ export function ScanReturnModal({ visible, onClose, onPick }: Props) {
                         {m.status !== "completed" ? (
                           <StatusChip
                             tone="warning"
-                            label={m.status.replace("_", " ")}
+                            label={saleStatusLabel(m.status)}
                           />
                         ) : null}
                       </HStack>

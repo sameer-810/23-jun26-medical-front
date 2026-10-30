@@ -6,7 +6,12 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { priceSaleLocally } from "../src/shared/offline/pricing";
+import {
+  aboveMrp,
+  GST_SLABS,
+  maxUnitPrice,
+  priceSaleLocally,
+} from "../src/shared/offline/pricing";
 
 // The backend's env module refuses to load without these; nothing here
 // connects to anything.
@@ -137,5 +142,78 @@ test("offline pricing matches the server's priceLine + totals for 300 random car
     });
     assert.equal(local.grandTotal, serverGrand, `grand ${ctx}`);
     assert.equal(local.roundOff, serverRoundOff, `roundOff ${ctx}`);
+  }
+});
+
+test("with tax off, device and server both charge no GST, in either pricing mode", async () => {
+  const { saleService } = await import(
+    "../../23-jun26-medical-back/src/modules/sale/sale.service.js" as string
+  );
+  for (let i = 0; i < 200; i++) {
+    const priceIncludesTax = rnd() < 0.5;
+    const taxType = rnd() < 0.8 ? "intra" : "inter";
+    const p = pick(products);
+    const quantity = 1 + Math.floor(rnd() * 5);
+    const taxRatePct = pick([5, 12, 18]);
+    const unitPrice = 10 + Math.floor(rnd() * 500) / 100;
+
+    const server = saleService.priceLine(
+      p,
+      { productId: "x", unit: p.baseUnit, quantity, unitPrice, taxRatePct },
+      { priceIncludesTax, taxType, taxEnabled: false },
+    );
+    const local = priceSaleLocally(
+      [
+        {
+          productName: p.name,
+          unit: p.baseUnit,
+          factor: 1,
+          quantity,
+          unitPrice,
+          taxRatePct,
+        },
+      ],
+      {
+        priceIncludesTax,
+        taxType: taxType as "intra" | "inter",
+        taxEnabled: false,
+      },
+    );
+    assert.equal(server.tax, 0);
+    assert.equal(server.taxRate, 0);
+    assert.equal(local.lines[0].taxRatePct, 0);
+    assert.equal(local.lines[0].taxableAmount, server.taxable);
+    assert.equal(local.lines[0].taxAmount, server.tax);
+    assert.equal(local.lines[0].lineTotal, server.lineTotal);
+    assert.equal(local.totalTax, 0);
+  }
+});
+
+test("the till's MRP ceiling is the server's, value for value", async () => {
+  const server = await import(
+    "../../23-jun26-medical-back/src/modules/sale/mrpCeiling.js" as string
+  );
+  for (let i = 0; i < 2000; i++) {
+    const mrpPerBase = Math.round(rnd() * 5000000) / 10000 + 0.01;
+    const factor = pick([1, 5, 10, 15, 30]);
+    const taxRate = pick(GST_SLABS);
+    const priceIncludesTax = rnd() < 0.5;
+    const ceiling = maxUnitPrice(mrpPerBase, factor, taxRate, priceIncludesTax);
+    assert.equal(
+      ceiling,
+      server.maxUnitPrice(mrpPerBase, factor, taxRate, priceIncludesTax),
+    );
+
+    const quantity = 1 + Math.floor(rnd() * 20);
+    const line = {
+      // Straddles the ceiling, so both verdicts are exercised.
+      unitPrice: Math.round(ceiling * (0.97 + rnd() * 0.06) * 100) / 100,
+      quantity,
+      baseQuantity: quantity * factor,
+      mrpPerBase,
+      taxRate,
+      priceIncludesTax,
+    };
+    assert.equal(aboveMrp(line), server.aboveMrp(line), JSON.stringify(line));
   }
 });

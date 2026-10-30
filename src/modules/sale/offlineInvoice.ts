@@ -39,6 +39,7 @@ export async function buildOfflineSaleDoc(
 
   const profile = await getCachedInvoiceProfile();
   const priceIncludesTax = Boolean(profile?.tax?.priceIncludesTax);
+  const taxEnabled = profile?.tax?.enabled !== false;
   const taxType: "intra" | "inter" =
     payload.taxType === "inter" ? "inter" : "intra";
 
@@ -70,7 +71,11 @@ export async function buildOfflineSaleDoc(
     });
   }
 
-  const priced = priceSaleLocally(inputs, { priceIncludesTax, taxType });
+  const priced = priceSaleLocally(inputs, {
+    priceIncludesTax,
+    taxType,
+    taxEnabled,
+  });
   const customer = payload.customerId
     ? localCatalog.customerById(payload.customerId)
     : undefined;

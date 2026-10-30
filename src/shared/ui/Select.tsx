@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   View,
   Pressable,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { ChevronDown, Check, Plus, X, Search } from "lucide-react-native";
 import { palette, radius, outline, shadows, layout } from "../designSystem";
@@ -16,6 +17,8 @@ import { useControlHeight } from "./useBreakpoint";
 export interface SelectOption {
   value: string;
   label: string;
+  /** Shown on the closed field when `compact` leaves no room for `label`. */
+  short?: string;
 }
 
 interface Props {
@@ -54,6 +57,8 @@ interface Props {
   error?: string;
   /** Helper text shown when there's no error. */
   hint?: string;
+  /** A short field for a table cell: tighter, and shows the option's `short`. */
+  compact?: boolean;
 }
 
 // Never render more than this at once: a 100k-option list would lock the UI.
@@ -77,6 +82,7 @@ export function Select({
   createNoun = "item",
   error,
   hint,
+  compact,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -84,11 +90,18 @@ export function Select({
   const [query, setQuery] = useState("");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const controlHeight = useControlHeight();
+  const trigger = useRef<View>(null);
+  const searchId = useId();
+  /** Row the arrow keys are on. -1 until they are used. */
+  const [cursor, setCursor] = useState(-1);
 
   const selected = options.find((o) => o.value === value);
   // Fall back to a caller-supplied label so a selected item still shows even
   // when it isn't in the current (searched/paged) option window.
-  const shownLabel = selected?.label || (value ? selectedLabel : undefined);
+  const shownLabel =
+    (compact && selected?.short) ||
+    selected?.label ||
+    (value ? selectedLabel : undefined);
 
   // Search once the list is long enough to be annoying, or when asked.
   const showSearch = searchable ?? (Boolean(onSearch) || options.length > 8);
@@ -116,11 +129,54 @@ export function Select({
   const visible = filtered.slice(0, RENDER_CAP);
   const hidden = filtered.length - visible.length;
 
-  const close = () => {
+  const close = (refocus = true) => {
     setOpen(false);
     setQuery("");
+    setCursor(-1);
     onSearch?.("");
+    // Back on the field, or Tab restarts from the top of the page.
+    if (refocus && Platform.OS === "web")
+      setTimeout(() => trigger.current?.focus(), 60);
   };
+
+  const choose = (v: string) => {
+    onChange(v);
+    close();
+  };
+
+  // RN Web's Modal takes focus just after it mounts, past any autoFocus.
+  useEffect(() => {
+    if (!open || !showSearch || Platform.OS !== "web") return;
+    const t = setTimeout(() => document.getElementById(searchId)?.focus(), 60);
+    return () => clearTimeout(t);
+  }, [open, showSearch, searchId]);
+
+  const keys = useRef({ visible, cursor, query, choose });
+  useEffect(() => {
+    keys.current = { visible, cursor, query, choose };
+  });
+  // On the document: a short list has no search box to hold focus.
+  useEffect(() => {
+    if (!open || Platform.OS !== "web") return;
+    const onKey = (e: KeyboardEvent) => {
+      const k = keys.current;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setCursor((c) => Math.min(c + 1, k.visible.length - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setCursor((c) => Math.max(c - 1, 0));
+      } else if (e.key === "Enter") {
+        const row = k.visible[k.cursor >= 0 ? k.cursor : k.query ? 0 : -1];
+        if (!row) return;
+        e.preventDefault();
+        e.stopPropagation();
+        k.choose(row.value);
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [open]);
 
   const create = async () => {
     if (!onCreate || !newLabel.trim()) return;
@@ -143,6 +199,7 @@ export function Select({
         </Text>
       )}
       <Pressable
+        ref={trigger}
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={
@@ -151,11 +208,12 @@ export function Select({
         style={[
           styles.field,
           { minHeight: controlHeight },
+          compact && styles.fieldCompact,
           error ? styles.fieldError : null,
         ]}
       >
         <Text
-          variant="body"
+          variant={compact ? "body-sm" : "body"}
           tone={shownLabel ? "primary" : "tertiary"}
           numberOfLines={1}
           style={{ flex: 1 }}
@@ -163,7 +221,7 @@ export function Select({
           {shownLabel || placeholder}
         </Text>
         <ChevronDown
-          size={18}
+          size={compact ? 14 : 18}
           color={palette.text.tertiary}
           strokeWidth={1.8}
         />
@@ -182,15 +240,15 @@ export function Select({
         visible={open}
         transparent
         animationType="fade"
-        onRequestClose={close}
+        onRequestClose={() => close()}
       >
-        <Pressable style={styles.backdrop} onPress={close}>
+        <Pressable style={styles.backdrop} onPress={() => close()}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
             <View style={styles.sheetHeader}>
               <Text variant="h4" tone="primary">
                 {label || "Select"}
               </Text>
-              <Pressable onPress={close} hitSlop={8}>
+              <Pressable onPress={() => close()} hitSlop={8}>
                 <X size={20} color={palette.text.tertiary} strokeWidth={2} />
               </Pressable>
             </View>
@@ -204,10 +262,15 @@ export function Select({
                 />
                 <View style={{ flex: 1 }}>
                   <TextField
+                    nativeID={searchId}
                     placeholder="Type to search…"
                     value={query}
-                    onChangeText={setQuery}
+                    onChangeText={(t) => {
+                      setQuery(t);
+                      setCursor(-1);
+                    }}
                     autoCapitalize="none"
+                    autoFocus
                   />
                 </View>
                 {loading && <ActivityIndicator color={palette.teal[600]} />}
@@ -228,15 +291,13 @@ export function Select({
                   }}
                 />
               )}
-              {visible.map((o) => (
+              {visible.map((o, i) => (
                 <OptionRow
                   key={o.value}
                   label={o.label}
                   selected={o.value === value}
-                  onPress={() => {
-                    onChange(o.value);
-                    close();
-                  }}
+                  active={i === cursor}
+                  onPress={() => choose(o.value)}
                 />
               ))}
               {!visible.length && !loading && (
@@ -258,7 +319,8 @@ export function Select({
               <Pressable
                 onPress={() => {
                   const q = query.trim();
-                  close();
+                  // A dialog is opening; it takes the focus, not this field.
+                  close(false);
                   onRequestCreate(q);
                 }}
                 accessibilityLabel={`Add a new ${createNoun}`}
@@ -309,10 +371,12 @@ export function Select({
 function OptionRow({
   label,
   selected,
+  active,
   onPress,
 }: {
   label: string;
   selected: boolean;
+  active?: boolean;
   onPress: () => void;
 }) {
   return (
@@ -320,7 +384,7 @@ function OptionRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.optionRow,
-        pressed && { backgroundColor: palette.ink[50] },
+        (pressed || active) && { backgroundColor: palette.ink[50] },
       ]}
     >
       <Text
@@ -347,6 +411,11 @@ const styles = StyleSheet.create({
     borderWidth: outline.width,
     borderColor: outline.color,
     backgroundColor: palette.surface.primary,
+  },
+  fieldCompact: {
+    minHeight: 32,
+    paddingHorizontal: 6,
+    borderRadius: radius.sm,
   },
   fieldError: {
     borderColor: palette.danger.text,

@@ -158,6 +158,8 @@ export interface ReceivePayload {
   supplierId?: string | null;
   supplierName?: string;
   referenceNo?: string;
+  /** Save even though this supplier's bill number already has a GRN. */
+  allowDuplicate?: boolean;
   notes?: string;
   receivedAt?: string;
   /** Intra-state splits GST into CGST+SGST; inter-state charges IGST. */
@@ -182,6 +184,10 @@ export interface ReceiptListItem {
   receivedByName: string;
   totalQuantity: number;
   totalValue: number;
+  /** Bill foot — read through `receiptPayable`. Optional: a list row only has
+   *  them once the backend's list DTO carries them. */
+  grandTotal?: number;
+  netPayable?: number;
   /** A voided GRN had its stock and batch costs reversed; it counts towards
    *  nothing, but stays in the history. */
   status: "active" | "void";

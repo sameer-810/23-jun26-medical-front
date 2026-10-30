@@ -13,6 +13,7 @@ import { useSale, useInvoiceProfile } from "@modules/sale/hooks/useSales";
 import { productApi } from "@modules/product/api/productApi";
 import { GuideModal } from "@modules/sale/components/GuideModal";
 import { guideShareText } from "@modules/sale/guideSlip";
+import { saleStatusLabel } from "@modules/sale/saleStatus";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { printInvoice } from "@modules/sale/invoice";
@@ -136,7 +137,7 @@ export default function SaleDetailScreen() {
   return (
     <Screen
       back="Back to sales"
-      overline={`Invoice · ${sale.status.replace("_", " ")}`}
+      overline={`Invoice · ${saleStatusLabel(sale.status)}`}
       title={sale.invoiceNo}
       subtitle={fmtDateTime(sale.saleDate)}
     >
@@ -226,7 +227,7 @@ export default function SaleDetailScreen() {
           </VStack>
           <VStack gap={6} align="flex-end">
             <StatusChip
-              label={sale.status.replace("_", " ")}
+              label={saleStatusLabel(sale.status)}
               tone={STATUS_TONE[sale.status]}
             />
             <StatusChip label={intra ? "CGST+SGST" : "IGST"} tone="neutral" />

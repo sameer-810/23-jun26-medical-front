@@ -1,9 +1,3 @@
-// The plain "bwip-js" entry resolves to its React Native build, which imports
-// `react-zlib-js` — a peer dependency it doesn't ship. That breaks the Android
-// bundle outright. The /browser entry is the same library minus the PNG/zlib
-// path we never use (we only ever call toSVG), and touches no DOM at import
-// time, so it is safe on native, web and node alike.
-import bwipjs from "bwip-js/browser";
 import {
   printHtml,
   getLabelScale,
@@ -106,6 +100,15 @@ function expMonthYear(expiry: string | null): string {
 async function codeSvgs(
   code: string,
 ): Promise<{ barcode: string; qr: string }> {
+  // Loaded on first use: at 930 KB it was the largest thing in the main bundle,
+  // and only a label print needs it.
+  //
+  // The plain "bwip-js" entry resolves to its React Native build, which imports
+  // `react-zlib-js` — a peer dependency it doesn't ship. That breaks the Android
+  // bundle outright. The /browser entry is the same library minus the PNG/zlib
+  // path we never use (we only ever call toSVG), and touches no DOM at import
+  // time, so it is safe on native, web and node alike.
+  const { default: bwipjs } = await import("bwip-js/browser");
   const [barcode, qr] = await Promise.all([
     bwipjs.toSVG({
       bcid: "code128",

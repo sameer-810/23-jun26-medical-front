@@ -45,6 +45,7 @@ import {
   ErrorState,
 } from "@shared/ui";
 import { fmtMoneyExact, fmtDate } from "@shared/format";
+import { saleStatusLabel } from "@modules/sale/saleStatus";
 
 const money = fmtMoneyExact;
 const STATUS_TONE = {
@@ -232,8 +233,10 @@ export default function CustomerDetailScreen() {
           { label: "Invoices", value: String(sales?.meta?.total ?? 0) },
           { label: "Net purchases", value: money(totalSpent) },
           {
-            label: "Outstanding",
-            value: money(outstanding),
+            // Below zero after a return: the money is the customer's, so the
+            // figure says who owes whom rather than showing a bare minus.
+            label: outstanding < 0 ? "Shop owes customer" : "Outstanding",
+            value: money(Math.abs(outstanding)),
             accent: outstanding > 0 ? accents.red : undefined,
           },
         ]}
@@ -302,7 +305,7 @@ export default function CustomerDetailScreen() {
               right={
                 s.status === "completed" ? undefined : (
                   <StatusChip
-                    label={s.status.replace("_", " ")}
+                    label={saleStatusLabel(s.status)}
                     tone={STATUS_TONE[s.status]}
                   />
                 )

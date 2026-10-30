@@ -18,6 +18,7 @@ import {
 import { productSchema } from "@modules/product/product.validation";
 import { PackUnit, ScheduleDrug } from "@modules/product/types";
 import { apiErrorMessage } from "@api/apiClient";
+import { goBackOr } from "@shared/goBackOr";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { ControlledSelect } from "@shared/form/ControlledSelect";
 import { palette } from "@shared/designSystem";
@@ -138,7 +139,9 @@ export default function ProductFormScreen() {
       prescriptionRequired: f.prescriptionRequired,
       scheduleDrug: f.scheduleDrug as ScheduleDrug,
     };
-    mut.mutate(payload as never, { onSuccess: () => navigation.goBack() });
+    mut.mutate(payload as never, {
+      onSuccess: () => goBackOr(navigation, "ProductsList"),
+    });
   });
 
   const categoryOptions = (categories || []).map((c) => ({
@@ -398,7 +401,9 @@ export default function ProductFormScreen() {
         destructive
         loading={removeMut.isPending}
         onConfirm={() =>
-          removeMut.mutate(id!, { onSuccess: () => navigation.goBack() })
+          removeMut.mutate(id!, {
+            onSuccess: () => goBackOr(navigation, "ProductsList"),
+          })
         }
         onCancel={() => setConfirmOpen(false)}
       />

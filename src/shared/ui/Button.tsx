@@ -2,7 +2,7 @@
  * Button — flat fill, tight radius, no shadow. Variants: primary (brand green),
  * accent (cobalt), secondary (hairline outline), ghost, destructive.
  */
-import React from "react";
+import React, { useRef } from "react";
 import {
   Pressable,
   View,
@@ -22,6 +22,9 @@ import { haptic, type FeedbackTone } from "../touchFeedback";
 import { Text } from "./Text";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/** Presses closer than this are one press with a bouncing finger. */
+const DOUBLE_PRESS_MS = 300;
 
 type Variant = "primary" | "secondary" | "ghost" | "accent" | "destructive";
 type Size = "xs" | "sm" | "md" | "lg";
@@ -117,6 +120,20 @@ export function Button({
   };
 
   /**
+   * A double-click lands inside one render, before `loading` or `disabled` can
+   * reach the button, so a state guard lets both presses through and a Save
+   * creates two records. A ref is the only thing the second press can see.
+   * Controls pressed in a tight loop opt out through `hapticTone="none"`.
+   */
+  const lastPress = useRef(0);
+  const guardedPress = () => {
+    const now = Date.now();
+    if (tone !== "none" && now - lastPress.current < DOUBLE_PRESS_MS) return;
+    lastPress.current = now;
+    onPress?.();
+  };
+
+  /**
    * The disabled dimming lives IN here, not in the style array.
    *
    * Reanimated writes animated styles straight onto the node, so they beat
@@ -134,7 +151,7 @@ export function Button({
   return (
     <View style={[fullWidth ? { alignSelf: "stretch" } : undefined, style]}>
       <AnimatedPressable
-        onPress={onPress}
+        onPress={guardedPress}
         disabled={isDisabled}
         /**
          * Without a role this renders as an anonymous div: a screen reader

@@ -15,6 +15,7 @@ import {
   optionalNumber,
 } from "@modules/admin/admin.validation";
 import { apiErrorMessage } from "@shared/api/apiClient";
+import { goBackOr } from "@shared/goBackOr";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
 import {
@@ -93,7 +94,7 @@ export default function CatalogFormScreen() {
       prescriptionRequired: f.prescriptionRequired,
     };
     const opts = {
-      onSuccess: () => navigation.goBack(),
+      onSuccess: () => goBackOr(navigation, "AdminCatalog"),
       onError: (err: unknown) => setServerError(apiErrorMessage(err)),
     };
     if (editing) updateMut.mutate(body, opts);
@@ -102,7 +103,9 @@ export default function CatalogFormScreen() {
 
   const onDelete = () => {
     if (!id) return;
-    deleteMut.mutate(id, { onSuccess: () => navigation.goBack() });
+    deleteMut.mutate(id, {
+      onSuccess: () => goBackOr(navigation, "AdminCatalog"),
+    });
   };
 
   const busy = createMut.isPending || updateMut.isPending;

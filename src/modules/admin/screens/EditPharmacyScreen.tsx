@@ -7,6 +7,7 @@ import {
   useUpdatePharmacy,
 } from "@modules/admin/hooks/useAdmin";
 import { apiErrorMessage } from "@shared/api/apiClient";
+import { goBackOr } from "@shared/goBackOr";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
 import { Screen, Text, VStack, Card, Button } from "@shared/ui";
@@ -77,7 +78,7 @@ export default function EditPharmacyScreen() {
     // key, so simply editing the phone number must not wipe it.
     if (geminiApiKey.trim()) body.geminiApiKey = geminiApiKey.trim();
     update.mutate(body, {
-      onSuccess: () => navigation.goBack(),
+      onSuccess: () => goBackOr(navigation, "AdminPharmacyDetail", { id }),
       onError: (err) => setServerError(apiErrorMessage(err)),
     });
   });

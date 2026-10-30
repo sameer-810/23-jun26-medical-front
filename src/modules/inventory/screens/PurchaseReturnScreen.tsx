@@ -7,6 +7,7 @@ import { useReceipt } from "@modules/inventory/hooks/useInventory";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import type { PurchaseReturnPayload } from "@modules/inventory/types";
 import { apiErrorMessage } from "@api/apiClient";
+import { goBackOr } from "@shared/goBackOr";
 import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
@@ -43,7 +44,7 @@ export default function PurchaseReturnScreen() {
       qc.invalidateQueries({ queryKey: ["receipt", receiptId] });
       qc.invalidateQueries({ queryKey: ["product-inventory"] });
       qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
-      navigation.goBack();
+      goBackOr(navigation, "ReceiptDetail", { id: receiptId });
     },
     onError: (err) => setServerError(apiErrorMessage(err)),
   });

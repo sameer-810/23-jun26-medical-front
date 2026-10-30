@@ -208,7 +208,10 @@ export const useAuthStore = create<AuthState>()(
             const rejected = status === 401 || status === 403;
             if (rejected) {
               await get().logout();
-              set({ signOutCode: res?.data?.error?.code ?? null });
+              // Not a Sign out press: the login page explains what happened.
+              set({
+                signOutCode: res?.data?.error?.code ?? "SESSION_ENDED",
+              });
             }
             return null;
           } finally {

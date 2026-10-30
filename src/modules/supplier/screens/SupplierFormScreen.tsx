@@ -11,6 +11,7 @@ import {
 } from "@modules/supplier/hooks/useSuppliers";
 import { supplierSchema } from "@modules/supplier/supplier.validation";
 import { apiErrorMessage } from "@api/apiClient";
+import { goBackOr } from "@shared/goBackOr";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
 import { Screen, Text, VStack, HStack, Card, Button } from "@shared/ui";
@@ -66,7 +67,7 @@ export default function SupplierFormScreen() {
         address: clearable(f.address),
         gstin: clearable(f.gstin),
       },
-      { onSuccess: () => navigation.goBack() },
+      { onSuccess: () => goBackOr(navigation, "SuppliersList") },
     ),
   );
 

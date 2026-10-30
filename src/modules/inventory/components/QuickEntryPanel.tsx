@@ -15,6 +15,7 @@ import { View, TextInput, Pressable, StyleSheet } from "react-native";
 import { X, PackagePlus } from "lucide-react-native";
 import { DraftLine, ProductLite } from "@modules/inventory/types";
 import { emptyLine } from "@modules/inventory/receiveDraft";
+import { sanitizeDecimal } from "@shared/numericInput";
 import { palette, radius } from "@shared/designSystem";
 import { Text, VStack, HStack, Button, Select } from "@shared/ui";
 
@@ -114,7 +115,7 @@ function Form({
       <TextInput
         ref={ref}
         value={value}
-        onChangeText={set}
+        onChangeText={(v) => set(opts.numeric ? sanitizeDecimal(v) : v)}
         placeholder={opts.placeholder}
         placeholderTextColor={palette.text.tertiary}
         keyboardType={opts.numeric ? "decimal-pad" : "default"}

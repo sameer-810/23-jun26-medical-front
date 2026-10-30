@@ -106,6 +106,7 @@ export default function PdcScreen() {
   const [filter, setFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [triedSave, setTriedSave] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   // Cleared is terminal — the row loses its actions and its Delete. Ask first,
   // the way deleting and receiving already do.
@@ -176,8 +177,23 @@ export default function PdcScreen() {
   const set = (k: keyof typeof form, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  // Only these two are required (as on the server). Errors stay quiet until the
+  // first Save, then track the fields as they are corrected.
+  const amountError =
+    triedSave && !(Number(form.amount) > 0)
+      ? "Enter the amount on the cheque"
+      : undefined;
+  const dateError =
+    triedSave && !form.chequeDate ? "Pick the cheque date" : undefined;
+
+  const closeForm = () => {
+    setShowForm(false);
+    setTriedSave(false);
+  };
+
   const submit = () => {
     const amount = Number(form.amount);
+    setTriedSave(true);
     if (!(amount > 0) || !form.chequeDate) return;
     createMut.mutate(
       {
@@ -209,7 +225,7 @@ export default function PdcScreen() {
           setForm(emptyForm);
           setPhoto(null);
           setReadResult(null);
-          setShowForm(false);
+          closeForm();
         },
       },
     );
@@ -261,7 +277,7 @@ export default function PdcScreen() {
                   <Plus size={16} color="#FFFFFF" strokeWidth={2} />
                 )
               }
-              onPress={() => setShowForm((s) => !s)}
+              onPress={() => (showForm ? closeForm() : setShowForm(true))}
             />
           </View>
           <View>
@@ -327,7 +343,7 @@ export default function PdcScreen() {
             <HStack gap={10} wrap>
               {readResult.confirm.amount != null ? (
                 <Button
-                  label={`Use amount ₹${readResult.confirm.amount}`}
+                  label={`Use amount ${money(readResult.confirm.amount)}`}
                   variant="secondary"
                   size="sm"
                   fullWidth={false}
@@ -405,6 +421,7 @@ export default function PdcScreen() {
                   value={form.amount}
                   onChangeText={(v) => set("amount", v)}
                   keyboardType="numeric"
+                  error={amountError}
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -412,6 +429,7 @@ export default function PdcScreen() {
                   label="Cheque date"
                   value={form.chequeDate}
                   onChange={(v) => set("chequeDate", v)}
+                  error={dateError}
                 />
               </View>
             </HStack>

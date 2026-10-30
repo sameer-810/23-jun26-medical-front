@@ -494,7 +494,7 @@ export default function SettingsScreen() {
               control={control}
               name="signatureLabel"
               label="Caption under the signature (optional)"
-              placeholder="For Ismail Medical & General Stores"
+              placeholder="For Your Pharmacy Name"
             />
             <Text variant="caption" tone="tertiary">
               PNG or JPG, under 1 MB. Leave empty to print a blank ruled line to

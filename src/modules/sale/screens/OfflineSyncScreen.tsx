@@ -9,7 +9,7 @@
  *    replayed bill. "Resolve" acknowledges; actual counts are corrected
  *    through the ordinary adjustment flow so the ledger stays honest.
  */
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Inbox, PackageCheck, CloudOff } from "lucide-react-native";
 import {
@@ -25,7 +25,7 @@ import {
   HStack,
   VStack,
 } from "@shared/ui";
-import { fmtMoney, fmtDate } from "@shared/format";
+import { fmtMoney, fmtDate, fmtDateTime } from "@shared/format";
 import { apiErrorMessage } from "@api/apiClient";
 import {
   useOfflineStore,
@@ -33,6 +33,8 @@ import {
   OutboxOp,
 } from "@shared/offline/useOfflineStore";
 import { requestSync } from "@shared/offline/outboxEngine";
+import { localCatalog } from "@shared/offline/localCatalog";
+import { useAuthStore } from "@shared/store/useAuthStore";
 import {
   reconciliationApi,
   ReconciliationTask,
@@ -50,6 +52,18 @@ function opTitle(op: OutboxOp) {
 export default function OfflineSyncScreen() {
   const online = useOfflineStore((s) => s.online);
   const ops = useOfflineStore((s) => s.ops);
+  const mirrorError = useOfflineStore((s) => s.mirrorError);
+  const incomplete = useOfflineStore((s) => s.incompleteTables);
+  const lastSyncAt = useOfflineStore((s) => s.lastSyncAt);
+  const orgId = useAuthStore((s) => s.user?.organizationId);
+  const [mirror, setMirror] = useState(() => localCatalog.counts());
+  // After a reload this screen can paint before the mirror has loaded.
+  useEffect(() => {
+    if (!orgId) return;
+    void localCatalog
+      .hydrate(orgId)
+      .then(() => setMirror(localCatalog.counts()));
+  }, [orgId, lastSyncAt]);
   const { pending, failed } = useQueueCounts();
   const retry = useOfflineStore((s) => s.retry);
   const remove = useOfflineStore((s) => s.remove);
@@ -98,8 +112,27 @@ export default function OfflineSyncScreen() {
             ? "Connected — bills sync automatically."
             : "Offline — billing continues; everything below syncs when the connection returns."
         }
-        style={{ marginBottom: 16 }}
+        style={{ marginBottom: mirrorError ? 8 : 16 }}
       />
+      {mirrorError ? (
+        <Banner
+          tone="danger"
+          message={mirrorError}
+          style={{ marginBottom: 16 }}
+        />
+      ) : null}
+      {incomplete.length > 0 ? (
+        <Banner
+          tone="warning"
+          message={`Still downloading ${incomplete.join(", ")}. Stay online until this clears.`}
+          style={{ marginBottom: 16 }}
+        />
+      ) : null}
+      <Text
+        variant="caption"
+        tone="tertiary"
+        style={{ marginBottom: 16 }}
+      >{`Offline copy on this computer: ${mirror.products.toLocaleString("en-IN")} medicines, ${mirror.stock.toLocaleString("en-IN")} stock rows, ${mirror.batches.toLocaleString("en-IN")} batches${lastSyncAt ? ` · synced ${fmtDateTime(lastSyncAt)}` : ""}`}</Text>
 
       <SectionHeader title="This device's queue" count={pending + failed} />
       {ops.length === 0 ? (
@@ -172,7 +205,7 @@ export default function OfflineSyncScreen() {
         <EmptyState
           icon={PackageCheck}
           title="Nothing to recount"
-          message="When an offline bill oversells a batch, the shelf to recount is listed here."
+          message="When an offline bill oversells a batch or breaks a billing rule, what to check is listed here."
         />
       ) : (
         <VStack gap={8}>
@@ -181,16 +214,20 @@ export default function OfflineSyncScreen() {
               <HStack align="center" gap={10}>
                 <VStack gap={2} style={{ flex: 1 }}>
                   <Text variant="label">
-                    {t.productName}
+                    {t.productName || t.invoiceNo || "Offline bill"}
                     {t.batchNumber ? ` · lot ${t.batchNumber}` : ""}
                   </Text>
                   <Text variant="body-sm" tone="secondary">
-                    Sold {t.qtyShort} more than the system had
+                    {t.type === "oversell"
+                      ? `Sold ${t.qtyShort} more than the system had`
+                      : t.detail}
                     {t.invoiceNo ? ` (${t.invoiceNo})` : ""} ·{" "}
                     {fmtDate(t.createdAt)}
                   </Text>
                   <Text variant="body-sm" tone="tertiary">
-                    Count the shelf, correct via Adjustments, then resolve.
+                    {t.type === "oversell"
+                      ? "Count the shelf, correct via Adjustments, then resolve."
+                      : "The sale stands as billed. Check it, then resolve."}
                   </Text>
                 </VStack>
                 <Button

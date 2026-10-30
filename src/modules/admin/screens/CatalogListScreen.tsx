@@ -6,6 +6,7 @@ import { useCatalog, useCatalogStats } from "@modules/admin/hooks/useAdmin";
 import { AdminNav } from "@modules/admin/components/AdminNav";
 import type { CatalogProduct } from "@modules/admin/types";
 import { palette, numeric } from "@shared/designSystem";
+import { fmtMoneyExact } from "@shared/format";
 import {
   Screen,
   Text,
@@ -89,7 +90,7 @@ export default function CatalogListScreen() {
       sortValue: (p) => p.mrp,
       render: (p) => (
         <Text variant="label" weight="600" tone="secondary" style={numeric}>
-          ₹{p.mrp}
+          {fmtMoneyExact(p.mrp)}
         </Text>
       ),
     },
@@ -256,7 +257,7 @@ function CatalogRow({
         </VStack>
         <VStack gap={4} align="flex-end">
           <Text variant="label" weight="600" tone="secondary" style={numeric}>
-            ₹{product.mrp}
+            {fmtMoneyExact(product.mrp)}
           </Text>
           {product.prescriptionRequired ? (
             <StatusChip label="Rx" tone="warning" />

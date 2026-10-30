@@ -1,10 +1,20 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { lazyScreen } from "@navigation/lazyScreen";
+// The till and its offline queue stay in the main bundle: billing must never
+// wait on a chunk, least of all during an outage.
 import NewSaleScreen from "@modules/sale/screens/NewSaleScreen";
-import SalesListScreen from "@modules/sale/screens/SalesListScreen";
-import SaleDetailScreen from "@modules/sale/screens/SaleDetailScreen";
 import OfflineSyncScreen from "@modules/sale/screens/OfflineSyncScreen";
-import RxRegisterScreen from "@modules/sale/screens/RxRegisterScreen";
+
+const SalesListScreen = lazyScreen(
+  () => import("@modules/sale/screens/SalesListScreen"),
+);
+const SaleDetailScreen = lazyScreen(
+  () => import("@modules/sale/screens/SaleDetailScreen"),
+);
+const RxRegisterScreen = lazyScreen(
+  () => import("@modules/sale/screens/RxRegisterScreen"),
+);
 
 export type SaleStackParamList = {
   NewSale: undefined;

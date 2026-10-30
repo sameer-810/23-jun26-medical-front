@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Building2, User, Mail, Phone, Lock } from "lucide-react-native";
 import { useCreatePharmacy } from "@modules/admin/hooks/useAdmin";
 import { apiErrorMessage } from "@shared/api/apiClient";
+import { goBackOr } from "@shared/goBackOr";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
 import { Screen, Text, VStack, Card, Button } from "@shared/ui";
@@ -47,7 +48,7 @@ export default function CreatePharmacyScreen() {
         },
       },
       {
-        onSuccess: () => navigation.goBack(),
+        onSuccess: () => goBackOr(navigation, "AdminDashboard"),
         onError: (err) =>
           setServerError(apiErrorMessage(err, "Could not create pharmacy")),
       },

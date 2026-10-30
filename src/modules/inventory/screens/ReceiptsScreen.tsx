@@ -13,7 +13,13 @@ import { ReceiptListItem } from "@modules/inventory/types";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { downloadBlob } from "@shared/download";
 import { apiErrorMessage } from "@api/apiClient";
-import { fmtDate, fmtMoneyExact } from "@shared/format";
+import { receiptPayable } from "@modules/inventory/receiptPayable";
+import {
+  fmtDate,
+  fmtMoneyExact,
+  fmtNumber,
+  isInvertedRange,
+} from "@shared/format";
 import { palette } from "@shared/designSystem";
 import {
   Screen,
@@ -185,15 +191,15 @@ export default function ReceiptsScreen() {
       ),
     },
     {
-      key: "totalValue",
+      key: "payable",
       header: "Value",
       width: 120,
       align: "right",
       sortable: true,
-      sortValue: (r) => r.totalValue,
+      sortValue: receiptPayable,
       render: (r) => (
         <Text variant="label" tone="primary">
-          {money(r.totalValue)}
+          {money(receiptPayable(r))}
         </Text>
       ),
     },
@@ -246,6 +252,11 @@ export default function ReceiptsScreen() {
               setTo(v);
               setPage(1);
             }}
+            error={
+              isInvertedRange(from, to)
+                ? "Can't be before the From date"
+                : undefined
+            }
             width={150}
           />
           {from || to ? (
@@ -396,8 +407,11 @@ function ReceiptRow({
               label={`${receipt.lineCount} line${receipt.lineCount === 1 ? "" : "s"}`}
               tone="neutral"
             />
-            <StatusChip label={`${receipt.totalQuantity} units`} tone="info" />
-            <StatusChip label={money(receipt.totalValue)} tone="success" />
+            <StatusChip
+              label={`${fmtNumber(receipt.totalQuantity)} unit${receipt.totalQuantity === 1 ? "" : "s"}`}
+              tone="info"
+            />
+            <StatusChip label={money(receiptPayable(receipt))} tone="success" />
           </HStack>
         </VStack>
         <ChevronRight size={18} color={palette.text.tertiary} strokeWidth={2} />

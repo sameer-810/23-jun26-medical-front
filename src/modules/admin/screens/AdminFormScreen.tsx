@@ -10,6 +10,7 @@ import {
   useRemoveAdmin,
 } from "@modules/admin/hooks/useAdmin";
 import { apiErrorMessage } from "@shared/api/apiClient";
+import { goBackOr } from "@shared/goBackOr";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
 import {
@@ -53,7 +54,7 @@ export default function AdminFormScreen() {
   const submit = handleSubmit((f) => {
     setServerError(null);
     const opts = {
-      onSuccess: () => navigation.goBack(),
+      onSuccess: () => goBackOr(navigation, "AdminAdmins"),
       onError: (err: unknown) => setServerError(apiErrorMessage(err)),
     };
     if (editing) {
@@ -79,7 +80,7 @@ export default function AdminFormScreen() {
   const onRemove = () => {
     if (!id) return;
     removeMut.mutate(id, {
-      onSuccess: () => navigation.goBack(),
+      onSuccess: () => goBackOr(navigation, "AdminAdmins"),
       onError: (err) => setServerError(apiErrorMessage(err)),
     });
   };

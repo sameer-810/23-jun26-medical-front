@@ -12,6 +12,7 @@ import {
 } from "@modules/admin/hooks/useAdmin";
 import { planSchema, optionalNumber } from "@modules/admin/admin.validation";
 import { apiErrorMessage } from "@shared/api/apiClient";
+import { goBackOr } from "@shared/goBackOr";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
 import {
@@ -108,7 +109,7 @@ export default function PlanFormScreen() {
         .filter(Boolean),
     };
     const opts = {
-      onSuccess: () => navigation.goBack(),
+      onSuccess: () => goBackOr(navigation, "AdminPlans"),
       onError: (err: unknown) => setServerError(apiErrorMessage(err)),
     };
     if (editing) updateMut.mutate(body, opts);
@@ -117,7 +118,9 @@ export default function PlanFormScreen() {
 
   const onDelete = () => {
     if (!id) return;
-    deleteMut.mutate(id, { onSuccess: () => navigation.goBack() });
+    deleteMut.mutate(id, {
+      onSuccess: () => goBackOr(navigation, "AdminPlans"),
+    });
   };
 
   return (

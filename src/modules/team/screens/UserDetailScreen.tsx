@@ -15,6 +15,7 @@ import {
 } from "@modules/team/hooks/useTeam";
 import { editMemberSchema } from "@modules/team/team.validation";
 import { apiErrorMessage } from "@api/apiClient";
+import { goBackOr } from "@shared/goBackOr";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { normalizePhone } from "@shared/form/fields";
 import { palette, radius } from "@shared/designSystem";
@@ -427,7 +428,7 @@ export default function UserDetailScreen() {
         loading={removeMut.isPending}
         onConfirm={() =>
           removeMut.mutate(id, {
-            onSuccess: () => navigation.goBack(),
+            onSuccess: () => goBackOr(navigation, "TeamList"),
           })
         }
         onCancel={() => setConfirmOpen(false)}

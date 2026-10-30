@@ -1,11 +1,40 @@
-import React from "react";
-import { View, Pressable, StyleSheet, ScrollView, Image } from "react-native";
+import React, { useRef, useState } from "react";
+import {
+  View,
+  Pressable,
+  StyleSheet,
+  ScrollView,
+  Image,
+  Platform,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LogOut, ChevronsLeft, ChevronsRight } from "lucide-react-native";
+import {
+  LogOut,
+  ChevronDown,
+  ChevronsLeft,
+  ChevronsRight,
+} from "lucide-react-native";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { palette, radius, layout } from "@shared/designSystem";
 import { Text, VStack, HStack, Avatar } from "@shared/ui";
 import { NavItem, SECTION_ORDER, useSidebarNavItems } from "./navItems";
+
+/**
+ * Below this window height the full 36px nav no longer fits, so the desktop
+ * sidebar tightens: 32px rows, smaller gaps, a smaller footer. Even that needs
+ * about 930px for an admin's 20 rows, so a shorter window still scrolls — the
+ * tightening puts everything through Reports above the fold at 768px, and the
+ * "more" strip says the rest exists.
+ */
+const TIGHT_BELOW_HEIGHT = 1100;
+
+/** Web only. Windows' default 15px bar takes a sixth of a 240px sidebar. */
+const thinScrollbar =
+  Platform.OS === "web" ? ({ scrollbarWidth: "thin" } as object) : null;
 
 interface Props {
   activeRoute: string;
@@ -29,13 +58,39 @@ export function Sidebar({
   // Same list the navigator registers routes from, minus the `hidden` ones that
   // are opened from a screen rather than browsed to.
   const items = useSidebarNavItems();
+  const { height } = useWindowDimensions();
+  // `onToggleCollapse` marks the desktop shell. The phone drawer keeps its rows:
+  // a thumb, unlike a mouse, can't use a 32px one.
+  const tight = Boolean(onToggleCollapse) && height < TIGHT_BELOW_HEIGHT;
+
+  // Measured, not assumed: scroll bars are invisible on many setups, and without
+  // a cue a row cut off at the fold reads as the end of the list.
+  const scrollRef = useRef<ScrollView>(null);
+  const metrics = useRef({ view: 0, content: 0, y: 0 });
+  const [moreBelow, setMoreBelow] = useState(false);
+  const syncMore = () => {
+    const { view, content, y } = metrics.current;
+    setMoreBelow(content - view - y > 8);
+  };
+  const onNavLayout = (e: LayoutChangeEvent) => {
+    metrics.current.view = e.nativeEvent.layout.height;
+    syncMore();
+  };
+  const onNavScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    metrics.current.y = e.nativeEvent.contentOffset.y;
+    syncMore();
+  };
+  const scrollDown = () => {
+    const { view, y } = metrics.current;
+    scrollRef.current?.scrollTo({ y: y + view * 0.8, animated: true });
+  };
 
   return (
     <View
       style={[
         styles.wrap,
         {
-          paddingTop: insets.top + 20,
+          paddingTop: insets.top + (tight ? 12 : 20),
           width: collapsed ? layout.sidebarCollapsedWidth : layout.sidebarWidth,
         },
       ]}
@@ -47,7 +102,7 @@ export function Sidebar({
         style={{
           paddingHorizontal: collapsed ? 0 : 20,
           justifyContent: collapsed ? "center" : "flex-start",
-          marginBottom: 20,
+          marginBottom: tight ? 8 : 20,
         }}
       >
         {collapsed ? (
@@ -106,54 +161,84 @@ export function Sidebar({
 
       {/* Nav — grouped into sections so 20+ items read as an information
           architecture, not one long undifferentiated scroll. */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: collapsed ? 10 : 12 }}
-      >
-        {SECTION_ORDER.map((section) => {
-          const group = items.filter((it) => it.section === section);
-          if (group.length === 0) return null;
-          return (
-            <View key={section}>
-              {collapsed ? (
-                <View style={styles.sectionDivider} />
-              ) : (
-                <Text
-                  variant="label-sm"
-                  tone="tertiary"
-                  style={styles.sectionLabel}
-                >
-                  {section.toUpperCase()}
-                </Text>
-              )}
-              {group.map((item) => (
-                <NavRow
-                  key={item.name}
-                  item={item}
-                  active={activeRoute === item.name}
-                  collapsed={collapsed}
-                  onPress={() => onNavigate(item.name)}
-                />
-              ))}
-            </View>
-          );
-        })}
-      </ScrollView>
+      <View style={{ flex: 1 }}>
+        <ScrollView
+          ref={scrollRef}
+          style={[{ flex: 1 }, thinScrollbar]}
+          contentContainerStyle={{ paddingHorizontal: collapsed ? 10 : 12 }}
+          scrollEventThrottle={64}
+          onLayout={onNavLayout}
+          onScroll={onNavScroll}
+          onContentSizeChange={(_, h) => {
+            metrics.current.content = h;
+            syncMore();
+          }}
+        >
+          {SECTION_ORDER.map((section) => {
+            const group = items.filter((it) => it.section === section);
+            if (group.length === 0) return null;
+            return (
+              <View key={section}>
+                {collapsed ? (
+                  <View style={styles.sectionDivider} />
+                ) : (
+                  <Text
+                    variant="label-sm"
+                    tone="tertiary"
+                    style={[
+                      styles.sectionLabel,
+                      tight && styles.sectionLabelTight,
+                    ]}
+                  >
+                    {section.toUpperCase()}
+                  </Text>
+                )}
+                {group.map((item) => (
+                  <NavRow
+                    key={item.name}
+                    item={item}
+                    active={activeRoute === item.name}
+                    collapsed={collapsed}
+                    tight={tight}
+                    onPress={() => onNavigate(item.name)}
+                  />
+                ))}
+              </View>
+            );
+          })}
+        </ScrollView>
+
+        {moreBelow ? (
+          <Pressable
+            onPress={scrollDown}
+            style={styles.moreStrip}
+            accessibilityRole="button"
+            accessibilityLabel="Scroll to more sections"
+          >
+            <ChevronDown
+              size={14}
+              color={palette.text.tertiary}
+              strokeWidth={2}
+            />
+          </Pressable>
+        ) : null}
+      </View>
 
       {/* User footer */}
       <View
         style={[
           styles.footer,
+          tight && styles.footerTight,
           {
-            paddingBottom: insets.bottom + 12,
+            paddingBottom: insets.bottom + (tight ? 10 : 12),
             paddingHorizontal: collapsed ? 0 : 16,
             alignItems: collapsed ? "center" : "stretch",
           },
         ]}
       >
         {collapsed ? (
-          <VStack gap={10} align="center">
-            <Avatar name={user?.fullName || "U"} size={36} />
+          <VStack gap={tight ? 6 : 10} align="center">
+            <Avatar name={user?.fullName || "U"} size={tight ? 32 : 36} />
             <Pressable
               onPress={() => logout()}
               hitSlop={8}
@@ -169,7 +254,7 @@ export function Sidebar({
           </VStack>
         ) : (
           <HStack gap={10} align="center">
-            <Avatar name={user?.fullName || "U"} size={38} />
+            <Avatar name={user?.fullName || "U"} size={tight ? 32 : 38} />
             <VStack gap={1} flex={1}>
               <Text variant="label" tone="primary" numberOfLines={1}>
                 {user?.fullName}
@@ -201,11 +286,13 @@ function NavRow({
   item,
   active,
   collapsed,
+  tight,
   onPress,
 }: {
   item: NavItem;
   active: boolean;
   collapsed: boolean;
+  tight: boolean;
   onPress: () => void;
 }) {
   const Icon = item.icon;
@@ -215,6 +302,7 @@ function NavRow({
       accessibilityLabel={item.label}
       style={({ pressed }) => [
         styles.navRow,
+        tight && styles.navRowTight,
         collapsed && styles.navRowCollapsed,
         active && styles.navRowActive,
         pressed && !active && { backgroundColor: palette.ink[50] },
@@ -295,6 +383,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     marginBottom: 1,
   },
+  navRowTight: { height: 32 },
   navRowCollapsed: {
     justifyContent: "center",
     paddingHorizontal: 0,
@@ -307,6 +396,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     letterSpacing: 0.6,
   },
+  sectionLabelTight: { marginTop: 5, marginBottom: 0 },
   sectionDivider: {
     height: 1,
     backgroundColor: palette.border.subtle,
@@ -317,6 +407,20 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: palette.border.default,
+  },
+  footerTight: { paddingTop: 10 },
+  /** Sits over the fold of the list; solid so a half-clipped row doesn't show. */
+  moreStrip: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: palette.surface.primary,
+    borderTopWidth: 1,
+    borderTopColor: palette.border.subtle,
   },
   logoutBtn: {
     width: 36,

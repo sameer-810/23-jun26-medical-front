@@ -21,7 +21,7 @@ import {
   Skeleton,
   ErrorState,
 } from "@shared/ui";
-import { fmtMoneyExact } from "@shared/format";
+import { fmtCount, fmtMoneyExact } from "@shared/format";
 
 const money = fmtMoneyExact;
 
@@ -121,9 +121,7 @@ export default function SuppliersScreen() {
     <Screen
       overline="Partners"
       title="Suppliers"
-      subtitle={
-        isError ? undefined : `${total.toLocaleString("en-IN")} suppliers`
-      }
+      subtitle={isError ? undefined : fmtCount(total, "supplier")}
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
       right={

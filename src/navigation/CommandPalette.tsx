@@ -218,6 +218,15 @@ export function CommandPalette() {
         }
         return;
       }
+      // F2 is search everywhere. The till's own box answers it when on screen.
+      if (e.key === "F2" && !s.open) {
+        if (document.getElementById("pos-search")?.offsetParent) return;
+        e.preventDefault();
+        setOpen(true);
+        setQuery("");
+        setActive(0);
+        return;
+      }
       if (!s.open) return;
       if (e.key === "Escape") setOpen(false);
       else if (e.key === "ArrowDown") {

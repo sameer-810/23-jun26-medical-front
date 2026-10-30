@@ -1,6 +1,10 @@
 import { useEffect } from "react";
 import { Platform, View } from "react-native";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  QueryKey,
+} from "@tanstack/react-query";
 import { NavigationContainer } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -55,6 +59,31 @@ const queryClient = new QueryClient({
     mutations: { networkMode: "always" },
   },
 });
+
+/**
+ * The default above stays at staleTime 0: stock, prices and bills are read fresh
+ * every time a screen asks, and the till depends on that.
+ *
+ * What's listed here is slow-moving reference data that several screens read, or
+ * a summary that's costly to rebuild on each visit. Each is invalidated by the
+ * mutations that change it on this device, so this only delays a change made on
+ * ANOTHER device, by at most the time shown. Never add stock, products, sales or
+ * ["invoice-profile"] (it prints on bills and no mutation invalidates it).
+ */
+const SLOW_QUERIES: [QueryKey, number][] = [
+  [["categories"], 5 * 60_000],
+  [["brands"], 5 * 60_000],
+  [["warehouses"], 5 * 60_000],
+  [["warehouse-tree"], 5 * 60_000],
+  [["permission-catalogue"], 5 * 60_000],
+  [["team-limits"], 5 * 60_000],
+  [["settings"], 60_000],
+  [["reminder-summary"], 60_000],
+  [["dashboard-summary"], 30_000],
+  [["dashboard", "finance"], 30_000],
+];
+for (const [queryKey, staleTime] of SLOW_QUERIES)
+  queryClient.setQueryDefaults(queryKey, { staleTime });
 
 /**
  * URL <-> route mapping.

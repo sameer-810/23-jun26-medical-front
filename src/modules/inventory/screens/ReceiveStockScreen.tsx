@@ -15,7 +15,11 @@ import {
   QuickEntryPanel,
   QuickEntry,
 } from "@modules/inventory/components/QuickEntryPanel";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import {
+  useIsFocused,
+  useNavigation,
+  useRoute,
+} from "@react-navigation/native";
 import {
   Plus,
   History,
@@ -69,16 +73,17 @@ import {
   gstWarning,
   packChoiceNeeded,
   packLabel,
+  unitCaption,
   toReceiptLines,
   incompleteLines,
   lineAmount,
   billTotals,
-  totalBaseUnits,
   applyProductToLines,
   catalogueRows,
 } from "@modules/inventory/receiveDraft";
-import { apiErrorMessage } from "@api/apiClient";
-import { fmtMoneyExact, fmtAmountExact } from "@shared/format";
+import { apiErrorCode, apiErrorMessage } from "@api/apiClient";
+import { fmtCount, fmtMoneyExact, fmtAmountExact } from "@shared/format";
+import { sanitizeDecimal } from "@shared/numericInput";
 import { palette, radius, layout } from "@shared/designSystem";
 import {
   Screen,
@@ -138,6 +143,8 @@ function expiryInfo(s: string): { state: ExpiryState; days: number } {
 export default function ReceiveStockScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  // The drawer keeps this screen mounted; a scan on another page is not for it.
+  const isFocused = useIsFocused();
   const { width } = useWindowDimensions();
   const wide = width >= layout.wideBreakpoint;
 
@@ -576,7 +583,17 @@ export default function ReceiveStockScreen() {
   };
   // USB scanner anywhere on the page, except inside the scan box (which
   // handles its own Enter) — the same arrangement the till uses.
-  useScanGun((code) => void handleScan(code), { ignoreSelector: "#grn-scan" });
+  useScanGun((code) => void handleScan(code), {
+    enabled: isFocused,
+    ignoreSelector: "#grn-scan",
+  });
+
+  /** Enter in Qty goes back to the search, ready for the next medicine. */
+  const focusAddLine = () => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      document.getElementById("grn-add")?.focus();
+    }
+  };
 
   /** Quick-entry row confirmed → it becomes a GRN line; back to scanning. */
   const commitQuick = (line: DraftLine) => {
@@ -634,12 +651,15 @@ export default function ReceiveStockScreen() {
   // A started row must be complete or the save is blocked — toReceiptLines
   // would otherwise drop it from the GRN.
   const pendingLines = incompleteLines(lines, productsById);
-  const totalBase = totalBaseUnits(lines, productsById);
   const bill = billTotals(lines, taxType);
   const freeUnits = lines.reduce(
     (s, l) => s + (Number(l.freeQuantity) || 0),
     0,
   );
+  // As the bill foots it: QTY plus FREE. Base units mix tablets with tubes, and
+  // the Swastik bill's 42 read as 1220.
+  const billQty =
+    freeUnits + lines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
 
   // Short-expiry gate: warn on lots nearing expiry, block already-expired ones.
   const [confirmShort, setConfirmShort] = useState(false);
@@ -725,12 +745,13 @@ export default function ReceiveStockScreen() {
     !needsShortConfirm &&
     !mut.isPending;
 
-  const submit = () => {
+  const submit = (allowDuplicate = false) => {
     if (!canSubmit) return;
     mut.mutate(
       {
         supplierId,
         referenceNo: referenceNo.trim() || undefined,
+        allowDuplicate: allowDuplicate || undefined,
         taxType,
         paymentMode,
         // Only meaningful on a credit bill; the server clamps it to the total.
@@ -765,7 +786,7 @@ export default function ReceiveStockScreen() {
       title="Purchase"
       subtitle="Enter a supplier bill — batch, expiry, location & cost"
       right={
-        <HStack gap={8}>
+        <HStack gap={8} wrap>
           <Button
             label="Scan bill"
             fullWidth={false}
@@ -877,7 +898,21 @@ export default function ReceiveStockScreen() {
           tone="danger"
           message={apiErrorMessage(mut.error)}
           style={{ marginBottom: 16 }}
-        />
+        >
+          {/* Refused so a bill isn't booked twice, but a supplier can reuse a
+              number, so a genuine repeat still has a way through. */}
+          {apiErrorCode(mut.error) === "DUPLICATE_BILL" ? (
+            <HStack gap={10} wrap style={{ marginTop: 10 }}>
+              <Button
+                label="This is a different bill, save anyway"
+                size="sm"
+                variant="secondary"
+                fullWidth={false}
+                onPress={() => submit(true)}
+              />
+            </HStack>
+          ) : null}
+        </Banner>
       ) : null}
 
       {/* Short-expiry gate: block expired outright, confirm near-expiry. */}
@@ -1061,6 +1096,7 @@ export default function ReceiveStockScreen() {
           // row's own picker does: this one APPENDS lines, for working down a
           // bill without touching each row.
           placeholder="Add a line — search your stock or the catalogue"
+          nativeID="grn-add"
           query={addQuery}
           onQueryChange={setAddQuery}
           items={productItems}
@@ -1196,6 +1232,16 @@ export default function ReceiveStockScreen() {
                         {packLabel(line, p)}
                       </Text>
                     )}
+                    {unitCaption(line, p) ? (
+                      <Text
+                        variant="caption"
+                        tone="tertiary"
+                        numberOfLines={2}
+                        style={{ marginTop: 2 }}
+                      >
+                        {unitCaption(line, p)}
+                      </Text>
+                    ) : null}
                     {line.unitNote ? (
                       <Text
                         variant="caption"
@@ -1244,6 +1290,7 @@ export default function ReceiveStockScreen() {
                     numeric
                     align="center"
                     error={started && !(qtyN > 0)}
+                    onEnter={focusAddLine}
                   />
                   <GrnCell
                     w={COL.free}
@@ -1388,9 +1435,9 @@ export default function ReceiveStockScreen() {
               Total to receive
             </Text>
             <Text variant="caption" tone="tertiary">
-              {lines.filter((l) => l.productId).length} items · {totalBase} base
-              units
-              {freeUnits > 0 ? ` · ${freeUnits} free (scheme)` : ""}
+              {fmtCount(lines.filter((l) => l.productId).length, "item")} · Qty{" "}
+              {billQty}
+              {freeUnits > 0 ? ` (${freeUnits} free)` : ""}
             </Text>
             <HStack gap={6} align="center" style={{ marginTop: 6 }}>
               <Text variant="caption" tone="tertiary">
@@ -1578,7 +1625,7 @@ export default function ReceiveStockScreen() {
           fullWidth={!wide}
           loading={mut.isPending}
           disabled={!canSubmit}
-          onPress={submit}
+          onPress={() => submit()}
         />
       </View>
 
@@ -1712,6 +1759,7 @@ function GrnCell({
   placeholder,
   error,
   warn,
+  onEnter,
 }: {
   w: number;
   value: string;
@@ -1721,12 +1769,15 @@ function GrnCell({
   placeholder?: string;
   error?: boolean;
   warn?: boolean;
+  onEnter?: () => void;
 }) {
   return (
     <TextInput
       value={value}
-      onChangeText={onChangeText}
+      onChangeText={(v) => onChangeText(numeric ? sanitizeDecimal(v) : v)}
       keyboardType={numeric ? "decimal-pad" : "default"}
+      blurOnSubmit={onEnter ? false : undefined}
+      onSubmitEditing={onEnter}
       placeholder={placeholder}
       placeholderTextColor={palette.text.tertiary}
       selectTextOnFocus

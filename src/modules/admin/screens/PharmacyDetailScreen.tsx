@@ -22,6 +22,7 @@ import {
 } from "@modules/admin/hooks/useAdmin";
 import { AdminNav } from "@modules/admin/components/AdminNav";
 import { apiErrorMessage } from "@shared/api/apiClient";
+import { goBackOr } from "@shared/goBackOr";
 import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
@@ -487,7 +488,9 @@ export default function PharmacyDetailScreen() {
               { onSuccess: () => setConfirmAction(null) },
             );
           else if (confirmAction === "archive")
-            archive.mutate(id, { onSuccess: () => navigation.goBack() });
+            archive.mutate(id, {
+              onSuccess: () => goBackOr(navigation, "AdminDashboard"),
+            });
         }}
         onCancel={() => setConfirmAction(null)}
       />

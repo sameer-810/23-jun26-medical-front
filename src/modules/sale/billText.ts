@@ -306,6 +306,9 @@ export function renderBillLines(
       ),
       true,
     );
+    // Without this, Less and Net can't be reconciled by the reader: 1122.50
+    // less 0 is not 1123.00.
+    if (sale.roundOff) line(`Round off: ${money(sale.roundOff)}`);
   } else {
     const intra = sale.taxType === "intra";
     line(

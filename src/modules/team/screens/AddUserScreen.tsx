@@ -11,6 +11,7 @@ import {
 import { addUserSchema } from "@modules/team/team.validation";
 import { normalizePhone } from "@shared/form/fields";
 import { apiErrorMessage } from "@api/apiClient";
+import { goBackOr } from "@shared/goBackOr";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
 import {
@@ -66,7 +67,7 @@ export default function AddUserScreen() {
         roleLabel: roleLabel || undefined,
         permissions,
       },
-      { onSuccess: () => navigation.goBack() },
+      { onSuccess: () => goBackOr(navigation, "TeamList") },
     ),
   );
 

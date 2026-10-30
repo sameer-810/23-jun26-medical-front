@@ -16,7 +16,7 @@ import {
   RxRegisterRow,
 } from "@modules/sale/api/prescriptionApi";
 import { apiErrorMessage } from "@api/apiClient";
-import { fmtDate } from "@shared/format";
+import { businessYmd, fmtDate, todayYmd } from "@shared/format";
 import {
   Screen,
   Text,
@@ -35,10 +35,12 @@ import {
   StatusChip,
 } from "@shared/ui";
 
+// Business dates, not UTC ones: from midnight to 05:30 IST toISOString() is
+// still yesterday, and the default range would leave out the sale just rung up.
 const monthAgo = () => {
   const d = new Date();
   d.setMonth(d.getMonth() - 1);
-  return d.toISOString().slice(0, 10);
+  return businessYmd(d) as string;
 };
 
 function toCsv(rows: RxRegisterRow[]): string {
@@ -84,7 +86,7 @@ function toCsv(rows: RxRegisterRow[]): string {
 
 export default function RxRegisterScreen() {
   const [from, setFrom] = useState(monthAgo());
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  const [to, setTo] = useState(todayYmd());
   const [schedule, setSchedule] = useState<string>("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(100);

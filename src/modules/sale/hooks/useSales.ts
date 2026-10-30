@@ -123,7 +123,10 @@ export const useCreateSale = () => {
     mutationFn: async (payload) => {
       // Stamped before the first attempt, so an online try that dies on the
       // wire and the queued replay of it are the SAME operation to the server.
-      const body = { ...payload, clientOpId: genOpId() };
+      const body = {
+        ...payload,
+        clientOpId: payload.clientOpId || genOpId(),
+      };
       if (useOfflineStore.getState().online) {
         try {
           return await saleApi.create(body);

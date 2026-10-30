@@ -7,7 +7,12 @@ import {
 } from "@modules/reports/hooks/useReports";
 import { ReportType, ReportColumn } from "@modules/reports/api/reportsApi";
 import { apiErrorMessage } from "@api/apiClient";
-import { fmtMoneyExact, fmtDate } from "@shared/format";
+import {
+  fmtMoneyExact,
+  fmtDate,
+  fmtNumber,
+  isInvertedRange,
+} from "@shared/format";
 import { palette, layout } from "@shared/designSystem";
 import {
   Screen,
@@ -21,6 +26,7 @@ import {
   EmptyState,
   DataTable,
   Column,
+  Skeleton,
   useBreakpoint,
 } from "@shared/ui";
 
@@ -69,7 +75,10 @@ const isMoneyStat = (k: string) => MONEY_STAT.test(k) && !COUNT_STAT.test(k);
 function fmt(value: unknown, col: ReportColumn) {
   if (value == null || value === "") return "—";
   if (col.type === "money") return money(Number(value));
-  if (col.type === "number") return String(value);
+  if (col.type === "number") {
+    const n = Number(value);
+    return Number.isFinite(n) ? fmtNumber(n) : String(value);
+  }
   // `toISOString` renders in UTC, so a sale at 00:01 IST printed as the
   // PREVIOUS day — inside a report whose header stated today's range. Dates go
   // through the shared IST formatter, like the rest of the app.
@@ -88,9 +97,13 @@ export default function ReportsScreen() {
 
   const meta = TYPES.find((t) => t.key === type)!;
   const params = { from: from.trim() || undefined, to: to.trim() || undefined };
+  // Not asked for at all: the answer could only be an empty report, which reads
+  // as "no sales in that period" rather than "these dates are the wrong way round".
+  const inverted = meta.timed && isInvertedRange(from, to);
   const { data, isLoading, isError, error, refetch, isRefetching } = useReport(
     type,
     params,
+    { enabled: !inverted },
   );
   const download = useDownloadReport();
 
@@ -131,6 +144,7 @@ export default function ReportsScreen() {
                   value={to}
                   onChange={setTo}
                   maximumDate={new Date()}
+                  error={inverted ? "Can't be before the From date" : undefined}
                 />
               </View>
             </HStack>
@@ -140,6 +154,7 @@ export default function ReportsScreen() {
               label="Export Excel"
               variant="secondary"
               fullWidth={false}
+              disabled={inverted}
               icon={
                 <FileSpreadsheet
                   size={16}
@@ -156,6 +171,7 @@ export default function ReportsScreen() {
               label="Export PDF"
               variant="secondary"
               fullWidth={false}
+              disabled={inverted}
               icon={
                 <FileText
                   size={16}
@@ -187,9 +203,11 @@ export default function ReportsScreen() {
                   {k}
                 </Text>
                 <Text variant="h3" tone="primary">
-                  {typeof v === "number" && isMoneyStat(k)
-                    ? money(v)
-                    : String(v)}
+                  {typeof v !== "number"
+                    ? String(v)
+                    : isMoneyStat(k)
+                      ? money(v)
+                      : fmtNumber(v)}
                 </Text>
               </VStack>
             ))}
@@ -197,8 +215,18 @@ export default function ReportsScreen() {
         </Card>
       )}
 
-      {/* Table */}
-      {isError ? (
+      {/* Table. Each state gets its own branch: the table's empty slot takes
+          one title and one message, so "Loading…" used to arrive with "No
+          records for this report" still attached. */}
+      {inverted ? (
+        <EmptyState
+          icon={BarChart3}
+          title="Check the dates"
+          message="The To date is before the From date. Change either one to run this report."
+        />
+      ) : isLoading ? (
+        <ReportSkeleton />
+      ) : isError ? (
         <EmptyState
           icon={BarChart3}
           title="Couldn't load report"
@@ -212,11 +240,23 @@ export default function ReportsScreen() {
           pageSize={50}
           dense
           emptyIcon={BarChart3}
-          emptyTitle={isLoading ? "Loading…" : "No data"}
+          emptyTitle="No data"
           emptyMessage="No records for this report or date range."
         />
       )}
     </Screen>
+  );
+}
+
+function ReportSkeleton() {
+  return (
+    <Card>
+      <VStack gap={12}>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} height={14} />
+        ))}
+      </VStack>
+    </Card>
   );
 }
 

@@ -116,13 +116,22 @@ export function isMeasurePack(pack?: string | null): boolean {
   return /\d\s*(ML|GM|GMS|G|KG|L|LTR)\b/.test(String(pack || "").toUpperCase());
 }
 
+/** The pack a distributor bills in: the smallest one above a single unit. */
+export function defaultPack(product: ProductLite): string {
+  const packs = (product.packs || []).filter((p) => Number(p.factor) > 1);
+  if (!packs.length) return product.baseUnit;
+  return packs.reduce((a, b) => (Number(b.factor) < Number(a.factor) ? b : a))
+    .unit;
+}
+
 export function unitForBillPack(
   product: ProductLite,
   pack?: string | null,
 ): { unit: string | null; note: string | null } {
   const packs = product.packs || [];
-  // A hand-added row has no bill pack: the base unit is the sensible default.
-  if (!pack) return { unit: product.baseUnit, note: null };
+  // A hand-added row has no bill pack, but the paper in hand still counts packs:
+  // qty 20 at rate 30 is 20 strips, not 20 tablets. The dropdown stays open.
+  if (!pack) return { unit: defaultPack(product), note: null };
 
   const size = parsePackSize(pack);
   // No packs defined: the base unit is the only unit there is. A measure pack
@@ -219,6 +228,18 @@ export function packLabel(line: DraftLine, product?: ProductLite | null) {
   const pack = (product?.packs || []).find((p) => p.unit === line.unit);
   if (pack) return `${pack.factor} ${product?.baseUnit}`;
   return line.unit || product?.baseUnit || "";
+}
+
+/**
+ * Says what the line's numbers count: the quiet difference between 20 strips and
+ * 20 tablets. Null while there is no unit to speak of, or only one it could be.
+ */
+export function unitCaption(line: DraftLine, product?: ProductLite | null) {
+  if (!product || !line.unit || !(product.packs || []).length) return null;
+  const pack = product.packs!.find((p) => p.unit === line.unit);
+  return pack
+    ? `Qty and rate per ${pack.unit} (${pack.factor} ${product.baseUnit})`
+    : `Qty and rate per single ${line.unit}`;
 }
 
 /**
@@ -349,16 +370,6 @@ export function billTotals(
     roundOff: paise(payable - total),
     payable,
   };
-}
-
-export function totalBaseUnits(
-  lines: DraftLine[],
-  byId: Record<string, ProductLite>,
-): number {
-  return lines.reduce(
-    (sum, l) => sum + baseQty(l, l.productId ? byId[l.productId] : null),
-    0,
-  );
 }
 
 /**

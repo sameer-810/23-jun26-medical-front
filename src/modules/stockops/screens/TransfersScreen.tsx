@@ -25,7 +25,7 @@ import {
   EmptyState,
   Banner,
 } from "@shared/ui";
-import { fmtDate } from "@shared/format";
+import { fmtDate, fmtNumber } from "@shared/format";
 
 export default function TransfersScreen() {
   const { data: locations } = useAllLocations();
@@ -56,7 +56,9 @@ export default function TransfersScreen() {
     .map((l) => ({ value: l.id, label: `${l.code} — ${l.name}` }));
 
   const qty = Number(quantity) || 0;
-  const tooMuch = qty > cell.available;
+  // `available` is 0 until a location is picked, which is "not known yet", not
+  // "none left" — so there's nothing to exceed before then.
+  const tooMuch = Boolean(cell.locationId) && qty > cell.available;
   const ready =
     cell.productId &&
     cell.batchId &&
@@ -181,7 +183,10 @@ export default function TransfersScreen() {
                   </Text>
                 </VStack>
                 <VStack gap={4} align="flex-end">
-                  <StatusChip label={`${t.quantity} units`} tone="info" />
+                  <StatusChip
+                    label={`${fmtNumber(t.quantity)} unit${t.quantity === 1 ? "" : "s"}`}
+                    tone="info"
+                  />
                   <Text variant="caption" tone="tertiary">
                     {t.fromLocationCode} → {t.toLocationCode}
                   </Text>

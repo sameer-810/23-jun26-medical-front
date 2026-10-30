@@ -9,6 +9,7 @@ import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { apiErrorMessage } from "@api/apiClient";
 import { palette, radius } from "@shared/designSystem";
+import { fmtMoneyExact } from "@shared/format";
 import {
   Screen,
   Text,
@@ -145,7 +146,7 @@ export default function MedicineDetailScreen() {
                   {m.packLabel ? ` · ${m.packLabel}` : ""}
                 </Text>
                 <HStack gap={6} align="center" style={{ marginTop: 2 }}>
-                  <StatusChip label={`₹${m.mrp}`} tone="success" />
+                  <StatusChip label={fmtMoneyExact(m.mrp)} tone="success" />
                   {m.prescriptionRequired ? (
                     <StatusChip label="Prescription" tone="warning" />
                   ) : null}

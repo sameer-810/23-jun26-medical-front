@@ -1,4 +1,3 @@
-import bwipjs from "bwip-js/browser";
 import type { LabelSpec } from "@modules/inventory/label";
 import {
   LABEL,
@@ -117,6 +116,7 @@ export async function drawLabel(
 
   // --- QR, vertically centred in the band, square always ------------------
   const qrCanvas = document.createElement("canvas");
+  const { default: bwipjs } = await import("bwip-js/browser");
   bwipjs.toCanvas(qrCanvas, { bcid: "qrcode", text: spec.labelCode });
   const qrX = LABEL.pad.left + (LABEL.qr.colMm - LABEL.qr.symbolMm) / 2;
   const qrY = LABEL.pad.top + (band - LABEL.qr.symbolMm) / 2;

@@ -20,6 +20,7 @@ import {
 } from "@modules/supplier/hooks/useSuppliers";
 import { supplierApi } from "@modules/supplier/api/supplierApi";
 import { apiErrorMessage } from "@api/apiClient";
+import { goBackOr } from "@shared/goBackOr";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { palette, accents, numeric } from "@shared/designSystem";
@@ -213,8 +214,8 @@ export default function SupplierDetailScreen() {
             value: money(supplier?.purchases?.value ?? 0),
           },
           {
-            label: "Need to pay",
-            value: money(outstanding),
+            label: outstanding < 0 ? "Supplier owes shop" : "Need to pay",
+            value: money(Math.abs(outstanding)),
             accent: outstanding > 0 ? accents.red : undefined,
           },
         ]}
@@ -224,7 +225,7 @@ export default function SupplierDetailScreen() {
         <Button
           label={
             outstanding > 0
-              ? `Pay supplier (₹${Math.round(outstanding)} due)`
+              ? `Pay supplier (${money(outstanding)} due)`
               : "Pay supplier"
           }
           variant={outstanding > 0 ? "primary" : "secondary"}
@@ -379,7 +380,7 @@ export default function SupplierDetailScreen() {
         title={`Pay ${supplier?.name || "supplier"}`}
         message={
           outstanding > 0
-            ? `Outstanding ₹${Math.round(outstanding)}. Enter the amount paid.`
+            ? `Outstanding ${money(outstanding)}. Enter the amount paid.`
             : "Enter the amount paid to this supplier."
         }
         label="Amount (₹)"
@@ -404,7 +405,9 @@ export default function SupplierDetailScreen() {
         destructive
         loading={removeMut.isPending}
         onConfirm={() =>
-          removeMut.mutate(id, { onSuccess: () => navigation.goBack() })
+          removeMut.mutate(id, {
+            onSuccess: () => goBackOr(navigation, "SuppliersList"),
+          })
         }
         onCancel={() => setRemoveOpen(false)}
       />

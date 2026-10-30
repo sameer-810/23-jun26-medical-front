@@ -34,6 +34,7 @@ import {
 import { ScannedBill, ScannedLine } from "@modules/inventory/types";
 import { apiErrorMessage } from "@api/apiClient";
 import { palette, radius } from "@shared/designSystem";
+import { fmtMoneyExact } from "@shared/format";
 import {
   Screen,
   Text,
@@ -563,7 +564,7 @@ function LineCard({ line }: { line: ScannedLine }) {
           {line.mrp != null && (
             <FieldChip
               label="MRP"
-              value={`₹${line.mrp}`}
+              value={fmtMoneyExact(line.mrp)}
               low={line.fields.mrp.confidence === "low"}
               alt={null}
             />

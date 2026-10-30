@@ -14,7 +14,13 @@ import {
   Modal,
   useWindowDimensions,
 } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import {
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+  useRoute,
+} from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
 import {
   History,
@@ -42,13 +48,18 @@ import {
   isScanSoundMuted,
 } from "@shared/scanFeedback";
 import { useProducts } from "@modules/product/hooks/useProducts";
+import { productApi } from "@modules/product/api/productApi";
 import { inventoryApi } from "@modules/inventory/api/inventoryApi";
 import { AlternativeItem } from "@modules/inventory/types";
 import { useScanGun } from "@shared/useScanGun";
 import { TextField } from "@shared/ui/TextField";
 import { RxGateModal } from "@modules/sale/components/RxGateModal";
 import { NewCustomerDialog } from "@modules/sale/components/NewCustomerDialog";
-import { useOfflineStore } from "@shared/offline/useOfflineStore";
+import { genOpId, useOfflineStore } from "@shared/offline/useOfflineStore";
+import { localCatalog } from "@shared/offline/localCatalog";
+import { aboveMrp, maxUnitPrice, GST_SLABS } from "@shared/offline/pricing";
+import { useAuthStore } from "@shared/store/useAuthStore";
+import { PERMISSIONS } from "@shared/permissions";
 import {
   useCustomers,
   useCreateCustomer,
@@ -59,7 +70,11 @@ import { SaleLineInput, Sale } from "@modules/sale/types";
 import { printInvoice } from "@modules/sale/invoice";
 import { apiErrorMessage } from "@api/apiClient";
 import { fmtMoney, fmtMoneyExact, fmtDate } from "@shared/format";
-import { palette, radius } from "@shared/designSystem";
+import { sanitizeDecimal } from "@shared/numericInput";
+import { draftKey, parseDraft, serializeDraft } from "@modules/sale/saleDraft";
+import { saleBlocker } from "@modules/sale/saleBlocker";
+import { layout, palette, radius } from "@shared/designSystem";
+import { useTabBottomPadding } from "@shared/ui/useBottomPadding";
 import {
   Screen,
   Text,
@@ -154,9 +169,37 @@ const clampWithNote = (
   };
 };
 
+/** The till's search, where the next keystroke belongs after any add. */
+const focusSearch = () => {
+  if (Platform.OS === "web" && typeof document !== "undefined") {
+    document.getElementById("pos-search")?.focus();
+  }
+};
+
+const focusQty = (i: number) => {
+  if (Platform.OS === "web" && typeof document !== "undefined") {
+    document.getElementById(`pos-qty-${i}`)?.focus();
+  }
+};
+
+/** A Modal is up: keys belong to it, not to the till underneath. */
+const modalOpen = () =>
+  typeof document !== "undefined" &&
+  document.querySelector('[aria-modal="true"]') !== null;
+
+interface Availability {
+  available: number | null;
+  lotMrp: number | null;
+  lots: Map<string, number>;
+}
+
 export default function NewSaleScreen() {
   const navigation = useNavigation<any>();
   const { width } = useWindowDimensions();
+  // The drawer keeps this screen mounted behind every other page, so anything
+  // listening on the whole document has to stand down when it isn't showing.
+  const isFocused = useIsFocused();
+  const tabClearance = useTabBottomPadding(0);
   /**
    * Only use the column grid when the medicine name actually has room.
    *
@@ -168,7 +211,8 @@ export default function NewSaleScreen() {
    * 1440, which is the width this was checked at — one step past the damage,
    * while 1366 (the commonest laptop here) sat squarely inside it.
    *
-   * 1400 is the first width that leaves the name ~200px.
+   * The columns are now narrow enough that 1024 leaves the name ~270px and 1366
+   * ~250px, with discount, GST and Remove off the Tab path.
    *
    * Two separate questions, deliberately split. Whether the TOTALS sit beside
    * the cart is about page shape; whether the LINE ITEMS use a column grid is
@@ -178,7 +222,7 @@ export default function NewSaleScreen() {
    * sale.
    */
   const railSide = width >= 1200;
-  const wide = width >= 1400;
+  const wide = width >= 1024;
 
   // What's typed vs what's actually searched. The counter search is the busiest
   // input in the product — undebounced it fired one request per keystroke, and
@@ -223,8 +267,15 @@ export default function NewSaleScreen() {
     customersFetching || customerQuery.trim() !== customerTerm;
   const createCustomer = useCreateCustomer();
   const mut = useCreateSale();
-  const { data: invoiceProfile } = useInvoiceProfile();
+  const { data: invoiceProfile, isFetched: profileSettled } =
+    useInvoiceProfile();
   const priceIncludesTax = invoiceProfile?.tax?.priceIncludesTax ?? false;
+  const taxEnabled = invoiceProfile?.tax?.enabled !== false;
+  // The GST box stays for whoever could correct the product itself, because
+  // rates change and product data goes stale. The server applies the same rule.
+  const canEditGst =
+    useAuthStore((s) => s.hasPermission)(PERMISSIONS.PRODUCTS_MANAGE) &&
+    taxEnabled;
 
   const [customerId, setCustomerId] = useState<string | null>(null);
 
@@ -298,7 +349,8 @@ export default function NewSaleScreen() {
     medicine: string;
   } | null>(null);
   const createReminder = useCreateReminder();
-  const scanBusy = useRef(false);
+  const scanQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const lastScanMiss = useRef<string | null>(null);
   type ProductRow = NonNullable<typeof products>["data"][number];
   type CustomerRow = NonNullable<typeof customers>["data"][number];
   const [knownProducts, setKnownProducts] = useState<
@@ -320,6 +372,7 @@ export default function NewSaleScreen() {
     label: p.name,
     sublabel: p.saltComposition || p.sku,
     right: `${fmtMoneyExact(p.sellingPrice)}/${p.baseUnit}`,
+    codes: [p.sku, p.barcode],
   }));
   const customerOptions = (customers?.data || []).map((c) => ({
     value: c.id,
@@ -365,10 +418,11 @@ export default function NewSaleScreen() {
     const p = productsById[line.productId];
     if (!p) return [{ value: line.baseUnit, label: line.baseUnit }];
     return [
-      { value: p.baseUnit, label: `${p.baseUnit} (base)` },
+      { value: p.baseUnit, label: `${p.baseUnit} (base)`, short: p.baseUnit },
       ...(p.packs || []).map((pk) => ({
         value: pk.unit,
         label: `${pk.unit} (×${pk.factor})`,
+        short: pk.unit,
       })),
     ];
   };
@@ -379,6 +433,26 @@ export default function NewSaleScreen() {
     );
 
   /**
+   * The price a line starts at, already inside the MRP. With GST-exclusive
+   * pricing that means below the MRP by the tax, or the first sale of every
+   * medicine would be refused. A price typed over this is the cashier's call
+   * and gets the error at the box instead.
+   */
+  const seedPrice = (
+    base: number,
+    mrpPerBase: number,
+    factor: number,
+    productRate: number,
+  ) => {
+    const price = Math.round(base * factor * 100) / 100;
+    if (!(mrpPerBase > 0)) return String(price);
+    const rate = taxEnabled ? productRate : 0;
+    return String(
+      Math.min(price, maxUnitPrice(mrpPerBase, factor, rate, priceIncludesTax)),
+    );
+  };
+
+  /**
    * Price for a product in a given unit = base price × that unit's pack factor.
    * The base price is the selling lot's MRP when known, else the product's.
    */
@@ -386,15 +460,21 @@ export default function NewSaleScreen() {
     productId: string,
     unit: string | null,
     lotMrp?: number | null,
+    known?: ProductRow,
   ) => {
-    const p = productsById[productId];
+    const p = known ?? productsById[productId];
     if (!p) return "";
     const factor =
       !unit || unit === p.baseUnit
         ? 1
         : (p.packs || []).find((x) => x.unit === unit)?.factor || 1;
-    const base = lotMrp && lotMrp > 0 ? lotMrp : p.sellingPrice || 0;
-    return String(Math.round(base * factor * 100) / 100);
+    const hasLot = Boolean(lotMrp && lotMrp > 0);
+    return seedPrice(
+      hasLot ? (lotMrp as number) : p.sellingPrice || 0,
+      hasLot ? (lotMrp as number) : p.mrp || 0,
+      factor,
+      p.taxRatePct || 0,
+    );
   };
   const removeLine = (i: number) =>
     setLines((cur) => cur.filter((_, idx) => idx !== i));
@@ -485,51 +565,95 @@ export default function NewSaleScreen() {
               available: alt.available,
               unit: alt.baseUnit,
               unitPrice: String(alt.sellingPrice),
+              lotMrp: null, // the old medicine's lot says nothing about this one
               taxRate: "", // let the server use the substitute's own GST rate
             }
           : l,
       ),
     );
     setSubFor(null);
+    void loadAvailabilityForProduct(alt.productId);
   };
 
   /** How many BASE units of a hand-picked product can actually be sold. */
-  const loadAvailabilityForProduct = async (productId: string) => {
+  const fetchAvailability = async (productId: string) => {
+    let available: number | null = null;
+    let lotMrp: number | null = null;
+    /** Stock of each lot, for lines pinned to one by a scanned label. */
+    const lots = new Map<string, number>();
     try {
       const inv = await inventoryApi.productInventory(productId);
       // The lot FEFO sells first: nearest expiry, unexpired, in stock.
       const first = inv.batches.find((b) => !b.expired && b.onHand > 0);
-      const lotMrp = first?.mrp && first.mrp > 0 ? first.mrp : null;
-      setLines((cur) =>
-        cur.map((l) => {
-          if (l.productId !== productId || l.batchId) return l;
-          // Re-price only a line still on the default price — never over a
-          // price the cashier typed.
-          const untouched =
-            Math.abs(
-              Number(l.unitPrice) -
-                Number(priceForUnit(productId, l.unit, l.lotMrp)),
-            ) < 0.01;
-          return {
-            ...l,
-            available: inv.summary.available,
-            lotMrp,
-            unitPrice:
-              untouched && lotMrp
-                ? priceForUnit(productId, l.unit, lotMrp)
-                : l.unitPrice,
-          };
-        }),
-      );
+      available = inv.summary.available;
+      lotMrp = first?.mrp && first.mrp > 0 ? first.mrp : null;
+      for (const b of inv.batches)
+        lots.set(b.batchId, b.expired ? 0 : b.onHand);
     } catch {
-      // Non-fatal: checkout still refuses to oversell, server-side.
+      // That endpoint needs inventory.view, which a till-only cashier may not
+      // hold; the synced mirror has the same lots. Without either it is still
+      // non-fatal: checkout refuses to oversell, server-side.
+      const first = localCatalog.fefoCandidates(productId)[0];
+      if (!first) return null;
+      available = localCatalog.availableForProduct(productId);
+      lotMrp = first.batch.mrp && first.batch.mrp > 0 ? first.batch.mrp : null;
     }
+    return { available, lotMrp, lots };
   };
 
-  /** Add a product from the search — a fresh FEFO line, or bump if already in. */
-  const addProduct = (id: string) => {
-    const p = productsById[id];
+  /**
+   * Puts fresh stock and the lot's MRP on a product's lines. `known` is for a
+   * product the render's own lookup can't see yet; `was` for one whose price
+   * has moved, since a line "on the default price" means the old default.
+   */
+  const applyAvailability = (
+    productId: string,
+    { available, lotMrp, lots }: Availability,
+    known?: ProductRow,
+    was?: ProductRow,
+  ) =>
+    setLines((cur) =>
+      cur.map((l) => {
+        if (l.productId !== productId) return l;
+        if (l.batchId) {
+          const onHand = lots.get(l.batchId);
+          return onHand == null ? l : { ...l, available: onHand };
+        }
+        // Re-price only a line still on the default price — never over a
+        // price the cashier typed.
+        const untouched =
+          Math.abs(
+            Number(l.unitPrice) -
+              Number(priceForUnit(productId, l.unit, l.lotMrp, was ?? known)),
+          ) < 0.01;
+        return {
+          ...l,
+          available,
+          lotMrp,
+          unitPrice: untouched
+            ? priceForUnit(productId, l.unit, lotMrp, known)
+            : l.unitPrice,
+        };
+      }),
+    );
+
+  const loadAvailabilityForProduct = async (
+    productId: string,
+    known?: ProductRow,
+  ) => {
+    const found = await fetchAvailability(productId);
+    if (found) applyAvailability(productId, found, known);
+  };
+
+  /**
+   * Add a product from the search — a fresh FEFO line, or bump if already in.
+   * `known` carries a row fresh off a scan: this render's lookup predates it, so
+   * reading it there dropped every scanned product outside the first 50.
+   */
+  const addProduct = (id: string, known?: ProductRow) => {
+    const p = known ?? productsById[id];
     if (!p) return;
+    setScanError(null);
     setKnownProducts((cur) => ({ ...cur, [id]: p }));
     setLines((cur) => {
       const idx = cur.findIndex((l) => l.productId === id && !l.batchId);
@@ -552,14 +676,19 @@ export default function NewSaleScreen() {
           available: null,
           unit: p.baseUnit,
           quantity: "1",
-          unitPrice: String(p.sellingPrice),
+          unitPrice: seedPrice(
+            p.sellingPrice,
+            p.mrp || 0,
+            1,
+            p.taxRatePct || 0,
+          ),
           discount: "",
           discountMode: "pct",
           taxRate: String(p.taxRatePct),
         },
       ];
     });
-    void loadAvailabilityForProduct(id);
+    void loadAvailabilityForProduct(id, p);
   };
 
   /**
@@ -567,19 +696,14 @@ export default function NewSaleScreen() {
    * pins the sale to it; a product barcode adds a normal FEFO line. Re-scanning
    * the same lot just bumps its quantity — supermarket-till behaviour.
    */
-  const handleScan = async (raw: string) => {
-    const code = raw.trim();
-    if (!code || scanBusy.current) return;
+  const resolveScan = async (code: string): Promise<boolean> => {
     setScanError(null);
-    scanBusy.current = true;
     try {
       const res = await inventoryApi.scan(code);
       const sp = res.product;
       if (!sp) throw new Error("Nothing matched that code.");
-      setKnownProducts((cur) => ({
-        ...cur,
-        [sp.id]: sp as unknown as ProductRow,
-      }));
+      const row = sp as unknown as ProductRow;
+      setKnownProducts((cur) => ({ ...cur, [sp.id]: row }));
       if (res.kind === "batch" && res.batch) {
         const b = res.batch;
         // A rejection must SOUND different. The scanner gun already beeped
@@ -590,12 +714,12 @@ export default function NewSaleScreen() {
           setScanError(
             `${sp.name} · batch ${b.batchNumber} has EXPIRED — not added.`,
           );
-          return;
+          return true;
         }
         if (res.available <= 0) {
           scanFeedback("error");
           setScanError(`${sp.name} · batch ${b.batchNumber} is out of stock.`);
-          return;
+          return true;
         }
         setLines((cur) => {
           const idx = cur.findIndex((l) => l.batchId === b.id);
@@ -618,7 +742,13 @@ export default function NewSaleScreen() {
               available: res.available,
               unit: sp.baseUnit,
               quantity: "1",
-              unitPrice: String(b.mrp || sp.sellingPrice),
+              lotMrp: b.mrp || null,
+              unitPrice: seedPrice(
+                b.mrp || sp.sellingPrice,
+                b.mrp || sp.mrp || 0,
+                1,
+                sp.taxRatePct || 0,
+              ),
               discount: "",
               discountMode: "pct",
               taxRate: String(sp.taxRatePct),
@@ -629,32 +759,118 @@ export default function NewSaleScreen() {
       } else {
         // Resolved to a product but not a specific lot — FEFO will choose, so
         // it went on the bill, but the cashier didn't pin a batch.
-        addProduct(sp.id);
+        addProduct(sp.id, row);
         scanFeedback("warn");
       }
+      return true;
     } catch (e) {
-      scanFeedback("error");
-      setScanError(apiErrorMessage(e));
-    } finally {
-      scanBusy.current = false;
+      lastScanMiss.current = apiErrorMessage(e);
+      return false;
     }
+  };
+
+  // Latest closure: a queued scan may run long after the render that queued it.
+  const resolveScanRef = useRef(resolveScan);
+  useEffect(() => {
+    resolveScanRef.current = resolveScan;
+  });
+
+  /**
+   * Scans run one at a time, in the order they arrived: a gun fires faster than
+   * /inventory/scan answers, and two lines racing can't merge into one. Resolves
+   * false on a miss, leaving the caller to say so or try something else.
+   */
+  const queueScan = (raw: string): Promise<boolean> => {
+    const code = raw.trim();
+    if (!code) return Promise.resolve(true);
+    const run = scanQueue.current.then(() => resolveScanRef.current(code));
+    scanQueue.current = run;
+    return run;
+  };
+
+  const reportScanMiss = (code: string) => {
+    scanFeedback("error");
+    setScanError(lastScanMiss.current || `Nothing matches "${code}".`);
+  };
+
+  const handleScan = async (raw: string) => {
+    if (!(await queueScan(raw))) reportScanMiss(raw.trim());
   };
 
   // A USB scanner types wherever focus happens to be, so listen page-wide.
   useScanGun((code) => void handleScan(code), {
+    enabled: isFocused,
     ignoreSelector: "#pos-search",
   });
 
+  const factorOf = (l: DraftLine) => {
+    const p = productsById[l.productId];
+    return !l.unit || !p || l.unit === p.baseUnit
+      ? 1
+      : (p.packs || []).find((x) => x.unit === l.unit)?.factor || 1;
+  };
+  /** The line's GST rate as it will bill: the box, else the product's. */
+  const rateOf = (l: DraftLine) => {
+    if (!taxEnabled) return 0;
+    const p = productsById[l.productId];
+    return l.taxRate === "" ? p?.taxRatePct || 0 : Number(l.taxRate) || 0;
+  };
+  /** MRP per base unit: the selling lot's, else the product's. 0 = none known. */
+  const mrpOf = (l: DraftLine) =>
+    l.lotMrp && l.lotMrp > 0 ? l.lotMrp : productsById[l.productId]?.mrp || 0;
+
+  /** What a blank price box bills: the product's price, held to the MRP. */
+  const defaultPrice = (l: DraftLine) => {
+    const factor = factorOf(l);
+    const price = (productsById[l.productId]?.sellingPrice || 0) * factor;
+    const mrp = mrpOf(l);
+    return mrp > 0
+      ? Math.min(price, maxUnitPrice(mrp, factor, rateOf(l), priceIncludesTax))
+      : price;
+  };
+
+  /**
+   * The server's MRP rule, at the box, so a price is refused while it can still
+   * be corrected. Offline this is the ONLY check that can stop it: a queued bill
+   * cannot be refused later.
+   */
+  const mrpIssue = (l: DraftLine): string | null => {
+    const quantity = Number(l.quantity) || 0;
+    const mrp = mrpOf(l);
+    if (!quantity || !(mrp > 0) || l.unitPrice === "") return null;
+    const factor = factorOf(l);
+    const taxRate = rateOf(l);
+    const over = aboveMrp({
+      unitPrice: Number(l.unitPrice) || 0,
+      quantity,
+      baseQuantity: Math.round(quantity * factor * 1000) / 1000,
+      mrpPerBase: mrp,
+      taxRate,
+      priceIncludesTax,
+    });
+    if (!over) return null;
+    const unit = l.unit || l.baseUnit;
+    const max = maxUnitPrice(mrp, factor, taxRate, priceIncludesTax);
+    return `Above MRP ${fmtMoneyExact(mrp * factor)} per ${unit} — the most you can charge is ${fmtMoneyExact(max)}${
+      priceIncludesTax ? "" : " + GST"
+    }.`;
+  };
+
+  /** A changed rate has to be a real slab; the product's own always stands. */
+  const gstIssue = (l: DraftLine): string | null => {
+    if (!canEditGst || l.taxRate === "") return null;
+    const rate = Number(l.taxRate);
+    if (rate === (productsById[l.productId]?.taxRatePct || 0)) return null;
+    return GST_SLABS.includes(rate)
+      ? null
+      : `GST must be ${GST_SLABS.join(", ")} or the product's own rate.`;
+  };
+
   // Client-side preview (tax-exclusive). Backend computes authoritative totals.
   const calc = (l: DraftLine) => {
-    const p = productsById[l.productId];
-    const factor =
-      !l.unit || !p || l.unit === p.baseUnit
-        ? 1
-        : (p.packs || []).find((x) => x.unit === l.unit)?.factor || 1;
     const qty = Number(l.quantity) || 0;
-    const fallback = (p?.sellingPrice || 0) * factor;
-    const unitPrice = l.unitPrice === "" ? fallback : Number(l.unitPrice) || 0;
+    const unitPrice =
+      l.unitPrice === "" ? defaultPrice(l) : Number(l.unitPrice) || 0;
     const gross = unitPrice * qty;
     const discountInput = Number(l.discount) || 0;
     // Same clamp the server applies, so the preview is what gets charged.
@@ -663,7 +879,7 @@ export default function NewSaleScreen() {
         ? (gross * Math.min(Math.max(discountInput, 0), 100)) / 100
         : Math.min(Math.max(discountInput, 0), gross);
     const net = Math.max(gross - discount, 0);
-    const rate = l.taxRate === "" ? p?.taxRatePct || 0 : Number(l.taxRate) || 0;
+    const rate = rateOf(l);
     // Mirror the server: when prices are tax-inclusive, the net already contains
     // the tax; otherwise tax is added on top.
     const taxable = priceIncludesTax ? net / (1 + rate / 100) : net;
@@ -694,6 +910,10 @@ export default function NewSaleScreen() {
   const shortLines = lines
     .map((l, i) => ({ i, issue: stockIssue(l) }))
     .filter((x) => x.issue);
+  const hasPriceIssue = lines.some((l) => mrpIssue(l) || gstIssue(l));
+  // Checked here, offline too: a queued bill can't be refused later, and a
+  // credit sale with no customer is a debt recorded against nobody.
+  const creditNeedsCustomer = paymentMode === "credit" && !customerId;
 
   // Lines with a product but no quantity. They are dropped from the payload, so
   // they block the sale: a row on the counter is either billed or removed.
@@ -755,8 +975,15 @@ export default function NewSaleScreen() {
       batchId: l.batchId || undefined,
       unit: l.unit || undefined,
       quantity: Number(l.quantity),
+      // A blank box normally leaves the price to the server. When the MRP has
+      // already pulled it down, say so: an offline bill replays as charged.
       unitPrice:
-        l.unitPrice === "" ? undefined : Math.max(Number(l.unitPrice) || 0, 0),
+        l.unitPrice === ""
+          ? defaultPrice(l) <
+            (productsById[l.productId]?.sellingPrice || 0) * factorOf(l)
+            ? defaultPrice(l)
+            : undefined
+          : Math.max(Number(l.unitPrice) || 0, 0),
       discountAmount:
         l.discountMode === "amount" && l.discount !== ""
           ? Math.min(Math.max(Number(l.discount) || 0, 0), calc(l).gross)
@@ -795,10 +1022,42 @@ export default function NewSaleScreen() {
   // no longer zero the acknowledgement is stale and must not carry over.
   if (!isFreeSale && ackFreeSale) setAckFreeSale(false);
 
+  const submitLock = useRef(false);
+  /**
+   * One id per bill, held until it succeeds, including across a reload: a retry
+   * after a dropped reply is then the same bill to the server, not a second one.
+   */
+  const [opId, setOpId] = useState(genOpId);
+
+  const user = useAuthStore((s) => s.user);
+  const draftStoreKey = user ? draftKey(user.organizationId, user.id) : null;
+  /** Nothing is saved until the stored draft has been read, or it gets erased. */
+  const [draftChecked, setDraftChecked] = useState(false);
+  const [restoredNote, setRestoredNote] = useState<string | null>(null);
+  /** A restored bill waiting to be re-checked. */
+  const [toRecheck, setToRecheck] = useState<{
+    lines: DraftLine[];
+    products: Record<string, ProductRow>;
+  } | null>(null);
+
+  const resetBill = () => {
+    setLines([]);
+    setCustomerId(null);
+    setDoctorName("");
+    setPrescriptionId(null);
+    setPaymentMode("cash");
+    setRefillDays("");
+    setRestoredNote(null);
+    setOpId(genOpId());
+    if (draftStoreKey) void AsyncStorage.removeItem(draftStoreKey);
+  };
+
   const canSubmit =
     validLines.length > 0 &&
     shortLines.length === 0 &&
     blankQtyLines.length === 0 &&
+    !hasPriceIssue &&
+    !creditNeedsCustomer &&
     (!isFreeSale || ackFreeSale) &&
     !mut.isPending;
   /**
@@ -816,7 +1075,8 @@ export default function NewSaleScreen() {
     .map((p) => p.name);
 
   const submit = (rxOverride?: string | null) => {
-    if (!canSubmit) return;
+    // A ref, not state: two presses inside one render see the same `canSubmit`.
+    if (!canSubmit || submitLock.current) return;
     setQueuedNotice(null);
     // Only a real id counts. Called straight from a button's onPress this
     // receives the press EVENT — a DOM element on web — which must never
@@ -839,8 +1099,10 @@ export default function NewSaleScreen() {
       setRxGateOpen(true);
       return;
     }
+    submitLock.current = true;
     mut.mutate(
       {
+        clientOpId: opId,
         customerId,
         doctorName: doctorName.trim() || undefined,
         prescriptionId: rxId || undefined,
@@ -849,16 +1111,14 @@ export default function NewSaleScreen() {
         lines: validLines,
       },
       {
+        onSettled: () => {
+          submitLock.current = false;
+        },
         onSuccess: (sale) => {
           // The Sales stack keeps this screen mounted, so clear the cart after a
           // sale or the next customer inherits it. `lines`/`validLines` used
           // below are captured render values and stay valid after this reset.
-          setLines([]);
-          setCustomerId(null);
-          setDoctorName("");
-          setPrescriptionId(null);
-          setPaymentMode("cash");
-          setRefillDays("");
+          resetBill();
           /**
            * Captured offline: there is no server sale to open, so stay here,
            * ready for the next customer, and say what was promised — the bill
@@ -872,6 +1132,7 @@ export default function NewSaleScreen() {
                 : "Bill saved offline — it will be numbered and synced when the connection returns.",
             );
             setQueuedSale(sale.printableSale);
+            focusSearch();
             return;
           }
           setQueuedNotice(null);
@@ -918,19 +1179,183 @@ export default function NewSaleScreen() {
     handlersRef.current = { submit, canSubmit };
   });
   useEffect(() => {
+    if (!isFocused) return;
     if (Platform.OS !== "web" || typeof document === "undefined") return;
     const onKey = (e: KeyboardEvent) => {
+      if (modalOpen()) return;
       if (e.key === "F2") {
         e.preventDefault();
-        document.getElementById("pos-search")?.focus();
+        focusSearch();
       } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
+        // Stopped here, or a payment chip with focus takes this Enter as a press.
+        e.stopPropagation();
         if (handlersRef.current.canSubmit) handlersRef.current.submit();
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+    // Capture: Pressable stops the keydown of a focused chip from bubbling.
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [isFocused]);
+
+  // Coming back from an invoice, the next bill starts with the search ready.
+  useFocusEffect(
+    useCallback(() => {
+      const t = setTimeout(focusSearch, 60);
+      return () => clearTimeout(t);
+    }, []),
+  );
+
+  // ---- Unfinished bill -----------------------------------------------------
+  /** Stored prices are a snapshot: bring them and the stock up to date. */
+  const recheckDraft = async (
+    restored: DraftLine[],
+    stored: Record<string, ProductRow>,
+  ) => {
+    const ids = [...new Set(restored.map((l) => l.productId))];
+    const fresh = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          return (await productApi.get(id)) as unknown as ProductRow;
+        } catch (e) {
+          // Deleted since: the line stays, marked unsellable, for a person to
+          // remove. Any other failure keeps the snapshot.
+          const status = (e as { response?: { status?: number } })?.response
+            ?.status;
+          if (status === 404) {
+            setLines((cur) =>
+              cur.map((l) => (l.productId === id ? { ...l, available: 0 } : l)),
+            );
+          }
+          return null;
+        }
+      }),
+    );
+    let repriced = 0;
+    for (const p of fresh) {
+      if (!p) continue;
+      const old = stored[p.id] ?? p;
+      setKnownProducts((cur) => ({ ...cur, [p.id]: p }));
+      const found = await fetchAvailability(p.id);
+      if (!found) continue;
+      // A price the cashier typed stands; only one still on the default moves.
+      repriced += restored.filter(
+        (l) =>
+          l.productId === p.id &&
+          !l.batchId &&
+          Math.abs(
+            Number(l.unitPrice) -
+              Number(priceForUnit(p.id, l.unit, l.lotMrp, old)),
+          ) < 0.01 &&
+          Math.abs(
+            Number(l.unitPrice) -
+              Number(priceForUnit(p.id, l.unit, found.lotMrp, p)),
+          ) >= 0.01,
+      ).length;
+      applyAvailability(p.id, found, p, old);
+    }
+    if (repriced > 0) {
+      setRestoredNote(
+        `Restored unfinished bill · ${repriced} price${repriced === 1 ? "" : "s"} updated`,
+      );
+    }
+  };
+
+  // Read once per signed-in user.
+  useEffect(() => {
+    if (!draftStoreKey || draftChecked) return;
+    let dead = false;
+    void AsyncStorage.getItem(draftStoreKey)
+      .catch(() => null)
+      .then((raw) => {
+        if (dead) return;
+        const d = parseDraft<DraftLine, ProductRow, CustomerRow>(raw);
+        setDraftChecked(true);
+        if (!d) return;
+        setKnownProducts((cur) => ({ ...d.products, ...cur }));
+        if (d.customer) {
+          const c = d.customer;
+          setKnownCustomers((cur) => ({ ...cur, [c.id]: c }));
+        }
+        setCustomerId(d.customerId);
+        setDoctorName(d.doctorName);
+        setPrescriptionId(d.prescriptionId);
+        setTaxType(d.taxType);
+        setPaymentMode(d.paymentMode);
+        setRefillDays(d.refillDays);
+        setOpId(d.opId);
+        setLines(d.lines);
+        setRestoredNote("Restored unfinished bill");
+        setToRecheck({ lines: d.lines, products: d.products });
+      });
+    return () => {
+      dead = true;
+    };
+  }, [draftStoreKey, draftChecked]);
+
+  // Held for the shop's tax settings: priced without them, every restored line
+  // looks hand-typed, because its default comes out ex-GST.
+  useEffect(() => {
+    if (!toRecheck || !profileSettled) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot hand-off
+    setToRecheck(null);
+    void recheckDraft(toRecheck.lines, toRecheck.products);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per restore
+  }, [toRecheck, profileSettled]);
+
+  // Written on every change, not debounced: the refresh that loses a bill gives
+  // no warning, and this is under a kilobyte per line.
+  useEffect(() => {
+    if (!draftStoreKey || !draftChecked) return;
+    if (lines.length === 0) {
+      void AsyncStorage.removeItem(draftStoreKey);
+      return;
+    }
+    const products: Record<string, ProductRow> = {};
+    for (const l of lines) {
+      const p = productsById[l.productId];
+      if (p) products[l.productId] = p;
+    }
+    void AsyncStorage.setItem(
+      draftStoreKey,
+      serializeDraft({
+        opId,
+        lines,
+        products,
+        customerId,
+        customer: selectedCustomer ?? null,
+        doctorName,
+        prescriptionId,
+        taxType,
+        paymentMode,
+        refillDays,
+      }),
+    ).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the bill's own fields
+  }, [
+    lines,
+    customerId,
+    doctorName,
+    prescriptionId,
+    taxType,
+    paymentMode,
+    refillDays,
+    opId,
+    draftStoreKey,
+    draftChecked,
+  ]);
+
+  // The draft survives anything; this only stops a stray Back mid-sale. Electron
+  // skips it, because there a blocked unload closes nothing and asks nothing.
+  const hasItems = lines.length > 0;
+  useEffect(() => {
+    if (!hasItems || Platform.OS !== "web" || typeof window === "undefined")
+      return;
+    if (/Electron/i.test(navigator.userAgent)) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasItems]);
 
   // ---- Sub-renderers -------------------------------------------------------
 
@@ -944,11 +1369,19 @@ export default function NewSaleScreen() {
       items={productItems}
       loading={productsLoading}
       onSelect={(id) => addProduct(id)}
-      onSubmitRaw={(code) => void handleScan(code)}
+      onSubmitRaw={queueScan}
+      onRawMiss={reportScanMiss}
       leading={<Search size={18} color={palette.teal[600]} strokeWidth={2} />}
       emptyText="No medicine matches — try a salt name, or scan the pack"
     />
   );
+
+  /** Enter returns to the search; the arrows walk the column of Qty boxes. */
+  const qtyKeys = (i: number) => ({
+    nativeID: `pos-qty-${i}`,
+    onEnter: focusSearch,
+    onArrow: (dir: 1 | -1) => focusQty(i + dir),
+  });
 
   const cart = (
     <View style={{ marginTop: 14 }}>
@@ -960,7 +1393,7 @@ export default function NewSaleScreen() {
           <HeadCell w={COL.qty} label="QTY" />
           <HeadCell w={COL.unit} label="UNIT" />
           <HeadCell w={COL.price} label="PRICE" />
-          <HeadCell w={COL.disc} label="DISCOUNT" />
+          <HeadCell w={COL.disc} label="DISC" />
           <HeadCell w={COL.gst} label="GST%" />
           <HeadCell w={COL.amount} label="AMOUNT" right />
           <View style={{ width: COL.rm }} />
@@ -991,26 +1424,10 @@ export default function NewSaleScreen() {
                         <Text variant="label" tone="primary" numberOfLines={1}>
                           {line.productName}
                         </Text>
-                        {/* Wraps on purpose. Salt · lot · stock · Substitute ·
-                            ShortBook is more than fits beside a 74px QTY box on
-                            a 1280 laptop, and squeezing them shrank "Out of
-                            stock" to three stacked words running under the
-                            quantity input. A second line is the honest answer. */}
-                        <HStack
-                          gap={6}
-                          align="center"
-                          wrap
-                          style={{ marginTop: 2 }}
-                        >
-                          {line.salt ? (
-                            <Text
-                              variant="caption"
-                              tone="tertiary"
-                              numberOfLines={1}
-                            >
-                              {line.salt}
-                            </Text>
-                          ) : null}
+                        {/* One line, always: a cart that wraps here costs a
+                            whole bill's height. Stock and the two actions come
+                            first; the salt takes what is left and truncates. */}
+                        <HStack gap={6} align="center" style={styles.metaRow}>
                           {line.batchId ? (
                             <View style={styles.lotBadge}>
                               <Text
@@ -1054,6 +1471,7 @@ export default function NewSaleScreen() {
                             <Pressable
                               onPress={() => setSubFor(subFor === i ? null : i)}
                               hitSlop={6}
+                              tabIndex={-1}
                               accessibilityRole="button"
                               accessibilityLabel="Find a same-salt substitute"
                             >
@@ -1078,6 +1496,16 @@ export default function NewSaleScreen() {
                               void addToShortbook(line, shortbookQty(line))
                             }
                           />
+                          {line.salt ? (
+                            <Text
+                              variant="caption"
+                              tone="tertiary"
+                              numberOfLines={1}
+                              style={{ flex: 1, minWidth: 0 }}
+                            >
+                              {line.salt}
+                            </Text>
+                          ) : null}
                         </HStack>
                       </View>
                       <Cell
@@ -1086,9 +1514,12 @@ export default function NewSaleScreen() {
                         onChangeText={(v) => setLine(i, { quantity: v })}
                         error={!!issue}
                         align="center"
+                        label={`Quantity of ${line.productName}`}
+                        {...qtyKeys(i)}
                       />
                       <View style={{ width: COL.unit }}>
                         <Select
+                          compact
                           value={line.unit}
                           options={unitOptions(line)}
                           onChange={(v) =>
@@ -1107,6 +1538,8 @@ export default function NewSaleScreen() {
                         w={COL.price}
                         value={line.unitPrice}
                         onChangeText={(v) => setLine(i, { unitPrice: v })}
+                        error={!!mrpIssue(line)}
+                        label={`Price of ${line.productName}`}
                       />
                       <DiscCell
                         w={COL.disc}
@@ -1115,13 +1548,18 @@ export default function NewSaleScreen() {
                         onValue={(v) => setLine(i, { discount: v })}
                         onMode={(m) => setLine(i, { discountMode: m })}
                         onNote={setClampNote}
+                        offTabPath
                       />
                       <Cell
                         w={COL.gst}
-                        value={line.taxRate}
+                        value={taxEnabled ? line.taxRate : "0"}
                         max={100}
                         onChangeText={(v) => setLine(i, { taxRate: v })}
                         align="center"
+                        error={!!gstIssue(line)}
+                        editable={canEditGst}
+                        offTabPath
+                        label={`GST percent of ${line.productName}`}
                       />
                       <Text
                         variant="label"
@@ -1133,6 +1571,7 @@ export default function NewSaleScreen() {
                       <Pressable
                         onPress={() => removeLine(i)}
                         hitSlop={8}
+                        tabIndex={-1}
                         style={{ width: COL.rm, alignItems: "center" }}
                         accessibilityRole="button"
                         accessibilityLabel={`Remove ${line.productName}`}
@@ -1144,6 +1583,15 @@ export default function NewSaleScreen() {
                         />
                       </Pressable>
                     </HStack>
+                    {mrpIssue(line) || gstIssue(line) ? (
+                      <Text
+                        variant="caption"
+                        tone="danger"
+                        style={{ textAlign: "right", marginTop: 4 }}
+                      >
+                        {mrpIssue(line) || gstIssue(line)}
+                      </Text>
+                    ) : null}
                   </View>
                 ) : (
                   // ---- Narrow: compact line card ----
@@ -1248,6 +1696,7 @@ export default function NewSaleScreen() {
                           onChangeText={(v) => setLine(i, { quantity: v })}
                           error={!!issue}
                           align="center"
+                          {...qtyKeys(i)}
                         />
                       </Field>
                       <Field label="Unit" w={104}>
@@ -1271,6 +1720,7 @@ export default function NewSaleScreen() {
                           w={84}
                           value={line.unitPrice}
                           onChangeText={(v) => setLine(i, { unitPrice: v })}
+                          error={!!mrpIssue(line)}
                         />
                       </Field>
                       <Field label="Disc" w={120}>
@@ -1286,10 +1736,12 @@ export default function NewSaleScreen() {
                       <Field label="GST%" w={56}>
                         <Cell
                           w={56}
-                          value={line.taxRate}
+                          value={taxEnabled ? line.taxRate : "0"}
                           max={100}
                           onChangeText={(v) => setLine(i, { taxRate: v })}
                           align="center"
+                          error={!!gstIssue(line)}
+                          editable={canEditGst}
                         />
                       </Field>
                       <View style={{ flex: 1, alignItems: "flex-end" }}>
@@ -1301,6 +1753,15 @@ export default function NewSaleScreen() {
                         </Text>
                       </View>
                     </HStack>
+                    {mrpIssue(line) || gstIssue(line) ? (
+                      <Text
+                        variant="caption"
+                        tone="danger"
+                        style={{ marginTop: 6 }}
+                      >
+                        {mrpIssue(line) || gstIssue(line)}
+                      </Text>
+                    ) : null}
                   </Card>
                 )}
                 {subFor === i ? (
@@ -1464,6 +1925,12 @@ export default function NewSaleScreen() {
             active={paymentMode}
             onChange={setPaymentMode}
           />
+          {creditNeedsCustomer ? (
+            <Text variant="caption" tone="danger" style={{ marginTop: 6 }}>
+              Credit needs a customer — choose one above, so the amount owed is
+              recorded against them.
+            </Text>
+          ) : null}
         </View>
       </VStack>
     </Card>
@@ -1545,7 +2012,8 @@ export default function NewSaleScreen() {
           </Text>
         </HStack>
         <Text variant="caption" tone="tertiary">
-          {qtyCount} unit{qtyCount === 1 ? "" : "s"} · GST-rounded on the server
+          {qtyCount} unit{qtyCount === 1 ? "" : "s"} · final GST is worked out
+          when the bill is saved
         </Text>
       </VStack>
     </Card>
@@ -1555,13 +2023,6 @@ export default function NewSaleScreen() {
     <View style={railSide ? [styles.rail, stickyStyle] : undefined}>
       {configCard}
       {totalsCard}
-      {scanError ? (
-        <Banner
-          tone="warning"
-          message={scanError}
-          style={{ marginBottom: 12 }}
-        />
-      ) : null}
       {shortbookNote ? (
         <Banner
           tone="info"
@@ -1598,49 +2059,6 @@ export default function NewSaleScreen() {
       ) : null}
       {clampNote ? (
         <Banner tone="info" message={clampNote} style={{ marginBottom: 12 }} />
-      ) : null}
-      {isFreeSale ? (
-        <Banner
-          tone="warning"
-          title="This bill charges nothing"
-          style={{ marginBottom: 12 }}
-        >
-          <Text variant="caption" tone="warning">
-            The discount takes the total to ₹0. The stock still leaves the shelf
-            — confirm this is intended.
-          </Text>
-          <Pressable
-            onPress={() => setAckFreeSale((v) => !v)}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: ackFreeSale }}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              marginTop: 8,
-            }}
-          >
-            <View
-              style={[
-                freeSaleBox,
-                ackFreeSale && {
-                  backgroundColor: palette.warning.text,
-                  borderColor: palette.warning.text,
-                },
-              ]}
-            />
-            <Text variant="label-sm" tone="warning">
-              Give these items free
-            </Text>
-          </Pressable>
-        </Banner>
-      ) : null}
-      {mut.isError ? (
-        <Banner
-          tone="danger"
-          message={apiErrorMessage(mut.error)}
-          style={{ marginBottom: 12 }}
-        />
       ) : null}
       <RxGateModal
         visible={rxGateOpen}
@@ -1684,22 +2102,86 @@ export default function NewSaleScreen() {
           ) : null}
         </Banner>
       ) : null}
-      <Button
-        label={
-          grand > 0 ? `Complete sale · ${fmtMoney(grand)}` : "Complete sale"
-        }
-        size="lg"
-        loading={mut.isPending}
-        disabled={!canSubmit}
-        onPress={() => submit()}
-        icon={<ShoppingCart size={18} color="#FFFFFF" strokeWidth={2} />}
-      />
+    </View>
+  );
+
+  /** First reason the bill can't go, in plain words, beside the button. */
+  const blocker = saleBlocker({
+    itemCount: lines.length,
+    blankQtyName: blankQtyLines[0]?.name,
+    shortName: shortLines[0] ? lines[shortLines[0].i].productName : null,
+    priceIssue: lines.map((l) => mrpIssue(l) || gstIssue(l)).find(Boolean),
+    creditNeedsCustomer,
+  });
+
+  /**
+   * Pinned below the page, because the rail is taller than a 768px screen: with
+   * one item in the cart Complete sale sat under the fold, and its errors above
+   * it were off-screen too. The total, the reason and the button are always here.
+   */
+  const footer = (
+    <View
+      style={[
+        styles.footer,
+        // The phone's tab bar floats over the bottom of the screen.
+        width < layout.wideBreakpoint && { paddingBottom: tabClearance },
+      ]}
+    >
+      <View style={{ flex: 1, minWidth: 0 }}>
+        {blocker ? (
+          <Text variant="caption" tone="danger" numberOfLines={2}>
+            {blocker}
+          </Text>
+        ) : isFreeSale ? (
+          <Pressable
+            onPress={() => setAckFreeSale((v) => !v)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: ackFreeSale }}
+            style={styles.freeAck}
+          >
+            <View
+              style={[
+                freeSaleBox,
+                ackFreeSale && {
+                  backgroundColor: palette.warning.text,
+                  borderColor: palette.warning.text,
+                },
+              ]}
+            />
+            <Text variant="caption" tone="warning" style={{ flex: 1 }}>
+              This bill charges nothing and the stock still leaves the shelf.
+              Give these items free
+            </Text>
+          </Pressable>
+        ) : mut.isError ? (
+          <Text variant="caption" tone="danger" numberOfLines={2}>
+            {apiErrorMessage(mut.error)}
+          </Text>
+        ) : null}
+      </View>
       {wide ? (
-        <HStack gap={8} justify="center" style={{ marginTop: 12 }}>
+        <HStack gap={12} align="center">
           <KeyHint k="F2" label="Search" />
           <KeyHint k="Ctrl ↵" label="Complete" />
         </HStack>
       ) : null}
+      <VStack gap={0} style={{ alignItems: "flex-end" }}>
+        <Text variant="caption" tone="tertiary">
+          To pay
+        </Text>
+        <Text variant="label-lg" tone="accent">
+          {fmtMoney(grand)}
+        </Text>
+      </VStack>
+      <Button
+        label="Complete sale"
+        size="md"
+        fullWidth={false}
+        loading={mut.isPending}
+        disabled={!canSubmit}
+        onPress={() => submit()}
+        icon={<ShoppingCart size={16} color="#FFFFFF" strokeWidth={2} />}
+      />
     </View>
   );
 
@@ -1708,6 +2190,7 @@ export default function NewSaleScreen() {
       overline="Sales"
       title="New sale"
       subtitle="Scan or search · FEFO auto-picks nearest-expiry batches"
+      overlay={footer}
       right={
         /* Wraps because these four do not fit one phone-width line: unwrapped,
            the last button sat past the right edge and the whole billing screen
@@ -1790,7 +2273,32 @@ export default function NewSaleScreen() {
         }}
       >
         <View style={{ flex: 1, minWidth: 0, width: "100%" }}>
-          {addBar}
+          {/* Sticks, so a long bill can't scroll the box the gun types into. */}
+          <View style={[styles.searchBar, searchStickyStyle]}>
+            {addBar}
+            {scanError ? (
+              <Text variant="caption" tone="danger" style={{ marginTop: 4 }}>
+                {scanError}
+              </Text>
+            ) : null}
+            {restoredNote ? (
+              <HStack gap={6} align="center" style={{ marginTop: 4 }}>
+                <Text variant="caption" tone="tertiary">
+                  {restoredNote} ·
+                </Text>
+                <Pressable
+                  onPress={resetBill}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear the restored bill"
+                >
+                  <Text variant="caption" tone="link">
+                    Clear
+                  </Text>
+                </Pressable>
+              </HStack>
+            ) : null}
+          </View>
           {cart}
           {lines.length > 0 ? (
             <HStack gap={6} align="center" style={{ marginTop: 12 }}>
@@ -1917,6 +2425,7 @@ function ShortbookChip({
       onPress={onPress}
       disabled={busy}
       hitSlop={6}
+      tabIndex={-1}
       accessibilityRole="button"
       accessibilityLabel="Add to ShortBook"
     >
@@ -2017,17 +2526,17 @@ function SubstitutePanel({
 
 /**
  * Fixed widths for everything except the medicine name, which takes the rest.
- * Trimmed from 588 to 552 total so the name keeps a workable share on a 1400px
- * laptop — the columns below hold short numbers and were sized generously.
+ * Sized to what these hold, so one row fits a 1366 screen beside the totals rail
+ * and still leaves the name around 250px.
  */
 const COL = {
-  qty: 60,
-  unit: 84,
-  price: 82,
-  disc: 104,
-  gst: 52,
-  amount: 84,
-  rm: 30,
+  qty: 52,
+  unit: 86,
+  price: 68,
+  disc: 62,
+  gst: 44,
+  amount: 76,
+  rm: 22,
 };
 
 function HeadCell({
@@ -2057,6 +2566,12 @@ function Cell({
   align = "left",
   error,
   max = Number.MAX_SAFE_INTEGER,
+  editable = true,
+  offTabPath,
+  label,
+  nativeID,
+  onEnter,
+  onArrow,
 }: {
   w: number;
   value: string;
@@ -2065,16 +2580,43 @@ function Cell({
   error?: boolean;
   /** Server-side ceiling for this field; negatives are always refused. */
   max?: number;
+  editable?: boolean;
+  /** Stays clickable, but Tab passes over it: qty, unit, price, next line. */
+  offTabPath?: boolean;
+  label?: string;
+  nativeID?: string;
+  onEnter?: () => void;
+  onArrow?: (dir: 1 | -1) => void;
 }) {
   return (
     <TextInput
+      nativeID={nativeID}
       value={value}
-      onChangeText={(v) => onChangeText(clampInput(v, max))}
+      onChangeText={(v) => onChangeText(clampInput(sanitizeDecimal(v), max))}
       keyboardType="decimal-pad"
       selectTextOnFocus
+      editable={editable}
+      focusable={offTabPath ? false : undefined}
+      accessibilityLabel={label}
+      blurOnSubmit={onEnter ? false : undefined}
+      onKeyPress={(e) => {
+        const { key, ctrlKey } = e.nativeEvent as unknown as {
+          key: string;
+          ctrlKey?: boolean;
+        };
+        if (key === "Enter" && !ctrlKey) onEnter?.();
+        else if (onArrow && (key === "ArrowDown" || key === "ArrowUp")) {
+          e.preventDefault();
+          onArrow(key === "ArrowDown" ? 1 : -1);
+        }
+      }}
       style={[
         styles.cell,
         { width: w, textAlign: align },
+        !editable && {
+          color: palette.text.tertiary,
+          backgroundColor: palette.ink[50],
+        },
         error && {
           borderColor: palette.danger.text,
           backgroundColor: palette.danger.bg,
@@ -2103,6 +2645,7 @@ function DiscCell({
   onValue,
   onMode,
   onNote,
+  offTabPath,
 }: {
   w: number;
   line: DraftLine;
@@ -2112,6 +2655,7 @@ function DiscCell({
   onMode: (m: "amount" | "pct") => void;
   /** Reports a rewritten value so the screen can say what it changed. */
   onNote: (note: string | null) => void;
+  offTabPath?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pick = (pct: number) => {
@@ -2125,7 +2669,7 @@ function DiscCell({
       <TextInput
         value={line.discount}
         onChangeText={(v) => {
-          const r = clampWithNote(v, 100, "Discount %");
+          const r = clampWithNote(sanitizeDecimal(v), 100, "Discount %");
           onValue(r.value);
           onNote(r.note);
           if (line.discountMode !== "pct") onMode("pct");
@@ -2134,6 +2678,7 @@ function DiscCell({
         placeholder="0"
         placeholderTextColor={palette.text.tertiary}
         selectTextOnFocus
+        focusable={offTabPath ? false : undefined}
         accessibilityLabel="Discount percent"
         // @ts-expect-error web-only outline reset
         style={[styles.discInput, { outlineStyle: "none" }]}
@@ -2141,6 +2686,7 @@ function DiscCell({
       <Pressable
         onPress={() => setOpen(true)}
         style={styles.discPick}
+        tabIndex={offTabPath ? -1 : undefined}
         accessibilityRole="button"
         accessibilityLabel="Choose a discount"
       >
@@ -2244,18 +2790,38 @@ function Row({
 
 const stickyStyle =
   Platform.OS === "web" ? ({ position: "sticky", top: 8 } as never) : undefined;
+const searchStickyStyle =
+  Platform.OS === "web" ? ({ position: "sticky", top: 0 } as never) : undefined;
 
 const styles = StyleSheet.create({
   rail: {},
+  searchBar: {
+    zIndex: 30,
+    paddingTop: 8,
+    paddingBottom: 6,
+    backgroundColor: palette.surface.secondary,
+  },
+  metaRow: { marginTop: 1, overflow: "hidden" },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: palette.border.default,
+    backgroundColor: palette.surface.primary,
+  },
+  freeAck: { flexDirection: "row", alignItems: "center", gap: 8 },
   gridHead: {
-    paddingHorizontal: 12,
-    paddingBottom: 8,
+    paddingHorizontal: 8,
+    paddingBottom: 4,
     borderBottomWidth: 1,
     borderBottomColor: palette.border.default,
   },
   gridRow: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: radius.sm,
   },
   gridRowAlt: { backgroundColor: palette.ink[50] },
@@ -2275,19 +2841,19 @@ const styles = StyleSheet.create({
     borderTopColor: palette.teal[100],
   },
   cell: {
-    height: 40,
+    height: 32,
     borderWidth: 1,
     borderColor: palette.border.default,
     borderRadius: radius.sm,
-    paddingHorizontal: 8,
-    fontSize: 14,
+    paddingHorizontal: 6,
+    fontSize: 13,
     color: palette.text.primary,
     backgroundColor: palette.surface.primary,
   },
   discWrap: {
     flexDirection: "row",
     alignItems: "center",
-    height: 40,
+    height: 32,
     borderWidth: 1,
     borderColor: palette.border.default,
     borderRadius: radius.sm,
@@ -2299,9 +2865,9 @@ const styles = StyleSheet.create({
     // Without this, react-native-web won't shrink the input below its intrinsic
     // width, pushing the ₹/% toggle past the cell where overflow:hidden clips it.
     minWidth: 0,
-    height: 38,
-    paddingHorizontal: 8,
-    fontSize: 14,
+    height: 30,
+    paddingHorizontal: 4,
+    fontSize: 13,
     color: palette.text.primary,
   },
   discChip: {
@@ -2314,9 +2880,9 @@ const styles = StyleSheet.create({
   discPick: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
-    height: 38,
-    paddingHorizontal: 6,
+    gap: 1,
+    height: 30,
+    paddingHorizontal: 3,
     borderLeftWidth: 1,
     borderLeftColor: palette.border.default,
   },
@@ -2345,14 +2911,14 @@ const styles = StyleSheet.create({
     borderColor: palette.teal[700],
   },
   lotBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 0,
     borderRadius: radius.full,
     backgroundColor: palette.teal[50],
   },
   fefoBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 0,
     borderRadius: radius.full,
     backgroundColor: palette.ink[100],
   },

@@ -15,6 +15,7 @@ import { PackRead, PackBatchMatch } from "@modules/inventory/types";
 import { apiErrorMessage } from "@api/apiClient";
 import { scanFeedback } from "@shared/scanFeedback";
 import { palette, radius } from "@shared/designSystem";
+import { fmtMoneyExact } from "@shared/format";
 import { Text, VStack, HStack, Button, StatusChip } from "@shared/ui";
 
 interface Props {
@@ -202,7 +203,7 @@ export function PackTextScanner({ onPicked, onClose }: Props) {
                   ) : null}
                   {result.read.mrp ? (
                     <StatusChip
-                      label={`MRP ₹${result.read.mrp}`}
+                      label={`MRP ${fmtMoneyExact(result.read.mrp)}`}
                       tone="neutral"
                     />
                   ) : null}

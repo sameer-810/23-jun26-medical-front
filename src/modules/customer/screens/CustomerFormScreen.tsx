@@ -11,6 +11,7 @@ import {
 } from "@modules/customer/hooks/useCustomers";
 import { customerSchema } from "@modules/customer/customer.validation";
 import { apiErrorMessage } from "@api/apiClient";
+import { goBackOr } from "@shared/goBackOr";
 import { ControlledTextField } from "@shared/form/ControlledTextField";
 import { palette, radius } from "@shared/designSystem";
 import { Screen, Text, VStack, HStack, Card, Button } from "@shared/ui";
@@ -60,7 +61,7 @@ export default function CustomerFormScreen() {
         address: clearable(f.address),
         gstin: clearable(f.gstin),
       },
-      { onSuccess: () => navigation.goBack() },
+      { onSuccess: () => goBackOr(navigation, "CustomersList") },
     ),
   );
 

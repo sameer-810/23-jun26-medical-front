@@ -5,6 +5,7 @@ import {
   TextInput,
   ScrollView,
   StyleSheet,
+  Platform,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -20,6 +21,8 @@ import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { apiErrorMessage } from "@api/apiClient";
 import { fmtMoney } from "@shared/format";
+import { sanitizeDecimal } from "@shared/numericInput";
+import { goBackOr } from "@shared/goBackOr";
 import { palette, radius } from "@shared/designSystem";
 import {
   Screen,
@@ -42,6 +45,13 @@ interface Line {
   quantity: string;
   estimatedPrice: string;
 }
+
+/** Enter in Qty goes back to the search, ready for the next medicine. */
+const focusSearch = () => {
+  if (Platform.OS === "web" && typeof document !== "undefined") {
+    document.getElementById("order-search")?.focus();
+  }
+};
 
 export default function OrderFormScreen() {
   const navigation = useNavigation<any>();
@@ -144,7 +154,7 @@ export default function OrderFormScreen() {
       // The list screen stays mounted behind this form and focus-refetch is off
       // globally, so the mutation has to invalidate the list itself.
       qc.invalidateQueries({ queryKey: ["orders"] });
-      navigation.goBack();
+      goBackOr(navigation, "OrdersList");
     },
     onError: (err) => setServerError(apiErrorMessage(err)),
   });
@@ -207,6 +217,7 @@ export default function OrderFormScreen() {
 
       <View style={{ marginBottom: 12, zIndex: 20 }}>
         <Combobox
+          nativeID="order-search"
           placeholder="Search by name or salt (c.paracetamol) to add a line"
           query={search}
           onQueryChange={setSearch}
@@ -278,12 +289,14 @@ export default function OrderFormScreen() {
                       value={l.quantity}
                       onChangeText={(v) => setLine(i, "quantity", v)}
                       align="center"
+                      onEnter={focusSearch}
                     />
                     <PoCell
                       w={POC.price}
                       value={l.estimatedPrice}
                       onChangeText={(v) => setLine(i, "estimatedPrice", v)}
                       align="right"
+                      onEnter={focusSearch}
                     />
                     <Text
                       style={{ width: POC.amount, textAlign: "right" }}
@@ -378,17 +391,21 @@ function PoCell({
   value,
   onChangeText,
   align = "left",
+  onEnter,
 }: {
   w: number;
   value: string;
   onChangeText: (v: string) => void;
   align?: "left" | "center" | "right";
+  onEnter?: () => void;
 }) {
   return (
     <TextInput
       value={value}
-      onChangeText={onChangeText}
+      onChangeText={(v) => onChangeText(sanitizeDecimal(v))}
       keyboardType="decimal-pad"
+      blurOnSubmit={onEnter ? false : undefined}
+      onSubmitEditing={onEnter}
       selectTextOnFocus
       style={[
         pog.cell,

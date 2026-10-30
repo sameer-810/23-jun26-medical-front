@@ -9,6 +9,7 @@ import { Customer } from "@modules/customer/types";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { palette } from "@shared/designSystem";
+import { fmtCount } from "@shared/format";
 import {
   Screen,
   Text,
@@ -149,9 +150,7 @@ export default function CustomersScreen() {
     <Screen
       overline="Partners"
       title="Customers"
-      subtitle={
-        isError ? undefined : `${total.toLocaleString("en-IN")} customers`
-      }
+      subtitle={isError ? undefined : fmtCount(total, "customer")}
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
       right={

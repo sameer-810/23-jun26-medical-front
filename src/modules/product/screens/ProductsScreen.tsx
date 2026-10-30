@@ -16,6 +16,7 @@ import { Medicine } from "@modules/medguide/types";
 import { useAuthStore } from "@shared/store/useAuthStore";
 import { PERMISSIONS } from "@shared/permissions";
 import { palette, radius, layout } from "@shared/designSystem";
+import { fmtCount, fmtMoneyExact } from "@shared/format";
 import {
   Screen,
   Text,
@@ -142,9 +143,7 @@ export default function ProductsScreen() {
       overline="Catalogue"
       title="Products"
       // No count to report when the list didn't load; 0 would be a real figure.
-      subtitle={
-        isError ? undefined : `${total.toLocaleString("en-IN")} products`
-      }
+      subtitle={isError ? undefined : fmtCount(total, "product")}
       refreshing={isRefetching || isLoading}
       onRefresh={refetch}
       right={
@@ -325,7 +324,7 @@ function CatalogRow({
           .filter(Boolean)
           .join(" · ") || "—"
       }
-      value={`₹${medicine.mrp}`}
+      value={fmtMoneyExact(medicine.mrp)}
       valueHint="MRP"
       chevron={false}
       right={
@@ -392,7 +391,7 @@ function ProductRow({
       ]
         .filter(Boolean)
         .join(" · ")}
-      value={`₹${product.sellingPrice}`}
+      value={fmtMoneyExact(product.sellingPrice)}
       valueHint={`per ${product.baseUnit}`}
       right={hasFlags ? flags : undefined}
       onPress={onPress}

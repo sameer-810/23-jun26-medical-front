@@ -57,12 +57,15 @@ interface OfflineState {
   clockSkewMs: number;
   /** Tables whose mirror is known incomplete after the last pull. */
   incompleteTables: string[];
+  /** The last pull could not save to the device; cleared by a clean pull. */
+  mirrorError: string | null;
 
   setOnline: (v: boolean) => void;
   setSyncMeta: (meta: {
     lastSyncAt?: string;
     clockSkewMs?: number;
     incompleteTables?: string[];
+    mirrorError?: string | null;
   }) => void;
   setSeries: (orgId: string, seriesCode: string, serverLastSeq: number) => void;
   /** Claims the next local invoice sequence, or null if unregistered. */
@@ -93,6 +96,7 @@ export const useOfflineStore = create<OfflineState>()(
       lastSyncAt: null,
       clockSkewMs: 0,
       incompleteTables: [],
+      mirrorError: null,
 
       setOnline: (v) => {
         if (get().online !== v) set({ online: v });

@@ -58,7 +58,9 @@ export default function DamagedScreen() {
 
   const qty = Number(quantity) || 0;
   const effectiveDir = type === "correction" ? direction : "out";
-  const tooMuch = effectiveDir === "out" && qty > cell.available;
+  // `available` is 0 until a location is picked: not known yet, not "none left".
+  const tooMuch =
+    effectiveDir === "out" && Boolean(cell.locationId) && qty > cell.available;
   const ready =
     cell.productId && cell.batchId && cell.locationId && qty > 0 && !tooMuch;
 

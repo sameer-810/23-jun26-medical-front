@@ -5,8 +5,9 @@ import { Plus, Receipt, Undo2, ClipboardList } from "lucide-react-native";
 import { useSales } from "@modules/sale/hooks/useSales";
 import { SaleListItem } from "@modules/sale/types";
 import { ScanReturnModal } from "@modules/sale/components/ScanReturnModal";
+import { saleStatusLabel } from "@modules/sale/saleStatus";
 import { layout, palette } from "@shared/designSystem";
-import { fmtInt, fmtMoney, fmtDate } from "@shared/format";
+import { fmtCount, fmtMoney, fmtDate } from "@shared/format";
 import { useDebouncedValue } from "@shared/hooks";
 import {
   Screen,
@@ -135,7 +136,7 @@ export default function SalesListScreen() {
       render: (s) => (
         <HStack gap={8} align="center">
           <StatusChip
-            label={s.status.replace("_", " ")}
+            label={saleStatusLabel(s.status)}
             tone={STATUS_TONE[s.status]}
           />
           {s.paymentMode ? (
@@ -160,7 +161,7 @@ export default function SalesListScreen() {
           </Text>
           {s.totalReturned > 0 ? (
             <Text variant="caption" tone="danger">
-              -{fmtMoney(s.totalReturned)}
+              −{fmtMoney(s.totalReturned)}
             </Text>
           ) : null}
         </VStack>
@@ -173,11 +174,12 @@ export default function SalesListScreen() {
       back="Back to billing"
       overline="Sales"
       title="Invoices"
-      subtitle={isError ? undefined : `${fmtInt(total)} sales`}
+      subtitle={isError ? undefined : fmtCount(total, "sale")}
       refreshing={searching}
       onRefresh={refetch}
       right={
-        <HStack gap={8}>
+        // Wraps: three labelled buttons don't fit a 390px phone on one line.
+        <HStack gap={8} wrap>
           <Button
             label="Rx register"
             size="sm"
@@ -337,7 +339,7 @@ function SaleRow({
       }
       right={
         <StatusChip
-          label={sale.status.replace("_", " ")}
+          label={saleStatusLabel(sale.status)}
           tone={STATUS_TONE[sale.status]}
         />
       }

@@ -25,7 +25,7 @@ import {
 } from "@modules/sale/api/prescriptionApi";
 import { useImageCapture, CapturedImage } from "@shared/useImageCapture";
 import { apiErrorMessage } from "@api/apiClient";
-import { fmtDate } from "@shared/format";
+import { fmtDate, todayYmd } from "@shared/format";
 import { palette, radius, shadows } from "@shared/designSystem";
 import {
   Text,
@@ -56,8 +56,6 @@ interface Props {
   onCancel: () => void;
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
-
 export function RxGateModal({
   visible,
   customerId,
@@ -71,7 +69,7 @@ export function RxGateModal({
   const optional = mode === "optional";
   const [doctor, setDoctor] = useState(initialDoctor || "");
   const [regNo, setRegNo] = useState("");
-  const [date, setDate] = useState(today());
+  const [date, setDate] = useState(todayYmd());
   const [patient, setPatient] = useState(customerName || "");
   const [age, setAge] = useState("");
   const [photo, setPhoto] = useState<CapturedImage | null>(null);

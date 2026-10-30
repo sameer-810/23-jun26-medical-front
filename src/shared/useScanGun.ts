@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
+import { BurstTracker, FLUSH_MS, MIN_CODE_LEN } from "./scanBurst";
 
 /**
  * Listens for a USB barcode scanner anywhere on the screen.
@@ -17,12 +18,24 @@ import { Platform } from "react-native";
  * buffer once the burst goes quiet.
  */
 
-/** Max gap between keystrokes still considered one scanner burst. */
-const BURST_GAP_MS = 50;
-/** Quiet period after which a burst is treated as finished (no Enter suffix). */
-const FLUSH_MS = 120;
-/** Shorter than this is almost certainly a human, not a scan. */
-const MIN_CODE_LEN = 6;
+type TextBox = HTMLInputElement | HTMLTextAreaElement;
+
+const isTextBox = (el: EventTarget | null): el is TextBox =>
+  el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+
+/**
+ * Puts back what a scan typed over. Through the native setter plus an input
+ * event, so React's controlled value moves with it; setting `.value` alone would
+ * be reverted on the next render.
+ */
+function restoreValue(el: TextBox, value: string) {
+  const proto =
+    el instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
 
 export function useScanGun(
   onScan: (code: string) => void,
@@ -39,14 +52,18 @@ export function useScanGun(
     if (!enabled) return;
     if (Platform.OS !== "web" || typeof document === "undefined") return;
 
-    let buffer = "";
-    let lastAt = 0;
+    const burst = new BurstTracker();
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // The field the burst began in and what it held before the first character.
+    let field: TextBox | null = null;
+    let prior = "";
 
     const flush = () => {
-      const code = buffer.trim();
-      buffer = "";
-      if (code.length >= MIN_CODE_LEN) cb.current(code);
+      const code = burst.buffer.trim();
+      burst.reset();
+      if (code.length < MIN_CODE_LEN) return;
+      if (field) restoreValue(field, prior);
+      cb.current(code);
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -60,28 +77,27 @@ export function useScanGun(
         return;
       }
 
-      const now = Date.now();
-      // A slow keystroke means a human started something new: drop the buffer.
-      if (now - lastAt > BURST_GAP_MS) buffer = "";
-      lastAt = now;
-
       if (timer) clearTimeout(timer);
 
       if (e.key === "Enter") {
-        if (buffer.length >= MIN_CODE_LEN) {
+        if (burst.isScan(e.timeStamp)) {
           // Swallow the Enter so it can't also submit some other form.
           e.preventDefault();
           e.stopPropagation();
           flush();
         } else {
-          buffer = "";
+          burst.reset();
         }
         return;
       }
 
       // Printable characters only — modifiers/arrows aren't part of a code.
       if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        buffer += e.key;
+        // Capture phase: this runs before the character reaches the field.
+        if (burst.char(e.key, e.timeStamp)) {
+          field = isTextBox(target) ? target : null;
+          prior = field?.value ?? "";
+        }
         timer = setTimeout(flush, FLUSH_MS);
       }
     };
